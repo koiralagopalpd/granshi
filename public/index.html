@@ -1,1 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101a2c">
+<title>Granshi — My Digital World</title>
+<meta name="description" content="One World. Endless Possibilities.">
+<style>
+:root{--navy:#101a2c;--gold:#e5c77e;--paper:#f6f7fb;--ink:#172033;--muted:#667085}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper)}
+a{text-decoration:none;color:inherit}
+.wrap{width:min(1160px,92%);margin:auto}
+header{position:sticky;top:0;z-index:5;background:#101a2cf5;color:#fff;border-bottom:1px solid #ffffff20;backdrop-filter:blur(8px)}
+.nav{height:72px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:1px}
+.mark{border:2px solid var(--gold);border-radius:13px;width:42px;height:42px;display:grid;place-items:center;color:var(--gold);font-size:22px}
+.brand small{display:block;font-size:10px;color:#c7d0dc;letter-spacing:2px}
+.navlinks{display:flex;gap:22px;font-size:14px}
+.navlinks a:hover{color:var(--gold)}
+.tools{display:flex;gap:8px}
+.tools button,.hamb{border:1px solid #ffffff55;color:#fff;background:#ffffff10;padding:10px 13px;border-radius:10px;cursor:pointer}
+.hamb{display:none}
+.hero{min-height:640px;color:white;position:relative;display:flex;align-items:center;overflow:hidden;background:#101a2c}
+.hero:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#101a2ce8 0%,#101a2cae 43%,#101a2c35 100%),url('/assets-brand.png') center 42%/cover no-repeat;transform:scale(1.08)}
+.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,#101a2c65,transparent 45%)}
+.hero .wrap{position:relative;z-index:1;padding:90px 0}
+.eyebrow{color:var(--gold);font-weight:850;letter-spacing:3px;font-size:12px}
+.hero h1{font-size:clamp(40px,7vw,72px);line-height:1.05;max-width:780px;margin:20px 0}
+.hero h1 span{color:var(--gold)}
+.hero p{font-size:17px;line-height:1.8;color:#e2e7ef;max-width:620px}
+.btn{display:inline-block;margin:18px 10px 0 0;padding:14px 20px;border-radius:12px;font-weight:800;background:linear-gradient(135deg,#f3dfa9,#d8b46a);color:#182235;border:0;cursor:pointer}
+.btn.alt{background:#ffffff12;color:white;border:1px solid #ffffff40}
+.meta{margin-top:28px;font-size:12px;letter-spacing:2px;color:#aab;opacity:.9}
+section{padding:70px 0}
+.head small{color:var(--gold);font-weight:800;letter-spacing:2px;font-size:11px}
+.head h2{margin:8px 0 10px;font-size:clamp(26px,4vw,36px)}
+.head p{color:var(--muted);max-width:560px}
+.search{margin:28px 0 20px;display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e6ef;border-radius:14px;padding:12px 16px;box-shadow:0 4px 20px #101a2c08}
+.search input{border:0;outline:0;flex:1;font:inherit;background:transparent}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+.card{background:#fff;border:1px solid #e6eaf2;border-radius:16px;padding:22px;transition:.2s;display:flex;flex-direction:column;gap:8px}
+.card:hover{transform:translateY(-3px);box-shadow:0 12px 30px #101a2c12;border-color:#d8b46a55}
+.card .ico{font-size:28px}
+.card h3{margin:0;font-size:18px}
+.card p{margin:0;color:var(--muted);font-size:14px;line-height:1.55;flex:1}
+.card a{color:#8a6b2a;font-weight:700;font-size:13px;margin-top:8px}
+.about p{line-height:1.8;color:#334;max-width:720px}
+.contact-box{background:linear-gradient(135deg,#101a2c,#1a2740);color:#fff;border-radius:20px;padding:40px 36px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
+.contact-box h2{margin:8px 0 12px}
+.contact-box p{color:#c7d0dc;line-height:1.7}
+.form label{display:block;font-size:12px;font-weight:700;margin:10px 0 4px;color:#c7d0dc}
+.form input,.form select,.form textarea{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #ffffff30;background:#ffffff12;color:#fff;font:inherit}
+.form textarea{min-height:110px;resize:vertical}
+.form button{margin-top:16px}
+.form .ok{color:#9fdfb0;font-size:14px;margin-top:10px}
+.form .err{color:#f5a8a8;font-size:14px;margin-top:10px}
+footer{background:var(--navy);color:#aab;padding:28px 0;font-size:14px}
+.pages-list a,.shop-list a{display:inline-block;margin:6px 10px 6px 0;padding:8px 14px;background:#fff;border:1px solid #e2e6ef;border-radius:10px;font-size:14px}
+.pages-list a:hover,.shop-list a:hover{border-color:var(--gold)}
+.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:20px}
+.product-card{background:#fff;border:1px solid #e6eaf2;border-radius:14px;overflow:hidden}
+.product-card img{width:100%;height:160px;object-fit:cover;display:block;background:#eee}
+.product-card .body{padding:14px}
+.product-card h3{margin:0 0 6px;font-size:16px}
+.product-card .price{font-weight:800;color:#8a6b2a}
+@media(max-width:760px){
+  .navlinks{display:none}.navlinks.open{display:flex;flex-direction:column;position:absolute;top:72px;left:0;right:0;background:#101a2c;padding:16px;gap:14px}
+  .hamb{display:block}
+  .contact-box{grid-template-columns:1fr;padding:28px 20px}
+  .hero{min-height:520px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="/"><span class="mark">G</span><span>GRANSHI<small>MY DIGITAL WORLD</small></span></a>
+    <nav class="navlinks" id="nav"></nav>
+    <div class="tools">
+      <button id="lang" type="button">नेपाली</button>
+      <button class="hamb" id="hamb" type="button" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
 
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow">ONE WORLD · ENDLESS POSSIBILITIES</div>
+    <h1 id="heroTitle">Explore Your<br><span>Digital World.</span></h1>
+    <p id="heroDesc">Knowledge, learning, creativity and technology — connected in one place.</p>
+    <a class="btn" href="#departments">Explore Departments →</a>
+    <a class="btn alt" href="#contact">Contact Us</a>
+    <div class="meta">gopalkoirala.com.np · LEARN · PLAY · EXPLORE · GROW</div>
+  </div>
+</section>
+
+<section id="departments">
+  <div class="wrap">
+    <div class="head">
+      <small>DISCOVER MORE</small>
+      <h2 id="deptHead">Explore Departments</h2>
+      <p id="deptSub">Search across Granshi and filter departments.</p>
+    </div>
+    <div class="search">⌕ <input id="q" placeholder="Search..." aria-label="Search"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+</section>
+
+<section id="pages" style="display:none;padding-top:0">
+  <div class="wrap">
+    <div class="head"><small>PAGES</small><h2>Published pages</h2></div>
+    <div class="pages-list" id="pagesList"></div>
+  </div>
+</section>
+
+<section id="shop" style="display:none">
+  <div class="wrap">
+    <div class="head"><small>MARKETPLACE</small><h2 id="shopHead">Products</h2></div>
+    <div class="product-grid" id="productGrid"></div>
+  </div>
+</section>
+
+<section class="about" id="about">
+  <div class="wrap">
+    <div class="head"><small>ABOUT GRANSHI</small><h2 id="aboutHead">Your world to learn, play and grow.</h2></div>
+    <p id="aboutText">Granshi is a growing digital platform for knowledge, learning, creativity and technology.</p>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="wrap">
+    <div class="contact-box">
+      <div>
+        <small style="color:var(--gold);font-weight:800;letter-spacing:2px">STAY CONNECTED</small>
+        <h2 id="contactHead">Send a message</h2>
+        <p id="contactText">Choose a department and write to us.</p>
+      </div>
+      <form class="form" id="contactForm">
+        <label for="c_name">Your name</label>
+        <input id="c_name" required maxlength="120" autocomplete="name">
+        <label for="c_email">Your email</label>
+        <input id="c_email" type="email" required maxlength="180" autocomplete="email">
+        <label for="c_dept">Department</label>
+        <select id="c_dept"><option value="">General</option></select>
+        <label for="c_subject">Subject</label>
+        <input id="c_subject" maxlength="200">
+        <label for="c_body">Message</label>
+        <textarea id="c_body" required maxlength="5000"></textarea>
+        <button class="btn" type="submit" id="c_submit">Send Message →</button>
+        <div id="c_msg"></div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer><div class="wrap" id="footerText">© Granshi — My Digital World</div></footer>
+
+<script>
+let lang='en', departments=[], pages=[], products=[], settings={}, menus=[];
+const fallback=[{name_en:'Knowledge',name_ne:'ज्ञान',description_en:'Discover facts and useful information.',description_ne:'तथ्य र उपयोगी जानकारी।',icon:'✦',url:'#'},{name_en:'Learning',name_ne:'सिकाइ',description_en:'Skills and tutorials.',description_ne:'सीप र ट्युटोरियल।',icon:'◎',url:'#'}];
+function t(en,ne){return lang==='ne'&&ne?ne:en}
+function renderNav(){
+  const items=menus.length?menus:[{label_en:'Home',label_ne:'गृहपृष्ठ',url:'/'},{label_en:'Explore',label_ne:'अन्वेषण',url:'#departments'},{label_en:'About',label_ne:'हाम्रोबारे',url:'#about'},{label_en:'Contact',label_ne:'सम्पर्क',url:'#contact'}];
+  document.getElementById('nav').innerHTML=items.map(m=>`<a href="${m.url}">${t(m.label_en,m.label_ne)}</a>`).join('');
+}
+function renderDepts(){
+  const q=document.getElementById('q').value.toLocaleLowerCase();
+  const data=departments.length?departments:fallback;
+  const matches=data.filter(d=>(d.name_en+' '+(d.name_ne||'')+' '+(d.description_en||'')+' '+(d.description_ne||'')).toLocaleLowerCase().includes(q));
+  document.getElementById('grid').innerHTML=matches.map(d=>`<article class="card"><div class="ico">${d.icon||'✦'}</div><h3>${t(d.name_en,d.name_ne)}</h3><p>${t(d.description_en,d.description_ne)}</p><a href="${d.url||'#'}">${t('EXPLORE →','हेर्नुहोस् →')}</a></article>`).join('')||`<p>${t('No match.','मिल्दो छैन।')}</p>`;
+}
+function renderPages(){
+  const sec=document.getElementById('pages');
+  if(!pages.length){sec.style.display='none';return}
+  sec.style.display='block';
+  document.getElementById('pagesList').innerHTML=pages.map(p=>`<a href="/${p.slug}${lang==='ne'?'?lang=ne':''}">${t(p.title_en,p.title_ne)}</a>`).join('');
+}
+function renderShop(){
+  const sec=document.getElementById('shop');
+  if(!products.length||settings.marketplace_enabled!=='1'){sec.style.display='none';return}
+  sec.style.display='block';
+  document.getElementById('productGrid').innerHTML=products.map(p=>`<a class="product-card" href="/${p.slug}">
+    ${p.image?`<img src="${p.image}" alt="">`:'<div style="height:160px;background:#eee"></div>'}
+    <div class="body"><h3>${t(p.name_en,p.name_ne)}</h3><div class="price">${p.price} ${p.currency||'NPR'}</div></div></a>`).join('');
+}
+function renderContactDepts(){
+  const data=departments.length?departments:[];
+  document.getElementById('c_dept').innerHTML=`<option value="">${t('General','सामान्य')}</option>`+data.map(d=>`<option value="${d.id}">${t(d.name_en,d.name_ne)}</option>`).join('');
+}
+function applyTexts(){
+  document.getElementById('lang').textContent=lang==='en'?'नेपाली':'English';
+  const ht=settings.hero_title_en||'Explore Your Digital World.';
+  document.getElementById('heroTitle').innerHTML=lang==='en'?ht.replace(/Digital World\.?/,'<span>Digital World.</span>'):(settings.hero_title_ne||ht);
+  document.getElementById('heroDesc').textContent=t(settings.hero_desc_en||'Knowledge, learning, creativity and technology — connected in one place.',settings.hero_desc_ne||'ज्ञान, सिकाइ, सिर्जनशीलता र प्रविधि — सबै एउटै ठाउँमा।');
+  document.getElementById('deptHead').textContent=t('Explore Departments','विभागहरू अन्वेषण गर्नुहोस्');
+  document.getElementById('deptSub').textContent=t('Search across Granshi and filter departments.','Granshi मा खोज्नुहोस्।');
+  document.getElementById('aboutHead').textContent=t('Your world to learn, play and grow.','सिक्ने, खेल्ने र बढ्ने तपाईंको संसार।');
+  document.getElementById('aboutText').textContent=t('Granshi is a growing digital platform for knowledge, learning, creativity and technology.','Granshi ज्ञान, सिकाइ, सिर्जनशीलता र प्रविधिको लागि बढ्दो डिजिटल प्लेटफर्म हो।');
+  document.getElementById('contactHead').textContent=t('Send a message','सन्देश पठाउनुहोस्');
+  document.getElementById('contactText').textContent=t('Choose a department and write to us.','विभाग छान्नुहोस् र लेख्नुहोस्।');
+  document.getElementById('footerText').textContent=settings.footer_text||'© Granshi — My Digital World';
+  if(settings.brand_name) document.title=settings.brand_name;
+  if(settings.primary_color) document.documentElement.style.setProperty('--navy',settings.primary_color);
+  if(settings.accent_color) document.documentElement.style.setProperty('--gold',settings.accent_color);
+  renderNav();renderDepts();renderPages();renderShop();renderContactDepts();
+}
+document.getElementById('q').addEventListener('input',renderDepts);
+document.getElementById('lang').onclick=()=>{lang=lang==='en'?'ne':'en';applyTexts()};
+document.getElementById('hamb').onclick=()=>document.getElementById('nav').classList.toggle('open');
+document.getElementById('contactForm').onsubmit=async e=>{
+  e.preventDefault();
+  const msg=document.getElementById('c_msg'),btn=document.getElementById('c_submit');
+  btn.disabled=true;msg.textContent='';msg.className='';
+  try{
+    const r=await fetch('/api/contact',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
+      name:document.getElementById('c_name').value.trim(),
+      email:document.getElementById('c_email').value.trim(),
+      subject:document.getElementById('c_subject').value.trim(),
+      body:document.getElementById('c_body').value.trim(),
+      department_id:document.getElementById('c_dept').value||null
+    })});
+    const d=await r.json();if(!r.ok)throw new Error(d.error||'Failed');
+    msg.className='ok';msg.textContent=t('Message sent. Thank you!','सन्देश पठाइयो। धन्यवाद!');
+    document.getElementById('contactForm').reset();
+  }catch(err){msg.className='err';msg.textContent=err.message||'Error'}
+  finally{btn.disabled=false}
+};
+fetch('/api/public').then(r=>r.ok?r.json():null).then(d=>{
+  if(!d)return;
+  settings=d.settings||{};departments=d.departments||[];pages=d.pages||[];products=d.products||[];menus=d.menus||[];
+  applyTexts();
+}).catch(()=>applyTexts());
+applyTexts();
+</script>
+</body>
+</html>
