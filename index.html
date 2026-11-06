@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Granshi Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f0f2f7;color:#182338;font-family:system-ui,Arial}
+.hidden{display:none!important}
+.login{max-width:430px;margin:8vh auto;background:#fff;padding:28px;border-radius:18px;box-shadow:0 15px 50px #16243b18}
+.login h1{margin-top:0}
+input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;border-radius:9px;margin:5px 0 12px;font:inherit;background:#fff}
+.btn{background:#172640;color:#fff;border:0;border-radius:9px;padding:11px 16px;font-weight:750;cursor:pointer;font-size:14px}
+.btn:hover{opacity:.92}
+.gold{background:#d8b46a;color:#182338}
+.muted{color:#68758a;font-size:13px;line-height:1.55}
+.shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+.side{background:#101a2c;color:#fff;padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto}
+.side h2{padding:4px 12px 14px;font-size:17px;margin:0;letter-spacing:1px}
+.side button{display:block;width:100%;text-align:left;background:none;color:#dce3ed;border:0;padding:11px 12px;border-radius:9px;cursor:pointer;font:inherit}
+.side button.active,.side button:hover{background:#ffffff18;color:#f1d99e}
+.main{padding:22px 26px;min-width:0}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.box{background:#fff;border:1px solid #e4e8ef;border-radius:14px;padding:18px 20px;margin-top:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field label{font-size:12px;font-weight:700;display:block}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.item{padding:12px;border:1px solid #e5e9ef;border-radius:10px;margin:8px 0;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;background:#fafbfd}
+.item small{display:block;color:#6a7689;margin-top:3px}
+.danger{background:#a83333}
+.notice{background:#fff5df;padding:11px 13px;border-radius:10px;color:#775820;font-size:13px;line-height:1.5;margin:10px 0}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700}
+.badge.new{background:#e8f0fe;color:#1a56db}
+.badge.read{background:#e8f5e9;color:#2e7d32}
+.badge.draft{background:#f3f4f6;color:#6b7280}
+.badge.published{background:#e8f5e9;color:#2e7d32}
+/* Drag-drop builder */
+.builder{display:grid;grid-template-columns:1fr 280px;gap:16px;margin-top:12px}
+.canvas{min-height:200px;background:#f7f8fb;border:2px dashed #d0d7e4;border-radius:12px;padding:12px}
+.block{background:#fff;border:1px solid #dfe4ec;border-radius:10px;padding:12px;margin:8px 0;cursor:grab;position:relative}
+.block:active{cursor:grabbing}
+.block .handle{position:absolute;left:6px;top:10px;color:#9aa3b2;font-size:14px;user-select:none}
+.block .rm{position:absolute;right:8px;top:8px;background:#f3f4f6;border:0;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px}
+.block .body{margin-left:22px;margin-right:28px}
+.block label{font-size:11px;font-weight:700;color:#68758a}
+.palette{background:#fff;border:1px solid #e4e8ef;border-radius:12px;padding:12px;height:fit-content;position:sticky;top:20px}
+.palette h4{margin:0 0 10px;font-size:13px}
+.palette button{display:block;width:100%;text-align:left;margin:5px 0;padding:9px 11px;border:1px solid #e5e9ef;border-radius:8px;background:#fafbfd;cursor:pointer;font-size:13px}
+.palette button:hover{border-color:#d8b46a;background:#fffbeb}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.stat{background:#f7f8fb;border-radius:12px;padding:16px;text-align:center}
+.stat b{display:block;font-size:24px;color:#101a2c}
+.stat span{font-size:12px;color:#68758a}
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .side{position:relative;height:auto;display:flex;overflow:auto;gap:4px;padding:10px}
+  .side h2{display:none}.side button{white-space:nowrap;width:auto}
+  .builder{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}
+  .main{padding:14px}
+}
+</style>
+</head>
+<body>
+
+<div id="login" class="login">
+  <h1>GRANSHI ADMIN</h1>
+  <p class="muted">Full control panel — pages, departments, marketplace, media.</p>
+  <div id="setupNote" class="notice hidden">First run: create admin. Need SETUP_TOKEN from <code>wrangler secret put SETUP_TOKEN</code>.</div>
+  <div class="field"><label>Email</label><input id="email" type="email" autocomplete="username"></div>
+  <div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password"></div>
+  <div id="setupTokenField" class="field hidden"><label>Setup Token</label><input id="setupToken" type="password"></div>
+  <button class="btn gold" id="loginBtn">Log in</button>
+  <p class="muted" id="loginStatus"></p>
+</div>
+
+<div id="app" class="shell hidden">
+  <aside class="side">
+    <h2>GRANSHI</h2>
+    <button data-tab="overview" class="active">Overview</button>
+    <button data-tab="pages">Pages (Builder)</button>
+    <button data-tab="departments">Departments</button>
+    <button data-tab="messages">Messages</button>
+    <button data-tab="menus">Menus</button>
+    <button data-tab="media">Media</button>
+    <button data-tab="products">Products</button>
+    <button data-tab="categories">Categories</button>
+    <button data-tab="orders">Orders</button>
+    <button data-tab="settings">Settings</button>
+    <button data-tab="security">Security</button>
+    <button id="logout" style="margin-top:18px;color:#f5a8a8">Log out</button>
+  </aside>
+  <main class="main">
+    <div class="bar"><h1 id="tabTitle" style="margin:0;font-size:22px">Overview</h1><span class="muted" id="who"></span></div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<script>
+const $=(s,el=document)=>el.querySelector(s);
+const $$=(s,el=document)=>[...el.querySelectorAll(s)];
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+async function api(path, opts={}) {
+  const r = await fetch('/api'+path, {...opts, headers:{'content-type':'application/json',...(opts.headers||{})}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(d.error || 'Request failed');
+  return d;
+}
+
+async function boot() {
+  try {
+    const st = await api('/setup/status');
+    if (!st.initialized) {
+      $('#setupNote').classList.remove('hidden');
+      $('#setupTokenField').classList.remove('hidden');
+      $('#loginBtn').textContent = 'Create admin';
+    }
+  } catch(_){}
+  try {
+    const me = await api('/auth/me');
+    showApp(me.email);
+  } catch {
+    $('#login').classList.remove('hidden');
+  }
+}
+
+$('#loginBtn').onclick = async () => {
+  const email = $('#email').value.trim();
+  const password = $('#password').value;
+  $('#loginStatus').textContent = 'Working...';
+  try {
+    if (!$('#setupTokenField').classList.contains('hidden')) {
+      await api('/setup', {method:'POST', body:JSON.stringify({email, password, setupToken:$('#setupToken').value})});
+    } else {
+      await api('/auth/login', {method:'POST', body:JSON.stringify({email, password})});
+    }
+    showApp(email);
+  } catch(e) { $('#loginStatus').textContent = e.message; }
+};
+
+$('#logout').onclick = async () => { await api('/auth/logout',{method:'POST'}); location.reload(); };
+
+function showApp(email) {
+  $('#login').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  $('#who').textContent = email;
+  $$('.side button[data-tab]').forEach(b => {
+    b.onclick = () => {
+      $$('.side button[data-tab]').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      tab(b.dataset.tab);
+    };
+  });
+  tab('overview');
+}
+
+const titles = {
+  overview:'Overview', pages:'Pages — Drag & Drop Builder', departments:'Departments',
+  messages:'Messages / Inbox', menus:'Menus', media:'Media Library',
+  products:'Products (Marketplace)', categories:'Categories', orders:'Orders',
+  settings:'Site Settings', security:'Security'
+};
+
+async function tab(name) {
+  $('#tabTitle').textContent = titles[name] || name;
+  const v = $('#view');
+  v.innerHTML = '<div class="box"><p class="muted">Loading…</p></div>';
+  try {
+    if (name === 'overview') {
+      const d = await api('/admin/overview');
+      v.innerHTML = `<div class="box">
+        <div class="stats">
+          <div class="stat"><b>${(d.pages||[]).length}</b><span>Published pages</span></div>
+          <div class="stat"><b>${(d.departments||[]).length}</b><span>Departments</span></div>
+          <div class="stat"><b>${d.new_messages||0}</b><span>New messages</span></div>
+          <div class="stat"><b>${d.product_count||0}</b><span>Products</span></div>
+        </div>
+        <p class="notice" style="margin-top:16px">Public pages: <code>/your-slug</code> · Products: same. Enable marketplace in Settings.</p>
+      </div>`;
+    }
+
+    if (name === 'pages') await renderPagesTab(v);
+    if (name === 'departments') await renderDeptsTab(v);
+    if (name === 'messages') await renderMessagesTab(v);
+    if (name === 'menus') await renderMenusTab(v);
+    if (name === 'media') await renderMediaTab(v);
+    if (name === 'products') await renderProductsTab(v);
+    if (name === 'categories') await renderCategoriesTab(v);
+    if (name === 'orders') await renderOrdersTab(v);
+    if (name === 'settings') await renderSettingsTab(v);
+    if (name === 'security') {
+      v.innerHTML = `<div class="box">
+        <h3>Change password</h3>
+        <div class="field"><label>Current</label><input id="oldp" type="password"></div>
+        <div class="field"><label>New (12+)</label><input id="newp" type="password"></div>
+        <button class="btn gold" id="change">Change</button>
+      </div>`;
+      $('#change').onclick = async () => {
+        try {
+          await api('/admin/password',{method:'POST',body:JSON.stringify({currentPassword:$('#oldp').value,newPassword:$('#newp').value})});
+          alert('Changed');
+        } catch(e){alert(e.message)}
+      };
+    }
+  } catch(e) {
+    v.innerHTML = `<div class="box">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+/* ========== PAGE BUILDER ========== */
+async function renderPagesTab(v) {
+  const list = await api('/admin/pages');
+  v.innerHTML = `<div class="box">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">All pages</h3>
+      <button class="btn gold" id="newPage">+ New page</button>
+    </div>
+    <div id="pageList">${list.map(p=>`
+      <div class="item">
+        <div><b>${esc(p.title_en)}</b>
+          <small>/${esc(p.slug)} · <span class="badge ${p.published?'published':'draft'}">${p.published?'Published':'Draft'}</span></small>
+        </div>
+        <div class="row">
+          <button class="btn" data-edit="${esc(p.slug)}">Edit</button>
+          <button class="btn danger" data-del="${esc(p.slug)}">Delete</button>
+        </div>
+      </div>`).join('')||'<p class="muted">No pages yet.</p>'}
+    </div>
+    <div id="pageEditor" class="hidden"></div>
+  </div>`;
+  $('#newPage').onclick = () => openBuilder();
+  $$('[data-edit]').forEach(b => b.onclick = () => openBuilder(list.find(x=>x.slug===b.dataset.edit)));
+  $$('[data-del]').forEach(b => b.onclick = async () => {
+    if (!confirm('Delete page?')) return;
+    await api('/admin/pages/'+encodeURIComponent(b.dataset.del),{method:'DELETE'});
+    tab('pages');
+  });
+}
+
+function openBuilder(page) {
+  const ed = $('#pageEditor');
+  ed.classList.remove('hidden');
+  let blocks = [];
+  try { blocks = page?.content ? (typeof page.content==='string'?JSON.parse(page.content):page.content) : []; } catch { blocks = []; }
+
+  ed.innerHTML = `
+    <h3 style="margin-top:20px">${page?'Edit':'New'} page</h3>
+    <div class="grid2">
+      <div class="field"><label>Title EN *</label><input id="p_title_en" value="${esc(page?.title_en||'')}"></div>
+      <div class="field"><label>Title NE</label><input id="p_title_ne" value="${esc(page?.title_ne||'')}"></div>
+      <div class="field"><label>Slug (URL) *</label><input id="p_slug" value="${esc(page?.slug||'')}" ${page?'readonly':''}></div>
+      <div class="field"><label>Sort</label><input id="p_sort" type="number" value="${page?.sort_order??0}"></div>
+      <div class="field"><label>Description EN</label><textarea id="p_desc_en" rows="2">${esc(page?.description_en||'')}</textarea></div>
+      <div class="field"><label>Description NE</label><textarea id="p_desc_ne" rows="2">${esc(page?.description_ne||'')}</textarea></div>
+    </div>
+    <label style="font-size:13px"><input type="checkbox" id="p_pub" ${page?.published?'checked':''}> Published (live on site)</label>
+
+    <div class="builder">
+      <div>
+        <h4>Content blocks — drag to reorder</h4>
+        <div class="canvas" id="canvas"></div>
+      </div>
+      <div class="palette">
+        <h4>Add block</h4>
+        <button data-add="heading">Heading</button>
+        <button data-add="paragraph">Paragraph</button>
+        <button data-add="image">Image</button>
+        <button data-add="button">Button</button>
+        <button data-add="quote">Quote</button>
+        <button data-add="hero">Hero section</button>
+        <button data-add="columns">2 Columns</button>
+        <button data-add="cards">Cards</button>
+        <button data-add="video">Video / Embed</button>
+        <button data-add="spacer">Spacer</button>
+        <button data-add="divider">Divider</button>
+        <button data-add="html">Custom HTML</button>
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn gold" id="savePage">Save page</button>
+      <button class="btn" id="cancelPage">Cancel</button>
+    </div>`;
+
+  const canvas = $('#canvas');
+
+  function draw() {
+    canvas.innerHTML = blocks.map((b,i) => blockUI(b,i)).join('') || '<p class="muted" style="padding:20px;text-align:center">Add blocks from the right →</p>';
+    // bind inputs
+    $$('[data-i]', canvas).forEach(el => {
+      el.oninput = () => {
+        const i = +el.dataset.i, f = el.dataset.f;
+        if (f.startsWith('col')) {
+          const ci = +f.split('.')[1];
+          if (!blocks[i].columns) blocks[i].columns = [{text:''},{text:''}];
+          blocks[i].columns[ci].text = el.value;
+        } else if (f.startsWith('card')) {
+          const [,ci,cf] = f.split('.');
+          if (!blocks[i].cards) blocks[i].cards = [];
+          if (!blocks[i].cards[+ci]) blocks[i].cards[+ci] = {};
+          blocks[i].cards[+ci][cf] = el.value;
+        } else {
+          blocks[i][f] = el.type==='checkbox' ? el.checked : el.value;
+        }
+      };
+    });
+    $$('[data-rm]', canvas).forEach(btn => {
+      btn.onclick = () => { blocks.splice(+btn.dataset.rm,1); draw(); initSortable(); };
+    });
+  }
+
+  function blockUI(b,i) {
+    const head = `<span class="handle">⠿</span><button class="rm" data-rm="${i}">×</button><div class="body">`;
+    if (b.type==='heading') return `<div class="block" data-id="${i}">${head}<label>Heading</label>
+      <input data-i="${i}" data-f="text" value="${esc(b.text||'')}">
+      <label>Level (1-4)</label><input data-i="${i}" data-f="level" type="number" min="1" max="4" value="${b.level||2}"></div></div>`;
+    if (b.type==='paragraph') return `<div class="block" data-id="${i}">${head}<label>Paragraph</label>
+      <textarea data-i="${i}" data-f="text" rows="3">${esc(b.text||'')}</textarea></div></div>`;
+    if (b.type==='image') return `<div class="block" data-id="${i}">${head}<label>Image URL</label>
+      <input data-i="${i}" data-f="url" value="${esc(b.url||'')}" placeholder="/media/...">
+      <label>Alt</label><input data-i="${i}" data-f="alt" value="${esc(b.alt||'')}">
+      <label>Caption</label><input data-i="${i}" data-f="caption" value="${esc(b.caption||'')}"></div></div>`;
+    if (b.type==='button') return `<div class="block" data-id="${i}">${head}<label>Button text</label>
+      <input data-i="${i}" data-f="text" value="${esc(b.text||'Learn more')}">
+      <label>URL</label><input data-i="${i}" data-f="url" value="${esc(b.url||'#')}">
+      <label><input type="checkbox" data-i="${i}" data-f="newtab" ${b.newtab?'checked':''}> Open new tab</label></div></div>`;
+    if (b.type==='quote') return `<div class="block" data-id="${i}">${head}<label>Quote</label>
+      <textarea data-i="${i}" data-f="text" rows="2">${esc(b.text||'')}</textarea>
+      <label>Cite</label><input data-i="${i}" data-f="cite" value="${esc(b.cite||'')}"></div></div>`;
+    if (b.type==='hero') return `<div class="block" data-id="${i}">${head}<label>Hero title</label>
+      <input data-i="${i}" data-f="title" value="${esc(b.title||'')}">
+      <label>Subtitle</label><input data-i="${i}" data-f="subtitle" value="${esc(b.subtitle||'')}">
+      <label>Background image URL</label><input data-i="${i}" data-f="image" value="${esc(b.image||'')}">
+      <label>Button text</label><input data-i="${i}" data-f="button_text" value="${esc(b.button_text||'')}">
+      <label>Button URL</label><input data-i="${i}" data-f="button_url" value="${esc(b.button_url||'')}"></div></div>`;
+    if (b.type==='columns') {
+      const c = b.columns || [{text:''},{text:''}];
+      return `<div class="block" data-id="${i}">${head}<label>Column 1</label><textarea data-i="${i}" data-f="col.0" rows="2">${esc(c[0]?.text||'')}</textarea>
+        <label>Column 2</label><textarea data-i="${i}" data-f="col.1" rows="2">${esc(c[1]?.text||'')}</textarea></div></div>`;
+    }
+    if (b.type==='cards') {
+      const cards = b.cards || [{title:'',text:'',icon:'✦',url:''},{title:'',text:'',icon:'◎',url:''}];
+      return `<div class="block" data-id="${i}">${head}${cards.map((c,ci)=>`
+        <div style="border-top:1px solid #eee;padding-top:8px;margin-top:8px">
+          <label>Card ${ci+1} title</label><input data-i="${i}" data-f="card.${ci}.title" value="${esc(c.title||'')}">
+          <label>Text</label><input data-i="${i}" data-f="card.${ci}.text" value="${esc(c.text||'')}">
+          <label>Icon / Image URL</label><input data-i="${i}" data-f="card.${ci}.icon" value="${esc(c.icon||'')}">
+          <label>Link URL</label><input data-i="${i}" data-f="card.${ci}.url" value="${esc(c.url||'')}">
+        </div>`).join('')}</div></div>`;
+    }
+    if (b.type==='video') return `<div class="block" data-id="${i}">${head}<label>Video URL (YouTube embed / Vimeo / direct)</label>
+      <input data-i="${i}" data-f="url" value="${esc(b.url||'')}" placeholder="https://www.youtube.com/embed/..."></div></div>`;
+    if (b.type==='spacer') return `<div class="block" data-id="${i}">${head}<label>Spacer height (px)</label>
+      <input data-i="${i}" data-f="height" type="number" value="${b.height||32}"></div></div>`;
+    if (b.type==='divider') return `<div class="block" data-id="${i}">${head}<label>Divider</label><p class="muted">Horizontal line</p></div></div>`;
+    if (b.type==='html') return `<div class="block" data-id="${i}">${head}<label>Custom HTML</label>
+      <textarea data-i="${i}" data-f="html" rows="4">${esc(b.html||'')}</textarea></div></div>`;
+    return '';
+  }
+
+  function initSortable() {
+    if (canvas._sortable) canvas._sortable.destroy();
+    canvas._sortable = Sortable.create(canvas, {
+      handle: '.handle',
+      animation: 150,
+      onEnd: (evt) => {
+        const moved = blocks.splice(evt.oldIndex, 1)[0];
+        blocks.splice(evt.newIndex, 0, moved);
+        draw();
+        initSortable();
+      }
+    });
+  }
+
+  draw();
+  initSortable();
+
+  $$('[data-add]', ed).forEach(btn => {
+    btn.onclick = () => {
+      const t = btn.dataset.add;
+      const defaults = {
+        heading: {type:'heading', text:'New heading', level:2},
+        paragraph: {type:'paragraph', text:''},
+        image: {type:'image', url:'', alt:'', caption:''},
+        button: {type:'button', text:'Learn more', url:'#', newtab:false},
+        quote: {type:'quote', text:'', cite:''},
+        hero: {type:'hero', title:'', subtitle:'', image:'', button_text:'Explore', button_url:'#'},
+        columns: {type:'columns', columns:[{text:''},{text:''}]},
+        cards: {type:'cards', cards:[{title:'Card 1',text:'',icon:'✦',url:''},{title:'Card 2',text:'',icon:'◎',url:''}]},
+        video: {type:'video', url:''},
+        spacer: {type:'spacer', height:32},
+        divider: {type:'divider'},
+        html: {type:'html', html:''}
+      };
+      blocks.push(defaults[t] || {type:t});
+      draw();
+      initSortable();
+    };
+  });
+
+  $('#cancelPage').onclick = () => ed.classList.add('hidden');
+  $('#savePage').onclick = async () => {
+    const payload = {
+      slug: $('#p_slug').value.trim() || $('#p_title_en').value.trim(),
+      title_en: $('#p_title_en').value.trim(),
+      title_ne: $('#p_title_ne').value.trim(),
+      description_en: $('#p_desc_en').value.trim(),
+      description_ne: $('#p_desc_ne').value.trim(),
+      sort_order: Number($('#p_sort').value||0),
+      published: $('#p_pub').checked,
+      content: blocks
+    };
+    if (!payload.title_en) return alert('Title required');
+    try {
+      const r = await api('/admin/pages',{method:'POST',body:JSON.stringify(payload)});
+      alert('Saved → /' + r.slug);
+      tab('pages');
+    } catch(e){alert(e.message)}
+  };
+}
+
+/* ========== DEPARTMENTS ========== */
+async function renderDeptsTab(v) {
+  const list = await api('/admin/departments');
+  v.innerHTML = `<div class="box">
+    <div class="row" style="justify-content:space-between"><h3 style="margin:0">Departments</h3><button class="btn gold" id="newD">+ Add</button></div>
+    <div id="dList">${list.map(d=>`
+      <div class="item"><div><b>${esc(d.icon||'')} ${esc(d.name_en)}</b>
+        <small>${esc(d.name_ne||'')} · email: ${esc(d.email||'—')}</small></div>
+        <div class="row"><button class="btn" data-e="${d.id}">Edit</button><button class="btn danger" data-d="${d.id}">Delete</button></div>
+      </div>`).join('')}
+    </div>
+    <div id="dEd" class="hidden"></div>
+  </div>`;
+  $('#newD').onclick = () => openDept();
+  $$('[data-e]').forEach(b=>b.onclick=()=>openDept(list.find(x=>x.id==b.dataset.e)));
+  $$('[data-d]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/departments/'+b.dataset.d,{method:'DELETE'});tab('departments')});
+}
+function openDept(d) {
+  const ed=$('#dEd');ed.classList.remove('hidden');
+  ed.innerHTML=`<h3>${d?'Edit':'New'} department</h3>
+    <div class="grid2">
+      <div class="field"><label>Name EN *</label><input id="d_en" value="${esc(d?.name_en||'')}"></div>
+      <div class="field"><label>Name NE</label><input id="d_ne" value="${esc(d?.name_ne||'')}"></div>
+      <div class="field"><label>Desc EN</label><textarea id="d_den">${esc(d?.description_en||'')}</textarea></div>
+      <div class="field"><label>Desc NE</label><textarea id="d_dne">${esc(d?.description_ne||'')}</textarea></div>
+      <div class="field"><label>URL</label><input id="d_url" value="${esc(d?.url||'#')}"></div>
+      <div class="field"><label>Icon</label><input id="d_icon" value="${esc(d?.icon||'✦')}"></div>
+      <div class="field"><label>Contact email</label><input id="d_email" type="email" value="${esc(d?.email||'')}"></div>
+      <div class="field"><label>Image URL</label><input id="d_img" value="${esc(d?.image||'')}"></div>
+      <div class="field"><label>Sort</label><input id="d_sort" type="number" value="${d?.sort_order??0}"></div>
+    </div>
+    <label><input type="checkbox" id="d_vis" ${d?.visible!==0?'checked':''}> Visible</label>
+    <div class="row" style="margin-top:12px"><button class="btn gold" id="saveD">Save</button><button class="btn" id="canD">Cancel</button></div>`;
+  $('#canD').onclick=()=>ed.classList.add('hidden');
+  $('#saveD').onclick=async()=>{
+    await api('/admin/departments',{method:'POST',body:JSON.stringify({
+      id:d?.id, name_en:$('#d_en').value.trim(), name_ne:$('#d_ne').value.trim(),
+      description_en:$('#d_den').value.trim(), description_ne:$('#d_dne').value.trim(),
+      url:$('#d_url').value.trim()||'#', icon:$('#d_icon').value.trim()||'✦',
+      email:$('#d_email').value.trim(), image:$('#d_img').value.trim(),
+      visible:$('#d_vis').checked, sort_order:Number($('#d_sort').value||0)
+    })});
+    tab('departments');
+  };
+}
+
+/* ========== MESSAGES ========== */
+async function renderMessagesTab(v) {
+  const list = await api('/admin/messages');
+  v.innerHTML = `<div class="box"><h3>Inbox</h3>
+    ${list.map(m=>`<div class="item"><div style="flex:1">
+      <b>${esc(m.name)}</b> &lt;${esc(m.email)}&gt; <span class="badge ${esc(m.status)}">${esc(m.status)}</span>
+      <small>${esc(m.department_name||'General')} · ${esc((m.created_at||'').replace('T',' ').slice(0,19))}</small>
+      <div style="margin-top:6px"><b>${esc(m.subject||'(no subject)')}</b></div>
+      <div style="margin-top:4px;white-space:pre-wrap">${esc(m.body)}</div>
+    </div>
+    <div class="row" style="flex-direction:column">
+      ${m.status!=='read'?`<button class="btn" data-r="${m.id}">Mark read</button>`:''}
+      <button class="btn danger" data-d="${m.id}">Delete</button>
+    </div></div>`).join('')||'<p class="muted">No messages.</p>'}
+  </div>`;
+  $$('[data-r]').forEach(b=>b.onclick=async()=>{await api('/admin/messages/'+b.dataset.r,{method:'POST',body:JSON.stringify({status:'read'})});tab('messages')});
+  $$('[data-d]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/messages/'+b.dataset.d,{method:'DELETE'});tab('messages')});
+}
+
+/* ========== MENUS ========== */
+async function renderMenusTab(v) {
+  const list = await api('/admin/menus');
+  v.innerHTML = `<div class="box">
+    <div class="row" style="justify-content:space-between"><h3 style="margin:0">Menus</h3><button class="btn gold" id="newM">+ Add</button></div>
+    ${list.map(m=>`<div class="item"><div><b>${esc(m.label_en)}</b><small>${esc(m.label_ne||'')} → ${esc(m.url)}</small></div>
+      <div class="row"><button class="btn" data-e="${m.id}">Edit</button><button class="btn danger" data-d="${m.id}">Delete</button></div></div>`).join('')}
+    <div id="mEd" class="hidden"></div>
+  </div>`;
+  $('#newM').onclick=()=>openMenu();
+  $$('[data-e]').forEach(b=>b.onclick=()=>openMenu(list.find(x=>x.id==b.dataset.e)));
+  $$('[data-d]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/menus/'+b.dataset.d,{method:'DELETE'});tab('menus')});
+}
+function openMenu(m){
+  const ed=$('#mEd');ed.classList.remove('hidden');
+  ed.innerHTML=`<h3>${m?'Edit':'New'} menu</h3>
+    <div class="grid2">
+      <div class="field"><label>Label EN *</label><input id="m_en" value="${esc(m?.label_en||'')}"></div>
+      <div class="field"><label>Label NE</label><input id="m_ne" value="${esc(m?.label_ne||'')}"></div>
+      <div class="field"><label>URL</label><input id="m_url" value="${esc(m?.url||'#')}"></div>
+      <div class="field"><label>Sort</label><input id="m_sort" type="number" value="${m?.sort_order??0}"></div>
+    </div>
+    <label><input type="checkbox" id="m_vis" ${m?.visible!==0?'checked':''}> Visible</label>
+    <div class="row" style="margin-top:12px"><button class="btn gold" id="saveM">Save</button><button class="btn" id="canM">Cancel</button></div>`;
+  $('#canM').onclick=()=>ed.classList.add('hidden');
+  $('#saveM').onclick=async()=>{
+    await api('/admin/menus',{method:'POST',body:JSON.stringify({
+      id:m?.id,label_en:$('#m_en').value.trim(),label_ne:$('#m_ne').value.trim(),
+      url:$('#m_url').value.trim()||'#',visible:$('#m_vis').checked,sort_order:Number($('#m_sort').value||0)
+    })});
+    tab('menus');
+  };
+}
+
+/* ========== MEDIA ========== */
+async function renderMediaTab(v) {
+  const a = await api('/admin/media');
+  v.innerHTML = `<div class="box">
+    <h3>Media</h3>
+    <p class="muted">Max 25 MB · R2 required</p>
+    <div class="row"><input id="file" type="file"><button class="btn gold" id="up">Upload</button></div>
+    ${a.map(x=>`<div class="item"><span>${esc(x.name)}<small>${esc(x.url)} · ${Math.round((x.size||0)/1024)} KB</small></span>
+      <div class="row"><button class="btn" onclick="navigator.clipboard.writeText('${esc(x.url)}')">Copy</button>
+      <button class="btn danger" data-d="${esc(x.key)}">Delete</button></div></div>`).join('')||'<p class="muted">Empty</p>'}
+  </div>`;
+  $('#up').onclick=async()=>{
+    const f=$('#file').files[0];if(!f)return alert('Choose file');
+    try{
+      const r=await fetch('/api/admin/media/upload',{method:'POST',headers:{'content-type':f.type||'application/octet-stream','x-file-name':encodeURIComponent(f.name)},body:f});
+      const d=await r.json();if(!r.ok)throw new Error(d.error);alert('OK: '+d.url);tab('media');
+    }catch(e){alert(e.message)}
+  };
+  $$('[data-d]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/media/'+encodeURIComponent(b.dataset.d),{method:'DELETE'});tab('media')});
+}
+
+/* ========== PRODUCTS ========== */
+async function renderProductsTab(v) {
+  const list = await api('/admin/products');
+  const cats = await api('/admin/categories').catch(()=>[]);
+  v.innerHTML = `<div class="box">
+    <div class="row" style="justify-content:space-between"><h3 style="margin:0">Products</h3><button class="btn gold" id="newP">+ Product</button></div>
+    <p class="notice">Marketplace tables ready. Turn on “Marketplace enabled” in Settings to show on homepage.</p>
+    ${list.map(p=>`<div class="item"><div><b>${esc(p.name_en)}</b>
+      <small>/${esc(p.slug)} · ${p.price} ${p.currency||'NPR'} · <span class="badge ${p.status==='published'?'published':'draft'}">${esc(p.status)}</span></small></div>
+      <div class="row"><button class="btn" data-e="${p.id}">Edit</button><button class="btn danger" data-d="${p.id}">Delete</button></div></div>`).join('')||'<p class="muted">No products yet.</p>'}
+    <div id="pEd" class="hidden"></div>
+  </div>`;
+  $('#newP').onclick=()=>openProduct(null,cats);
+  $$('[data-e]').forEach(b=>b.onclick=()=>openProduct(list.find(x=>x.id==b.dataset.e),cats));
+  $$('[data-d]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/products/'+b.dataset.d,{method:'DELETE'});tab('products')});
+}
+function openProduct(p, cats) {
+  const ed=$('#pEd');ed.classList.remove('hidden');
+  ed.innerHTML=`<h3>${p?'Edit':'New'} product</h3>
+    <div class="grid2">
+      <div class="field"><label>Name EN *</label><input id="pr_en" value="${esc(p?.name_en||'')}"></div>
+      <div class="field"><label>Name NE</label><input id="pr_ne" value="${esc(p?.name_ne||'')}"></div>
+      <div class="field"><label>Slug</label><input id="pr_slug" value="${esc(p?.slug||'')}"></div>
+      <div class="field"><label>Price</label><input id="pr_price" type="number" step="0.01" value="${p?.price??0}"></div>
+      <div class="field"><label>Compare price</label><input id="pr_cmp" type="number" step="0.01" value="${p?.compare_price??''}"></div>
+      <div class="field"><label>Currency</label><input id="pr_cur" value="${esc(p?.currency||'NPR')}"></div>
+      <div class="field"><label>Stock</label><input id="pr_stock" type="number" value="${p?.stock??0}"></div>
+      <div class="field"><label>SKU</label><input id="pr_sku" value="${esc(p?.sku||'')}"></div>
+      <div class="field"><label>Image URL</label><input id="pr_img" value="${esc(p?.image||'')}"></div>
+      <div class="field"><label>Category</label><select id="pr_cat"><option value="">—</option>${(cats||[]).map(c=>`<option value="${c.id}" ${p?.category_id==c.id?'selected':''}>${esc(c.name_en)}</option>`).join('')}</select></div>
+      <div class="field"><label>Status</label><select id="pr_st"><option value="draft" ${p?.status==='draft'?'selected':''}>Draft</option><option value="published" ${p?.status==='published'?'selected':''}>Published</option></select></div>
+      <div class="field"><label>Sort</label><input id="pr_sort" type="number" value="${p?.sort_order??0}"></div>
+    </div>
+    <div class="field"><label>Description EN</label><textarea id="pr_den">${esc(p?.description_en||'')}</textarea></div>
+    <div class="field"><label>Description NE</label><textarea id="pr_dne">${esc(p?.description_ne||'')}</textarea></div>
+    <label><input type="checkbox" id="pr_feat" ${p?.featured?'checked':''}> Featured</label>
+    <div class="row" style="margin-top:12px"><button class="btn gold" id="savePr">Save</button><button class="btn" id="canPr">Cancel</button></div>`;
+  $('#canPr').onclick=()=>ed.classList.add('hidden');
+  $('#savePr').onclick=async()=>{
+    await api('/admin/products',{method:'POST',body:JSON.stringify({
+      id:p?.id, name_en:$('#pr_en').value.trim(), name_ne:$('#pr_ne').value.trim(),
+      slug:$('#pr_slug').value.trim(), price:Number($('#pr_price').value||0),
+      compare_price:$('#pr_cmp').value===''?null:Number($('#pr_cmp').value),
+      currency:$('#pr_cur').value.trim()||'NPR', stock:Number($('#pr_stock').value||0),
+      sku:$('#pr_sku').value.trim(), image:$('#pr_img').value.trim(),
+      category_id:$('#pr_cat').value?Number($('#pr_cat').value):null,
+      status:$('#pr_st').value, featured:$('#pr_feat').checked,
+      sort_order:Number($('#pr_sort').value||0),
+      description_en:$('#pr_den').value.trim(), description_ne:$('#pr_dne').value.trim()
+    })});
+    tab('products');
+  };
+}
+
+/* ========== CATEGORIES ========== */
+async function renderCategoriesTab(v) {
+  const list = await api('/admin/categories');
+  v.innerHTML = `<div class="box">
+    <div class="row" style="justify-content:space-between"><h3 style="margin:0">Categories</h3><button class="btn gold" id="newC">+ Category</button></div>
+    ${list.map(c=>`<div class="item"><div><b>${esc(c.name_en)}</b><small>/${esc(c.slug)}</small></div>
+      <div class="row"><button class="btn" data-e="${c.id}">Edit</button><button class="btn danger" data-d="${c.id}">Delete</button></div></div>`).join('')||'<p class="muted">None yet</p>'}
+    <div id="cEd" class="hidden"></div>
+  </div>`;
+  $('#newC').onclick=()=>openCat();
+  $$('[data-e]').forEach(b=>b.onclick=()=>openCat(list.find(x=>x.id==b.dataset.e)));
+  $$('[data-d]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/categories/'+b.dataset.d,{method:'DELETE'});tab('categories')});
+}
+function openCat(c){
+  const ed=$('#cEd');ed.classList.remove('hidden');
+  ed.innerHTML=`<h3>${c?'Edit':'New'} category</h3>
+    <div class="grid2">
+      <div class="field"><label>Name EN *</label><input id="c_en" value="${esc(c?.name_en||'')}"></div>
+      <div class="field"><label>Name NE</label><input id="c_ne" value="${esc(c?.name_ne||'')}"></div>
+      <div class="field"><label>Slug</label><input id="c_slug" value="${esc(c?.slug||'')}"></div>
+      <div class="field"><label>Image</label><input id="c_img" value="${esc(c?.image||'')}"></div>
+    </div>
+    <div class="field"><label>Desc EN</label><textarea id="c_den">${esc(c?.description_en||'')}</textarea></div>
+    <label><input type="checkbox" id="c_vis" ${c?.visible!==0?'checked':''}> Visible</label>
+    <div class="row" style="margin-top:12px"><button class="btn gold" id="saveC">Save</button><button class="btn" id="canC">Cancel</button></div>`;
+  $('#canC').onclick=()=>ed.classList.add('hidden');
+  $('#saveC').onclick=async()=>{
+    await api('/admin/categories',{method:'POST',body:JSON.stringify({
+      id:c?.id,name_en:$('#c_en').value.trim(),name_ne:$('#c_ne').value.trim(),
+      slug:$('#c_slug').value.trim(),image:$('#c_img').value.trim(),
+      description_en:$('#c_den').value.trim(),visible:$('#c_vis').checked
+    })});
+    tab('categories');
+  };
+}
+
+/* ========== ORDERS ========== */
+async function renderOrdersTab(v) {
+  const list = await api('/admin/orders');
+  v.innerHTML = `<div class="box"><h3>Orders</h3>
+    <p class="muted">Orders will appear here when checkout is connected (future).</p>
+    ${list.map(o=>`<div class="item"><div><b>#${esc(o.order_number)}</b> — ${esc(o.customer_name)}
+      <small>${esc(o.customer_email)} · ${o.total} ${o.currency} · ${esc(o.status)}</small></div>
+      <button class="btn" data-s="${o.id}">Mark paid</button></div>`).join('')||'<p class="muted">No orders yet.</p>'}
+  </div>`;
+  $$('[data-s]').forEach(b=>b.onclick=async()=>{await api('/admin/orders/'+b.dataset.s,{method:'POST',body:JSON.stringify({status:'paid'})});tab('orders')});
+}
+
+/* ========== SETTINGS ========== */
+async function renderSettingsTab(v) {
+  const d = await api('/admin/overview');
+  const s = d.settings || {};
+  v.innerHTML = `<div class="box"><h3>Site settings</h3>
+    <div class="grid2">
+      <div class="field"><label>Brand name</label><input id="s_brand" value="${esc(s.brand_name||'')}"></div>
+      <div class="field"><label>Tagline</label><input id="s_tag" value="${esc(s.tagline||'')}"></div>
+      <div class="field"><label>Contact email</label><input id="s_mail" value="${esc(s.contact_email||'')}"></div>
+      <div class="field"><label>Hero image URL</label><input id="s_hero" value="${esc(s.hero_image||'')}"></div>
+      <div class="field"><label>Hero title EN</label><input id="s_hten" value="${esc(s.hero_title_en||'')}"></div>
+      <div class="field"><label>Hero title NE</label><input id="s_htne" value="${esc(s.hero_title_ne||'')}"></div>
+      <div class="field"><label>Hero desc EN</label><textarea id="s_hden">${esc(s.hero_desc_en||'')}</textarea></div>
+      <div class="field"><label>Hero desc NE</label><textarea id="s_hdne">${esc(s.hero_desc_ne||'')}</textarea></div>
+      <div class="field"><label>Primary color</label><input id="s_pri" value="${esc(s.primary_color||'#101a2c')}"></div>
+      <div class="field"><label>Accent color</label><input id="s_acc" value="${esc(s.accent_color||'#e5c77e')}"></div>
+      <div class="field"><label>Footer text</label><input id="s_foot" value="${esc(s.footer_text||'')}"></div>
+      <div class="field"><label>Currency</label><input id="s_cur" value="${esc(s.currency||'NPR')}"></div>
+    </div>
+    <label style="display:block;margin:12px 0"><input type="checkbox" id="s_mkt" ${s.marketplace_enabled==='1'?'checked':''}> Marketplace enabled (show products on homepage)</label>
+    <button class="btn gold" id="saveS">Save settings</button>
+    <p class="notice">Real email: set secret <code>RESEND_API_KEY</code>. Department emails under Departments.</p>
+  </div>`;
+  $('#saveS').onclick=async()=>{
+    await api('/admin/settings',{method:'POST',body:JSON.stringify({
+      brand_name:$('#s_brand').value, tagline:$('#s_tag').value, contact_email:$('#s_mail').value,
+      hero_image:$('#s_hero').value, hero_title_en:$('#s_hten').value, hero_title_ne:$('#s_htne').value,
+      hero_desc_en:$('#s_hden').value, hero_desc_ne:$('#s_hdne').value,
+      primary_color:$('#s_pri').value, accent_color:$('#s_acc').value,
+      footer_text:$('#s_foot').value, currency:$('#s_cur').value,
+      marketplace_enabled: $('#s_mkt').checked ? '1' : '0'
+    })});
+    alert('Saved');
+  };
+}
+
+boot();
+</script>
+</body>
+</html>
