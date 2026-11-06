@@ -1,0 +1,16 @@
+{
+  "name": "granshi-cms",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Granshi — full free-tier CMS (Workers + D1 + R2) with drag-drop builder & marketplace-ready schema",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create granshi-db",
+    "db:migrate": "wrangler d1 migrations apply granshi-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply granshi-db --local"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
