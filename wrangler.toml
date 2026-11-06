@@ -11,7 +11,7 @@ run_worker_first = ["/api/*", "/media/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "granshi-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "d3e055f9-36f2-4d9e-8891-c6532c1ab05f "
 migrations_dir = "database"
 
 [[r2_buckets]]
