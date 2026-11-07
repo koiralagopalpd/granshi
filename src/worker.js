@@ -21,7 +21,7 @@ async function hmac(secret, value) {
 
 async function passwordHash(password, salt = b64(crypto.getRandomValues(new Uint8Array(16)))) {
   const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: unb64(salt), iterations: 180000, hash: "SHA-256" }, key, 256);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: unb64(salt), iterations: 100000, hash: "SHA-256" }, key, 256);
   return { salt, hash: b64(bits) };
 }
 
