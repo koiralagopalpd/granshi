@@ -608,10 +608,11 @@ export default {
     if (u.pathname.startsWith("/api/")) {
       try {
         return await api(req, env);
-      } catch (e) {
-        return json({ error: "Server error", detail: env.ENVIRONMENT === "development" ? String(e) : undefined }, 500);
-      }
-    }
+      } 
+    }catch (e) {
+  console.error("GRANSHI API ERROR:", e?.stack || e);
+  return json({ error: "Server error" }, 500);
+}
 
     if (u.pathname.startsWith("/media/")) {
       if (!env.MEDIA) return new Response("Media not configured", { status: 503 });
