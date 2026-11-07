@@ -612,7 +612,7 @@ export default {
     } catch (e) {
   console.error("GRANSHI API ERROR:", e?.stack || e);
   return json({ error: "Server error" }, 500);
-}
+}}}
     if (u.pathname.startsWith("/media/")) {
       if (!env.MEDIA) return new Response("Media not configured", { status: 503 });
       const key = u.pathname.slice(7);
