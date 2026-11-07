@@ -24,9 +24,3 @@ ENVIRONMENT = "production"
 # SESSION_SECRET
 # SETUP_TOKEN
 # RESEND_API_KEY  (optional – real email)
-[observability]
-enabled = true
-
-[observability.logs]
-invocation_logs = true
-head_sampling_rate = 1
