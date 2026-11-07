@@ -610,8 +610,7 @@ export default {
         return await api(req, env);
       } 
     }catch (e) {
-  console.error("GRANSHI API ERROR:", e?.stack || e);
-  return json({ error: "Server error" }, 500);
+  return json({ error: "Server error", detail: env.ENVIRONMENT === "development" ? String(e) : undefined }, 500);
 }
 
     if (u.pathname.startsWith("/media/")) {
