@@ -23,30 +23,9 @@ ENVIRONMENT = "production"
 # Secrets (wrangler secret put):
 # SESSION_SECRET
 # SETUP_TOKEN
-# RESEND_API_KEY  (optional – real email){
-  // ...
-  "observability": {
-    "enabled": false,
-    "head_sampling_rate": 1,
-    "redact_query_string": false,
-    "logs": {
-      "enabled": true,
-      "head_sampling_rate": 1,
-      "invocation_logs": true,
-      "persist": true
-    },
-    "traces": {
-      "enabled": false,
-      "head_sampling_rate": 1,
-      "persist": true
-    },
-    "issues": {
-      "enabled": true
-    }
-  },
-  // ...
-}
-Logs
+# RESEND_API_KEY  (optional – real email)[observability]
+enabled = true
 
-
-
+[observability.logs]
+invocation_logs = true
+head_sampling_rate = 1
