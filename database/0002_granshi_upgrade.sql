@@ -1,7 +1,9 @@
 -- GRANSHI CMS UPGRADE
--- Additive migration: existing tables and records are preserved.
+-- Safe additive migration
+-- Existing data and Marketplace categories are preserved.
 
--- 1. Department and Category relationship for Pages
+-- 1. Add Department and ZIP support to Pages
+
 ALTER TABLE pages ADD COLUMN department_id INTEGER;
 ALTER TABLE pages ADD COLUMN category_id INTEGER;
 ALTER TABLE pages ADD COLUMN page_type TEXT NOT NULL DEFAULT 'blocks';
@@ -9,10 +11,28 @@ ALTER TABLE pages ADD COLUMN zip_key TEXT;
 ALTER TABLE pages ADD COLUMN zip_entry TEXT DEFAULT 'index.html';
 ALTER TABLE pages ADD COLUMN version_number INTEGER NOT NULL DEFAULT 1;
 
--- 2. Department relationship for Categories
-ALTER TABLE categories ADD COLUMN department_id INTEGER;
 
--- 3. Page ZIP version history
+-- 2. Separate Department Categories
+-- Do NOT modify Marketplace categories table.
+
+CREATE TABLE IF NOT EXISTS department_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    department_id INTEGER NOT NULL,
+    name_en TEXT NOT NULL,
+    name_ne TEXT,
+    slug TEXT NOT NULL,
+    description_en TEXT,
+    description_ne TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    published INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT,
+    updated_at TEXT,
+    UNIQUE(department_id, slug)
+);
+
+
+-- 3. ZIP Page Version History
+
 CREATE TABLE IF NOT EXISTS page_versions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     page_slug TEXT NOT NULL,
@@ -31,7 +51,9 @@ CREATE TABLE IF NOT EXISTS page_versions (
     UNIQUE(page_slug, version_number)
 );
 
--- 4. Message reply history
+
+-- 4. Message Reply History
+
 CREATE TABLE IF NOT EXISTS message_replies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     message_id INTEGER NOT NULL,
@@ -41,7 +63,9 @@ CREATE TABLE IF NOT EXISTS message_replies (
     email_sent INTEGER NOT NULL DEFAULT 0
 );
 
--- 5. Message attachments
+
+-- 5. Message Attachments
+
 CREATE TABLE IF NOT EXISTS message_attachments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     message_id INTEGER NOT NULL,
@@ -49,11 +73,13 @@ CREATE TABLE IF NOT EXISTS message_attachments (
     file_key TEXT NOT NULL,
     file_name TEXT NOT NULL,
     content_type TEXT,
-    file_size INTEGER DEFAULT 0,
+    file_size INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
 );
 
--- 6. Media usage references
+
+-- 6. Media Usage References
+
 CREATE TABLE IF NOT EXISTS media_usage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     media_key TEXT NOT NULL,
@@ -62,7 +88,9 @@ CREATE TABLE IF NOT EXISTS media_usage (
     created_at TEXT NOT NULL
 );
 
--- 7. ZIP asset metadata
+
+-- 7. ZIP Page Assets
+
 CREATE TABLE IF NOT EXISTS page_zip_assets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     page_slug TEXT NOT NULL,
@@ -70,20 +98,22 @@ CREATE TABLE IF NOT EXISTS page_zip_assets (
     asset_path TEXT NOT NULL,
     r2_key TEXT NOT NULL,
     content_type TEXT,
-    file_size INTEGER DEFAULT 0,
+    file_size INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     UNIQUE(page_slug, version_number, asset_path)
 );
 
--- 8. Useful indexes
+
+-- 8. Indexes
+
 CREATE INDEX IF NOT EXISTS idx_pages_department
 ON pages(department_id);
 
 CREATE INDEX IF NOT EXISTS idx_pages_category
 ON pages(category_id);
 
-CREATE INDEX IF NOT EXISTS idx_categories_department
-ON categories(department_id);
+CREATE INDEX IF NOT EXISTS idx_department_categories_department
+ON department_categories(department_id);
 
 CREATE INDEX IF NOT EXISTS idx_page_versions_slug
 ON page_versions(page_slug, version_number);
