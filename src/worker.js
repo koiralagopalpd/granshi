@@ -506,11 +506,52 @@ async function api(req, env) {
       ).results || []
     );
   }
-  if (p.startsWith("/api/admin/messages/") && method === "POST") {
-    const x = await body(req);
-    if (x.status) await env.DB.prepare("UPDATE messages SET status=? WHERE id=?").bind(x.status, p.split("/").pop()).run();
-    return json({ ok: true });
+ if (p.startsWith("/api/admin/messages/") && method === "POST") {
+  const x = await body(req);
+  const id = p.split("/").pop();
+
+  if (x.replyText !== undefined) {
+    const replyText = String(x.replyText).trim();
+
+    if (!replyText || replyText.length > 5000) {
+      return json({ error: "Reply must be 1–5000 characters." }, 400);
+    }
+
+    const message = await env.DB.prepare(
+      "SELECT id, name, email, subject FROM messages WHERE id=?"
+    ).bind(id).first();
+
+    if (!message || !message.email) {
+      return json({ error: "Message or email not found." }, 404);
+    }
+
+    const sent = await sendEmail(env, {
+      to: message.email,
+      from: "Granshi <info@gopalkoirala.com.np>",
+      subject: `Re: ${message.subject || "Your message to Granshi"}`,
+      html: `<p>Hello ${escapeHtml(message.name || "there")},</p><p>${escapeHtml(replyText).replace(/\n/g, "<br>")}</p><p>Regards,<br>Granshi</p>`,
+      replyTo: "info@gopalkoirala.com.np",
+    });
+
+    if (!sent.sent) {
+      return json({ error: "Email could not be sent.", reason: sent.reason }, 502);
+    }
+
+    await env.DB.prepare(
+      "UPDATE messages SET status='replied' WHERE id=?"
+    ).bind(id).run();
+
+    return json({ ok: true, replied: true });
   }
+
+  if (x.status) {
+    await env.DB.prepare(
+      "UPDATE messages SET status=? WHERE id=?"
+    ).bind(x.status, id).run();
+  }
+
+  return json({ ok: true });
+} 
   if (p.startsWith("/api/admin/messages/") && method === "DELETE") {
     await env.DB.prepare("DELETE FROM messages WHERE id=?").bind(p.split("/").pop()).run();
     return json({ ok: true });
