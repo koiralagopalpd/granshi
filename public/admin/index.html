@@ -469,20 +469,66 @@ function openDept(d) {
 /* ========== MESSAGES ========== */
 async function renderMessagesTab(v) {
   const list = await api('/admin/messages');
+
   v.innerHTML = `<div class="box"><h3>Inbox</h3>
-    ${list.map(m=>`<div class="item"><div style="flex:1">
-      <b>${esc(m.name)}</b> &lt;${esc(m.email)}&gt; <span class="badge ${esc(m.status)}">${esc(m.status)}</span>
-      <small>${esc(m.department_name||'General')} · ${esc((m.created_at||'').replace('T',' ').slice(0,19))}</small>
-      <div style="margin-top:6px"><b>${esc(m.subject||'(no subject)')}</b></div>
-      <div style="margin-top:4px;white-space:pre-wrap">${esc(m.body)}</div>
-    </div>
-    <div class="row" style="flex-direction:column">
-      ${m.status!=='read'?`<button class="btn" data-r="${m.id}">Mark read</button>`:''}
-      <button class="btn danger" data-d="${m.id}">Delete</button>
-    </div></div>`).join('')||'<p class="muted">No messages.</p>'}
+    ${list.map(m=>`<div class="item">
+      <div style="flex:1">
+        <b>${esc(m.name)}</b> &lt;${esc(m.email)}&gt;
+        <span class="badge ${esc(m.status)}">${esc(m.status)}</span>
+        <small>${esc(m.department_name||'General')} · ${esc((m.created_at||'').replace('T',' ').slice(0,19))}</small>
+        <div style="margin-top:6px"><b>${esc(m.subject||'(no subject)')}</b></div>
+        <div style="margin-top:4px;white-space:pre-wrap">${esc(m.body)}</div>
+        <div style="margin-top:12px">
+          <label>Reply to this message</label>
+          <textarea data-reply="${m.id}" rows="4" style="width:100%;padding:10px;margin-top:5px" placeholder="Write your reply..."></textarea>
+          <button class="btn gold" data-send="${m.id}" style="margin-top:8px">Send Reply</button>
+        </div>
+      </div>
+      <div class="row" style="flex-direction:column">
+        ${m.status!=='read' && m.status!=='replied'?`<button class="btn" data-r="${m.id}">Mark read</button>`:''}
+        <button class="btn danger" data-d="${m.id}">Delete</button>
+      </div>
+    </div>`).join('')||'<p class="muted">No messages.</p>'}
   </div>`;
-  $$('[data-r]').forEach(b=>b.onclick=async()=>{await api('/admin/messages/'+b.dataset.r,{method:'POST',body:JSON.stringify({status:'read'})});tab('messages')});
-  $$('[data-d]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/messages/'+b.dataset.d,{method:'DELETE'});tab('messages')});
+
+  $$('[data-send]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.send;
+    const box=document.querySelector(`[data-reply="${id}"]`);
+    const replyText=box.value.trim();
+
+    if(!replyText){alert('Please write a reply first.');return;}
+    if(!confirm('Send this reply by email?'))return;
+
+    b.disabled=true;
+    b.textContent='Sending...';
+
+    try{
+      await api('/admin/messages/'+id,{
+        method:'POST',
+        body:JSON.stringify({replyText})
+      });
+      alert('Reply sent successfully.');
+      tab('messages');
+    }catch(e){
+      alert('Reply failed: '+e.message);
+      b.disabled=false;
+      b.textContent='Send Reply';
+    }
+  });
+
+  $$('[data-r]').forEach(b=>b.onclick=async()=>{
+    await api('/admin/messages/'+b.dataset.r,{
+      method:'POST',
+      body:JSON.stringify({status:'read'})
+    });
+    tab('messages');
+  });
+
+  $$('[data-d]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Delete?'))return;
+    await api('/admin/messages/'+b.dataset.d,{method:'DELETE'});
+    tab('messages');
+  });
 }
 
 /* ========== MENUS ========== */
