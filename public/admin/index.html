@@ -285,12 +285,14 @@ function openBuilder(page) {
 
   const canvas = $('#canvas');
 
-  function draw() {
+    function draw() {
     canvas.innerHTML = blocks.map((b,i) => blockUI(b,i)).join('') || '<p class="muted" style="padding:20px;text-align:center">Add blocks from the right →</p>';
-    // bind inputs
+
+    // Original input handling
     $$('[data-i]', canvas).forEach(el => {
       el.oninput = () => {
         const i = +el.dataset.i, f = el.dataset.f;
+
         if (f.startsWith('col')) {
           const ci = +f.split('.')[1];
           if (!blocks[i].columns) blocks[i].columns = [{text:''},{text:''}];
@@ -305,20 +307,119 @@ function openBuilder(page) {
         }
       };
     });
-    $$('[data-rm]', canvas).forEach(btn => {
-      btn.onclick = () => { blocks.splice(+btn.dataset.rm,1); draw(); initSortable(); };
-    });
-  }
 
-  function blockUI(b,i) {
-    const head = `<span class="handle">⠿</span><button class="rm" data-rm="${i}">×</button><div class="body">`;
+    // Original delete handling
+    $$('[data-rm]', canvas).forEach(btn => {
+      btn.onclick = () => {
+        blocks.splice(+btn.dataset.rm,1);
+        draw();
+        initSortable();
+      };
+    });
+
+    // Mobile photo upload
+    $$('[data-image-file]', canvas).forEach(input => {
+      input.onchange = async () => {
+        const file = input.files[0];
+        if (!file) return;
+
+        const i = Number(input.dataset.imageFile);
+
+        if (!file.type.startsWith('image/')) {
+          alert('Please choose an image.');
+          return;
+        }
+
+        if (file.size > 25 * 1024 * 1024) {
+          alert('Maximum file size is 25 MB.');
+          return;
+        }
+
+        input.disabled = true;
+
+        try {
+          const r = await fetch('/api/admin/media/upload', {
+            method: 'POST',
+            headers: {
+              'content-type': file.type,
+              'x-file-name': encodeURIComponent(file.name)
+            },
+            body: file
+          });
+
+          const d = await r.json();
+
+          if (!r.ok) throw new Error(d.error || 'Upload failed');
+
+          blocks[i].url = d.url;
+          draw();
+          initSortable();
+
+          alert('Photo uploaded successfully.');
+        } catch(e) {
+          alert('Upload failed: ' + e.message);
+          input.disabled = false;
+        }
+      };
+    });
+// Mobile video upload
+    $$('[data-video-file]', canvas).forEach(input => {
+      input.onchange = async () => {
+        const file = input.files[0];
+        if (!file) return;
+
+        const i = Number(input.dataset.videoFile);
+
+        if (!file.type.startsWith('video/')) {
+          alert('Please choose a video.');
+          return;
+        }
+
+        if (file.size > 25 * 1024 * 1024) {
+          alert('Maximum video size is 25 MB.');
+          return;
+        }
+
+        input.disabled = true;
+
+        try {
+          const r = await fetch('/api/admin/media/upload', {
+            method: 'POST',
+            headers: {
+              'content-type': file.type,
+              'x-file-name': encodeURIComponent(file.name)
+            },
+            body: file
+          });
+
+          const d = await r.json();
+
+          if (!r.ok) throw new Error(d.error || 'Upload failed');
+
+          blocks[i].url = d.url;
+          draw();
+          initSortable();
+
+          alert('Video uploaded successfully.');
+        } catch(e) {
+          alert('Video upload failed: ' + e.message);
+          input.disabled = false;
+        }
+      };
+    });
+   }
+
+  function blockUI(b,i) {   const head = `<span class="handle">⠿</span><button class="rm" data-rm="${i}">×</button><div class="body">`;
     if (b.type==='heading') return `<div class="block" data-id="${i}">${head}<label>Heading</label>
       <input data-i="${i}" data-f="text" value="${esc(b.text||'')}">
       <label>Level (1-4)</label><input data-i="${i}" data-f="level" type="number" min="1" max="4" value="${b.level||2}"></div></div>`;
     if (b.type==='paragraph') return `<div class="block" data-id="${i}">${head}<label>Paragraph</label>
       <textarea data-i="${i}" data-f="text" rows="3">${esc(b.text||'')}</textarea></div></div>`;
-    if (b.type==='image') return `<div class="block" data-id="${i}">${head}<label>Image URL</label>
+        if (b.type==='image') return `<div class="block" data-id="${i}">${head}
+      <label>Image URL</label>
       <input data-i="${i}" data-f="url" value="${esc(b.url||'')}" placeholder="/media/...">
+      <label>Choose photo from phone</label>
+      <input type="file" accept="image/*" data-image-file="${i}">
       <label>Alt</label><input data-i="${i}" data-f="alt" value="${esc(b.alt||'')}">
       <label>Caption</label><input data-i="${i}" data-f="caption" value="${esc(b.caption||'')}"></div></div>`;
     if (b.type==='button') return `<div class="block" data-id="${i}">${head}<label>Button text</label>
@@ -349,8 +450,12 @@ function openBuilder(page) {
           <label>Link URL</label><input data-i="${i}" data-f="card.${ci}.url" value="${esc(c.url||'')}">
         </div>`).join('')}</div></div>`;
     }
-    if (b.type==='video') return `<div class="block" data-id="${i}">${head}<label>Video URL (YouTube embed / Vimeo / direct)</label>
-      <input data-i="${i}" data-f="url" value="${esc(b.url||'')}" placeholder="https://www.youtube.com/embed/..."></div></div>`;
+       if (b.type==='video') return `<div class="block" data-id="${i}">${head}
+      <label>Video URL (YouTube / Vimeo / direct)</label>
+      <input data-i="${i}" data-f="url" value="${esc(b.url||'')}" placeholder="Video URL">
+      <label>Choose video from phone</label>
+      <input type="file" accept="video/*" data-video-file="${i}">
+      </div></div>`; 
     if (b.type==='spacer') return `<div class="block" data-id="${i}">${head}<label>Spacer height (px)</label>
       <input data-i="${i}" data-f="height" type="number" value="${b.height||32}"></div></div>`;
     if (b.type==='divider') return `<div class="block" data-id="${i}">${head}<label>Divider</label><p class="muted">Horizontal line</p></div></div>`;
