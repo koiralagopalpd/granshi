@@ -255,27 +255,37 @@ function renderPageHtml(page, settings, lang = "en") {
 }
 
 /* ---------- Email (optional Resend) ---------- */
-async function sendEmail(env, { to, subject, html, replyTo }) {
-  if (!env.RESEND_API_KEY || !to) return { sent: false, reason: "no_api_key_or_to" };
+
+async function sendEmail(env, { to, subject, html, replyTo, from }) {
+  if (!env.RESEND_API_KEY || !to) {
+    return { sent: false, reason: "no_api_key_or_to" };
+  }
+
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        from: "Granshi <noreply@gopalkoirala.com.np>",
+        from: from || "Granshi <noreply@gopalkoirala.com.np>",
         to: [to],
         subject,
         html,
         reply_to: replyTo || undefined,
       }),
     });
-    if (!res.ok) return { sent: false, reason: await res.text() };
+
+    if (!res.ok) {
+      return { sent: false, reason: await res.text() };
+    }
+
     return { sent: true };
   } catch (e) {
     return { sent: false, reason: String(e) };
   }
 }
-
 /* ---------- API ---------- */
 async function api(req, env) {
   const u = new URL(req.url);
