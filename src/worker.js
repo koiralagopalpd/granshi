@@ -674,7 +674,50 @@ export default {
       h.set("cache-control", "public, max-age=86400");
       return new Response(obj.body, { headers: h });
     }
+    // Department page
+    if (u.pathname.startsWith("/department/")) {
+      const departmentUrl = u.pathname.replace(/\/$/, "");
 
+      const dept = await env.DB.prepare(
+        "SELECT * FROM departments WHERE url=? AND visible=1"
+      ).bind(departmentUrl).first();
+
+      if (dept) {
+        const settings = await getSettings(env);
+        const lang = u.searchParams.get("lang") === "ne" ? "ne" : "en";
+
+        const title = lang === "ne" && dept.name_ne
+          ? dept.name_ne
+          : dept.name_en;
+
+        const desc = lang === "ne" && dept.description_ne
+          ? dept.description_ne
+          : dept.description_en || "";
+
+        const bodyHtml = `
+          <section class="page-hero">
+            <div class="wrap">
+              <h1>${escapeHtml(title)}</h1>
+              ${desc ? `<p>${escapeHtml(desc)}</p>` : ""}
+            </div>
+          </section>
+          <article class="wrap">
+            ${dept.image ? `<figure class="blk-img"><img src="${escapeHtml(dept.image)}" alt="${escapeHtml(title)}"></figure>` : ""}
+            <p class="blk-p">${escapeHtml(desc).replace(/\n/g, "<br>")}</p>
+          </article>
+        `;
+
+        return new Response(
+          pageChrome(title, desc, bodyHtml, settings, lang),
+          {
+            headers: {
+              "content-type": "text/html; charset=utf-8",
+              "cache-control": "public, max-age=60"
+            }
+          }
+        );
+      }
+    }
     // CMS page SSR
     if (u.pathname !== "/" && !u.pathname.startsWith("/admin") && !u.pathname.includes(".")) {
       const slug = u.pathname.slice(1).replace(/\/$/, "");
