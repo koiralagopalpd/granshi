@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -61,6 +60,7 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
     <button data-tab="overview" class="active">Overview</button>
     <button data-tab="departments">Departments</button>
     <button data-tab="messages">Messages</button>
+    <button data-tab="comments">Comments</button>
     <button data-tab="menus">Menus</button>
     <button data-tab="settings">Settings</button>
     <button data-tab="security">Security</button>
@@ -102,7 +102,7 @@ function showApp(email){
   $$('.side button[data-tab]').forEach(b=>b.onclick=()=>{$$('.side button[data-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');tab(b.dataset.tab)});
   tab('overview');
 }
-const titles={overview:'Overview',departments:'Departments & content',messages:'Messages',menus:'Menus',settings:'Settings',security:'Security'};
+const titles={overview:'Overview',departments:'Departments & content',messages:'Messages',comments:'Comments / Feedback',menus:'Menus',settings:'Settings',security:'Security'};
 async function tab(name){
   $('#tabTitle').textContent=titles[name]||name;
   const v=$('#view');v.innerHTML='<div class="box"><p class="muted">Loading…</p></div>';
@@ -114,6 +114,7 @@ async function tab(name){
     }
     if(name==='departments') await renderDepartments(v);
     if(name==='messages') await renderMessages(v);
+    if(name==='comments') await renderComments(v);
     if(name==='menus') await renderMenus(v);
     if(name==='settings') await renderSettings(v);
     if(name==='security'){
@@ -130,29 +131,39 @@ async function tab(name){
 async function renderDepartments(v){
   const list=await api('/admin/departments');
   v.innerHTML=`<div class="box">
-    <div class="row" style="justify-content:space-between"><h3 style="margin:0">Departments</h3><button class="btn gold" id="newDept">+ Department</button></div>
-    <p class="muted">Click a department to manage its pages, categories and media.</p>
+    <div class="row" style="justify-content:space-between;align-items:center;gap:8px">
+      <h3 style="margin:0;font-size:16px">Departments</h3>
+      <button class="btn gold" id="newDept" style="padding:6px 10px;font-size:12px">+ New</button>
+    </div>
+    <p class="muted" style="margin:8px 0">Open → Pages / Media। Edit → नाम/slug।</p>
     <div id="deptList">${list.map(d=>`
-      <div class="item">
-        <div><b>${esc(d.icon||'')} ${esc(d.name_en)}</b><br><small class="muted">${esc(d.name_ne||'')} · /dept/${esc(d.slug||d.id)}</small></div>
-        <div class="row">
-          <button class="btn gold" data-open="${d.id}">Open</button>
-          <button class="btn" data-edit="${d.id}">Edit</button>
-          <button class="btn danger" data-del="${d.id}">Delete</button>
+      <div class="item" style="align-items:center;padding:10px 12px">
+        <div style="flex:1;min-width:0"><b style="font-size:14px">${esc(d.icon||'')} ${esc(d.name_en)}</b>
+          <div class="muted" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.name_ne||'')} · /dept/${esc(d.slug||d.id)}</div>
+        </div>
+        <div class="row" style="flex-shrink:0;gap:4px">
+          <button class="btn gold" style="padding:5px 8px;font-size:11px" data-open="${d.id}">Open</button>
+          <button class="btn" style="padding:5px 8px;font-size:11px" data-edit="${d.id}">Edit</button>
+          <button class="btn danger" style="padding:5px 8px;font-size:11px" data-del="${d.id}">Del</button>
         </div>
       </div>`).join('')||'<p class="muted">No departments</p>'}
     </div>
     <div id="deptEd" class="hidden"></div>
     <div id="deptHub" class="hidden"></div>
   </div>`;
-  $('#newDept').onclick=()=>editDept();
-  $$('[data-edit]').forEach(b=>b.onclick=()=>editDept(list.find(x=>x.id==b.dataset.edit)));
-  $$('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete department?'))return;await api('/admin/departments/'+b.dataset.del,{method:'DELETE'});tab('departments')});
+  $('#newDept').onclick=()=>{ $('#deptList').classList.add('hidden'); $('#deptHub').classList.add('hidden'); editDept(); };
+  $$('[data-edit]').forEach(b=>b.onclick=()=>{ $('#deptList').classList.add('hidden'); $('#deptHub').classList.add('hidden'); editDept(list.find(x=>x.id==b.dataset.edit)); });
+  $$('[data-del]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('यो department मेटाउने हो? यो कार्य उल्ट्याउन मिल्दैन।'))return;
+    if(!confirm('Confirm delete?'))return;
+    await api('/admin/departments/'+b.dataset.del,{method:'DELETE'});
+    tab('departments');
+  });
   $$('[data-open]').forEach(b=>b.onclick=()=>openDeptHub(+b.dataset.open));
 }
 function editDept(d){
   const ed=$('#deptEd');ed.classList.remove('hidden');
-  ed.innerHTML=`<h3>${d?'Edit':'New'} department</h3>
+  ed.innerHTML=`<h3 style="margin-top:0">${d?'Edit':'New'} department</h3>
     <div class="grid2">
       <div><label>Name EN *</label><input id="d_en" value="${esc(d?.name_en||'')}"></div>
       <div><label>Name NE</label><input id="d_ne" value="${esc(d?.name_ne||'')}"></div>
@@ -165,7 +176,7 @@ function editDept(d){
     <label>Description NE</label><textarea id="d_dne">${esc(d?.description_ne||'')}</textarea>
     <label><input type="checkbox" id="d_vis" ${d?.visible!==0?'checked':''}> Visible</label>
     <div class="row" style="margin-top:10px"><button class="btn gold" id="saveD">Save</button><button class="btn" id="canD">Cancel</button></div>`;
-  $('#canD').onclick=()=>ed.classList.add('hidden');
+  $('#canD').onclick=()=>{ed.classList.add('hidden');$('#deptList').classList.remove('hidden')};
   $('#saveD').onclick=async()=>{
     await api('/admin/departments',{method:'POST',body:JSON.stringify({
       id:d?.id,name_en:$('#d_en').value.trim(),name_ne:$('#d_ne').value.trim(),slug:$('#d_slug').value.trim(),
@@ -176,29 +187,42 @@ function editDept(d){
   };
 }
 async function openDeptHub(id){
-  const hub=$('#deptHub');hub.classList.remove('hidden');hub.innerHTML='<p class="muted">Loading…</p>';
-  const data=await api('/admin/departments/'+id+'/bundle');
-  const dept=data.department;
-  let sub='pages';
-  function draw(){
-    hub.innerHTML=`<div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e9ef">
-      <h3 style="margin:0 0 8px">${esc(dept.icon||'')} ${esc(dept.name_en)}</h3>
-      <div class="tabs">
-        <button class="${sub==='pages'?'on':''}" data-s="pages">Pages</button>
-        <button class="${sub==='categories'?'on':''}" data-s="categories">Categories</button>
-        <button class="${sub==='media'?'on':''}" data-s="media">Media</button>
-        <button class="btn" id="closeHub">Close</button>
-      </div>
-      <div id="subView"></div>
-    </div>`;
-    $('#closeHub').onclick=()=>hub.classList.add('hidden');
-    $$('[data-s]').forEach(b=>b.onclick=()=>{sub=b.dataset.s;draw()});
-    const sv=$('#subView');
-    if(sub==='pages') renderDeptPages(sv,dept,data.pages,data.categories);
-    if(sub==='categories') renderDeptCats(sv,dept,data.categories);
-    if(sub==='media') renderDeptMedia(sv,dept,data.media);
+  const listEl=$('#deptList');const ed=$('#deptEd');const hub=$('#deptHub');
+  if(listEl)listEl.classList.add('hidden');
+  if(ed)ed.classList.add('hidden');
+  hub.classList.remove('hidden');
+  hub.innerHTML='<p class="muted">Loading…</p>';
+  try{
+    const data=await api('/admin/departments/'+id+'/bundle');
+    const dept=data.department;
+    let sub='pages';
+    function draw(){
+      hub.innerHTML=`<div>
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0;font-size:16px">${esc(dept.icon||'')} ${esc(dept.name_en)}</h3>
+          <button class="btn" id="closeHub" style="padding:5px 10px;font-size:12px">← Back</button>
+        </div>
+        <div class="tabs">
+          <button class="${sub==='pages'?'on':''}" data-s="pages">Pages</button>
+          <button class="${sub==='categories'?'on':''}" data-s="categories">Categories</button>
+          <button class="${sub==='media'?'on':''}" data-s="media">Media</button>
+        </div>
+        <div id="subView"></div>
+      </div>`;
+      $('#closeHub').onclick=()=>{hub.classList.add('hidden');hub.innerHTML='';$('#deptList').classList.remove('hidden')};
+      $$('[data-s]').forEach(b=>b.onclick=()=>{sub=b.dataset.s;draw()});
+      const sv=$('#subView');
+      if(sub==='pages') renderDeptPages(sv,dept,data.pages||[],data.categories||[]);
+      if(sub==='categories') renderDeptCats(sv,dept,data.categories||[]);
+      if(sub==='media') renderDeptMedia(sv,dept,data.media||[]);
+    }
+    draw();
+  }catch(e){
+    hub.innerHTML=`<div class="notice">Open failed: ${esc(e.message)}</div>
+      <p class="muted">D1 मा column नभए ALTER चलाउनुहोस् (तलको SQL)।</p>
+      <button class="btn" id="closeHub">← Back</button>`;
+    $('#closeHub').onclick=()=>{hub.classList.add('hidden');$('#deptList').classList.remove('hidden')};
   }
-  draw();
 }
 function renderDeptPages(sv,dept,pages,cats){
   sv.innerHTML=`<div class="row" style="justify-content:space-between"><b>Pages in this department</b><button class="btn gold" id="np">+ Page (ZIP)</button></div>
@@ -572,6 +596,44 @@ async function renderMessages(v){
   $$('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/messages/'+b.dataset.del,{method:'DELETE'});tab('messages')});
 }
 
+async function renderComments(v){
+  let list=[];
+  try{list=await api('/admin/comments')}catch(e){
+    v.innerHTML=`<div class="box"><div class="notice">Comments table चाहिन्छ। D1 Console मा यो SQL Run गर्नुहोस्:</div>
+<pre style="font-size:12px;overflow:auto">CREATE TABLE IF NOT EXISTS comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  page_slug TEXT NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT,
+  body TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL
+);</pre>
+<p class="muted">${esc(e.message)}</p></div>`;
+    return;
+  }
+  const pending=list.filter(c=>c.status==='pending');
+  v.innerHTML=`<div class="box">
+    <h3 style="margin-top:0">Page comments / feedback</h3>
+    <p class="muted">Visitor ले page मा comment पठाउँछ → यहाँ <b>Approve</b> गरेपछि मात्र public मा देखिन्छ।</p>
+    <p>Pending: <b>${pending.length}</b> · Total: ${list.length}</p>
+    ${list.map(c=>`<div class="item" style="flex-direction:column;align-items:stretch">
+      <div class="row" style="justify-content:space-between">
+        <div><b>${esc(c.name)}</b> ${c.email?`&lt;${esc(c.email)}&gt;`:''}
+          <span class="badge ${c.status==='approved'?'published':c.status==='pending'?'new':'draft'}">${esc(c.status)}</span>
+          <br><small class="muted">Page: /${esc(c.page_slug)} · ${esc((c.created_at||'').replace('T',' ').slice(0,19))}</small>
+        </div>
+        <div class="row" style="gap:4px">
+          ${c.status!=='approved'?`<button class="btn gold" style="padding:5px 8px;font-size:11px" data-ap="${c.id}">Approve</button>`:''}
+          <button class="btn danger" style="padding:5px 8px;font-size:11px" data-dc="${c.id}">Del</button>
+        </div>
+      </div>
+      <div style="margin-top:8px;white-space:pre-wrap">${esc(c.body)}</div>
+    </div>`).join('')||'<p class="muted">No comments yet</p>'}
+  </div>`;
+  $$('[data-ap]').forEach(b=>b.onclick=async()=>{await api('/admin/comments/'+b.dataset.ap,{method:'POST',body:JSON.stringify({status:'approved'})});tab('comments')});
+  $$('[data-dc]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this comment?'))return;await api('/admin/comments/'+b.dataset.dc,{method:'DELETE'});tab('comments')});
+}
 async function renderMenus(v){
   const list=await api('/admin/menus');
   v.innerHTML=`<div class="box"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Menus</h3><button class="btn gold" id="nm">+ Item</button></div>
@@ -609,12 +671,14 @@ async function renderSettings(v){
     <label>About EN</label><textarea id="s_ae">${esc(s.about_en||'')}</textarea>
     <label>About NE</label><textarea id="s_an">${esc(s.about_ne||'')}</textarea>
     <label>Footer</label><input id="s_f" value="${esc(s.footer_text||'')}">
+    <label style="display:block;margin-top:12px"><input type="checkbox" id="s_comments" ${s.comments_enabled==='0'?'':'checked'}> Enable page comments / feedback</label>
     <button class="btn gold" id="ss" style="margin-top:10px">Save</button></div>`;
   $('#ss').onclick=async()=>{
     await api('/admin/settings',{method:'POST',body:JSON.stringify({
       brand_name:$('#s_b').value,tagline:$('#s_t').value,contact_email:$('#s_m').value,hero_image:$('#s_h').value,
       hero_title_en:$('#s_hte').value,hero_title_ne:$('#s_htn').value,hero_desc_en:$('#s_hde').value,hero_desc_ne:$('#s_hdn').value,
-      primary_color:$('#s_p').value,accent_color:$('#s_a').value,about_en:$('#s_ae').value,about_ne:$('#s_an').value,footer_text:$('#s_f').value
+      primary_color:$('#s_p').value,accent_color:$('#s_a').value,about_en:$('#s_ae').value,about_ne:$('#s_an').value,footer_text:$('#s_f').value,
+      comments_enabled:$('#s_comments').checked?'1':'0'
     })});
     alert('Saved');
   };
