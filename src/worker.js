@@ -1019,11 +1019,35 @@ export default {
     if (u.pathname.startsWith("/dept/")) {
       const slug = u.pathname.slice(6).replace(/\/$/, "");
       try {
-        const dept = await env.DB.prepare(
-          "SELECT * FROM departments WHERE slug=? AND visible=1"
-        )
-          .bind(slug)
-          .first();
+        let dept = null;
+        if (/^\d+$/.test(slug)) {
+          dept = await env.DB.prepare(
+            "SELECT * FROM departments WHERE id=? AND visible=1"
+          )
+            .bind(Number(slug))
+            .first();
+        }
+        if (!dept) {
+          try {
+            dept = await env.DB.prepare(
+              "SELECT * FROM departments WHERE slug=? AND visible=1"
+            )
+              .bind(slug)
+              .first();
+          } catch (_) {
+            dept = null;
+          }
+        }
+        if (!dept) {
+          const all = await safeAll(
+            env,
+            "SELECT * FROM departments WHERE visible=1"
+          );
+          dept =
+            all.find(
+              (d) => (d.slug && d.slug === slug) || String(d.id) === slug
+            ) || null;
+        }
         if (dept) {
           const settings = await getSettings(env);
           const pages = await env.DB.prepare(
