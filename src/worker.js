@@ -102,37 +102,53 @@ function slugify(s) {
 }
 
 async function getSettings(env) {
-  const r = await env.DB.prepare("SELECT key,value FROM settings").all();
-  return Object.fromEntries((r.results || []).map((x) => [x.key, x.value]));
+  try {
+    const r = await env.DB.prepare("SELECT key,value FROM settings").all();
+    return Object.fromEntries((r.results || []).map((x) => [x.key, x.value]));
+  } catch {
+    return {};
+  }
+}
+
+async function safeAll(env, sql, ...binds) {
+  try {
+    const stmt = env.DB.prepare(sql);
+    const r = binds.length ? await stmt.bind(...binds).all() : await stmt.all();
+    return r.results || [];
+  } catch {
+    return [];
+  }
 }
 
 async function allPublic(env) {
-  const [settings, pages, depts, menus, latest, popular] = await Promise.all([
-    getSettings(env),
-    env.DB.prepare(
-      `SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.department_id,p.is_popular,p.updated_at, d.name_en AS dept_en, d.name_ne AS dept_ne, d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id = p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT 100`
-    ).all(),
-    env.DB.prepare(
-      "SELECT id,name_en,name_ne,description_en,description_ne,url,icon,email,image,slug,sort_order FROM departments WHERE visible=1 ORDER BY sort_order"
-    ).all(),
-    env.DB.prepare(
-      "SELECT id,label_en,label_ne,url,parent_id,sort_order FROM menus WHERE visible=1 ORDER BY sort_order"
-    ).all(),
-    env.DB.prepare(
-      `SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.updated_at, d.name_en AS dept_en, d.name_ne AS dept_ne FROM pages p LEFT JOIN departments d ON d.id = p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT 8`
-    ).all(),
-    env.DB.prepare(
-      `SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.updated_at, d.name_en AS dept_en, d.name_ne AS dept_ne FROM pages p LEFT JOIN departments d ON d.id = p.department_id WHERE p.published=1 AND p.is_popular=1 ORDER BY p.updated_at DESC LIMIT 8`
-    ).all(),
-  ]);
-  return {
-    settings,
-    pages: pages.results || [],
-    departments: depts.results || [],
-    menus: menus.results || [],
-    latest: latest.results || [],
-    popular: popular.results || [],
-  };
+  const settings = await getSettings(env);
+  let pages = await safeAll(
+    env,
+    `SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.updated_at, p.department_id, p.is_popular, d.name_en AS dept_en, d.name_ne AS dept_ne, d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id = p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT 100`
+  );
+  if (!pages.length) {
+    pages = await safeAll(
+      env,
+      `SELECT slug,title_en,title_ne,description_en,description_ne,updated_at FROM pages WHERE published=1 ORDER BY updated_at DESC LIMIT 100`
+    );
+  }
+  let depts = await safeAll(
+    env,
+    "SELECT id,name_en,name_ne,description_en,description_ne,url,icon,email,image,slug,sort_order FROM departments WHERE visible=1 ORDER BY sort_order"
+  );
+  if (!depts.length) {
+    depts = await safeAll(
+      env,
+      "SELECT id,name_en,name_ne,description_en,description_ne,url,icon,email,image,sort_order FROM departments WHERE visible=1 ORDER BY sort_order"
+    );
+  }
+  const menus = await safeAll(
+    env,
+    "SELECT id,label_en,label_ne,url,parent_id,sort_order FROM menus WHERE visible=1 ORDER BY sort_order"
+  );
+  const latest = pages.slice(0, 8);
+  const popular = pages.filter((p) => p.is_popular == 1).slice(0, 8);
+  return { settings, pages, departments: depts, menus, latest, popular };
 }
 
 function renderBlocks(content) {
@@ -224,6 +240,55 @@ async function api(req, env) {
   if (p === "/api/health") return json({ ok: true, v: 4 });
   if (p === "/api/public" && method === "GET")
     return json(await allPublic(env));
+
+  // Public comments / feedback on pages
+  if (p === "/api/comments" && method === "GET") {
+    const slug = slugify(u.searchParams.get("slug") || "");
+    if (!slug) return json({ error: "slug required" }, 400);
+    const rows = await safeAll(
+      env,
+      "SELECT id,name,body,created_at FROM comments WHERE page_slug=? AND status='approved' ORDER BY created_at DESC LIMIT 100",
+      slug
+    );
+    return json({ comments: rows });
+  }
+  if (p === "/api/comments" && method === "POST") {
+    const x = await body(req);
+    // honeypot
+    if (x.website) return json({ ok: true });
+    const slug = slugify(x.page_slug || x.slug || "");
+    const name = String(x.name || "")
+      .trim()
+      .slice(0, 80);
+    const email = String(x.email || "")
+      .trim()
+      .slice(0, 180);
+    const bodyText = String(x.body || x.comment || "")
+      .trim()
+      .slice(0, 2000);
+    if (!slug || !name || !bodyText)
+      return json({ error: "Name and comment required." }, 400);
+    if (bodyText.length < 3) return json({ error: "Comment too short." }, 400);
+    try {
+      await env.DB.prepare(
+        "INSERT INTO comments(page_slug,name,email,body,status,created_at) VALUES(?,?,?,?,?,?)"
+      )
+        .bind(slug, name, email, bodyText, "pending", new Date().toISOString())
+        .run();
+    } catch (e) {
+      return json(
+        {
+          error: "Comments not ready. Create comments table in D1.",
+          detail: String(e),
+        },
+        503
+      );
+    }
+    return json({
+      ok: true,
+      message: "Thanks! Your feedback is awaiting approval.",
+    });
+  }
 
   if (p === "/api/contact" && method === "POST") {
     const x = await body(req);
@@ -402,31 +467,42 @@ async function api(req, env) {
   // Department detail bundle (pages + categories + media)
   if (p.match(/^\/api\/admin\/departments\/\d+\/bundle$/) && method === "GET") {
     const id = Number(p.split("/")[4]);
-    const [dept, pages, cats, media] = await Promise.all([
-      env.DB.prepare("SELECT * FROM departments WHERE id=?").bind(id).first(),
-      env.DB.prepare(
-        "SELECT * FROM pages WHERE department_id=? ORDER BY sort_order,updated_at DESC"
-      )
-        .bind(id)
-        .all(),
-      env.DB.prepare(
-        "SELECT * FROM categories WHERE department_id=? ORDER BY sort_order"
-      )
-        .bind(id)
-        .all(),
-      env.DB.prepare(
-        "SELECT * FROM media WHERE department_id=? ORDER BY created_at DESC"
-      )
-        .bind(id)
-        .all(),
-    ]);
+    const dept = await env.DB.prepare("SELECT * FROM departments WHERE id=?")
+      .bind(id)
+      .first();
     if (!dept) return json({ error: "Not found" }, 404);
-    return json({
-      department: dept,
-      pages: pages.results || [],
-      categories: cats.results || [],
-      media: media.results || [],
-    });
+    let pages = await safeAll(
+      env,
+      "SELECT * FROM pages WHERE department_id=? ORDER BY sort_order,updated_at DESC",
+      id
+    );
+    // fallback: all pages if column missing (so UI still opens)
+    if (!pages.length) {
+      try {
+        await env.DB.prepare("SELECT department_id FROM pages LIMIT 1").first();
+      } catch {
+        pages = await safeAll(
+          env,
+          "SELECT * FROM pages ORDER BY updated_at DESC LIMIT 50"
+        );
+      }
+    }
+    const cats = await safeAll(
+      env,
+      "SELECT * FROM categories WHERE department_id=? ORDER BY sort_order",
+      id
+    );
+    let media = await safeAll(
+      env,
+      "SELECT * FROM media WHERE department_id=? ORDER BY created_at DESC",
+      id
+    );
+    if (!media.length)
+      media = await safeAll(
+        env,
+        "SELECT * FROM media ORDER BY created_at DESC LIMIT 100"
+      );
+    return json({ department: dept, pages, categories: cats, media });
   }
 
   // Pages
@@ -851,7 +927,41 @@ async function api(req, env) {
     return json({ ok: true });
   }
 
+  // Admin: comments moderation
+  if (p === "/api/admin/comments" && method === "GET") {
+    const rows = await safeAll(
+      env,
+      "SELECT * FROM comments ORDER BY created_at DESC LIMIT 300"
+    );
+    return json(rows);
+  }
+  if (p.match(/^\/api\/admin\/comments\/\d+$/) && method === "POST") {
+    const id = p.split("/").pop();
+    const x = await body(req);
+    if (
+      x.status === "approved" ||
+      x.status === "pending" ||
+      x.status === "spam"
+    ) {
+      await env.DB.prepare("UPDATE comments SET status=? WHERE id=?")
+        .bind(x.status, id)
+        .run();
+    }
+    return json({ ok: true });
+  }
+  if (p.match(/^\/api\/admin\/comments\/\d+$/) && method === "DELETE") {
+    await env.DB.prepare("DELETE FROM comments WHERE id=?")
+      .bind(p.split("/").pop())
+      .run();
+    return json({ ok: true });
+  }
+
   return json({ error: "API route not found." }, 404);
+}
+
+function commentsWidgetHtml(slug) {
+  const s = escapeHtml(slug);
+  return ` <section id="granshi-comments" class="g-comments" data-slug="${s}"> <h2 class="g-c-title">Comments / Feedback</h2> <div id="g-c-list" class="g-c-list"><p class="g-c-muted">Loading…</p></div> <form id="g-c-form" class="g-c-form"> <p class="g-c-muted">Share your thoughts. Comments appear after approval.</p> <label>Name *</label> <input name="name" required maxlength="80" autocomplete="name"> <label>Email (optional)</label> <input name="email" type="email" maxlength="180" autocomplete="email"> <label style="position:absolute;left:-9999px">Website</label> <input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px"> <label>Comment *</label> <textarea name="body" required maxlength="2000" rows="4"></textarea> <button type="submit">Send feedback</button> <p id="g-c-msg" class="g-c-msg"></p> </form> </section> <style> .g-comments{max-width:720px;margin:40px auto;padding:24px 16px;border-top:1px solid #e5e9ef;font-family:system-ui,sans-serif;color:#172033} .g-c-title{font-size:1.25rem;margin:0 0 16px} .g-c-list{margin-bottom:24px} .g-c-item{background:#f7f8fb;border-radius:12px;padding:12px 14px;margin:10px 0} .g-c-item b{font-size:14px}.g-c-item time{font-size:12px;color:#667085;margin-left:8px} .g-c-item p{margin:8px 0 0;line-height:1.55;white-space:pre-wrap} .g-c-muted{color:#667085;font-size:13px} .g-c-form label{display:block;font-size:12px;font-weight:700;margin:10px 0 4px} .g-c-form input,.g-c-form textarea{width:100%;padding:10px 12px;border:1px solid #dfe4ec;border-radius:8px;font:inherit;box-sizing:border-box} .g-c-form button{margin-top:12px;padding:10px 16px;border:0;border-radius:8px;background:#172640;color:#fff;font-weight:700;cursor:pointer} .g-c-msg{font-size:13px;margin-top:8px} .g-c-msg.ok{color:#1b7a3d}.g-c-msg.err{color:#a83333} </style> <script> (function(){ var root=document.getElementById('granshi-comments'); if(!root)return; var slug=root.getAttribute('data-slug'); var list=document.getElementById('g-c-list'); var form=document.getElementById('g-c-form'); var msg=document.getElementById('g-c-msg'); function esc(t){return String(t||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})} function load(){ fetch('/api/comments?slug='+encodeURIComponent(slug)).then(function(r){return r.json()}).then(function(d){ var rows=d.comments||[]; if(!rows.length){list.innerHTML='<p class="g-c-muted">No comments yet. Be the first.</p>';return} list.innerHTML=rows.map(function(c){ var t=(c.created_at||'').replace('T',' ').slice(0,16); return '<div class="g-c-item"><b>'+esc(c.name)+'</b><time>'+esc(t)+'</time><p>'+esc(c.body)+'</p></div>'; }).join(''); }).catch(function(){list.innerHTML='<p class="g-c-muted">Could not load comments.</p>'}); } form.addEventListener('submit',function(e){ e.preventDefault(); msg.className='g-c-msg';msg.textContent='Sending…'; var fd=new FormData(form); fetch('/api/comments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({ page_slug:slug,name:fd.get('name'),email:fd.get('email'),body:fd.get('body'),website:fd.get('website') })}).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d}})}).then(function(x){ if(!x.ok)throw new Error(x.d.error||'Failed'); msg.className='g-c-msg ok';msg.textContent=x.d.message||'Thank you!'; form.reset(); }).catch(function(err){msg.className='g-c-msg err';msg.textContent=err.message||'Error'}); }); load(); })(); </script>`;
 }
 
 export default {
@@ -969,6 +1079,8 @@ async function renderAnyPage(page, env, u) {
     lang === "ne" && page.description_ne
       ? page.description_ne
       : page.description_en || "";
+  const commentsOn = settings.comments_enabled !== "0";
+  const widget = commentsOn ? commentsWidgetHtml(page.slug) : "";
   const isZip = String(page.template || "").startsWith("zip:");
   if (isZip && env.MEDIA) {
     const entry = String(page.template).slice(4) || "index.html";
@@ -988,6 +1100,11 @@ async function renderAnyPage(page, env, u) {
     } else {
       html = `<base href="${base}">` + html;
     }
+    if (widget) {
+      if (/<\/body>/i.test(html))
+        html = html.replace(/<\/body>/i, widget + "\n</body>");
+      else html += widget;
+    }
     return new Response(html, {
       headers: {
         "content-type": "text/html; charset=utf-8",
@@ -995,7 +1112,7 @@ async function renderAnyPage(page, env, u) {
       },
     });
   }
-  const body = `<section class="page-hero"><div class="wrap"><h1>${escapeHtml( title )}</h1>${ desc ? `<p>${escapeHtml(desc)}</p>` : "" }</div></section><article class="wrap">${renderBlocks( page.content )}</article>`;
+  const body = `<section class="page-hero"><div class="wrap"><h1>${escapeHtml( title )}</h1>${ desc ? `<p>${escapeHtml(desc)}</p>` : "" }</div></section><article class="wrap">${renderBlocks( page.content )}</article>${widget}`;
   return new Response(pageChrome(title, desc, body, settings, lang), {
     headers: {
       "content-type": "text/html; charset=utf-8",
