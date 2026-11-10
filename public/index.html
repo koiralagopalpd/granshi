@@ -12,62 +12,64 @@
 body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper)}
 a{text-decoration:none;color:inherit}
 .wrap{width:min(1100px,92%);margin:auto}
-header{position:sticky;top:0;z-index:20;background:#101a2cf5;color:#fff;border-bottom:1px solid #ffffff20;backdrop-filter:blur(8px)}
+header{position:sticky;top:0;z-index:30;background:#101a2cf5;color:#fff;border-bottom:1px solid #ffffff20;backdrop-filter:blur(8px)}
 .nav{height:72px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:1px}
 .mark{border:2px solid var(--gold);border-radius:13px;width:42px;height:42px;display:grid;place-items:center;color:var(--gold);font-size:22px}
 .brand small{display:block;font-size:10px;color:#c7d0dc;letter-spacing:2px}
 .navlinks{display:flex;gap:22px;font-size:14px;align-items:center}
-.navlinks a:hover{color:var(--gold)}
+.navlinks a{cursor:pointer}.navlinks a:hover{color:var(--gold)}
 .tools{display:flex;gap:8px}
 .tools button,.hamb{border:1px solid #ffffff55;color:#fff;background:#ffffff10;padding:10px 13px;border-radius:10px;cursor:pointer}
 .hamb{display:none}
-.hero{min-height:520px;color:white;position:relative;display:flex;align-items:center;overflow:hidden;background:#101a2c}
+.hero{min-height:560px;color:#fff;position:relative;display:flex;align-items:center;overflow:hidden;background:#101a2c}
 .hero:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#101a2ce8 0%,#101a2cae 45%,#101a2c40 100%),url('/assets-brand.png') center 42%/cover no-repeat;transform:scale(1.06)}
 .hero:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,#101a2c70,transparent 50%)}
-.hero .wrap{position:relative;z-index:1;padding:80px 0}
+.hero .wrap{position:relative;z-index:1;padding:72px 0 56px}
 .eyebrow{color:var(--gold);font-weight:850;letter-spacing:3px;font-size:12px}
-.hero h1{font-size:clamp(36px,6vw,64px);line-height:1.05;max-width:720px;margin:18px 0}
+.hero h1{font-size:clamp(34px,6vw,60px);line-height:1.05;max-width:720px;margin:16px 0}
 .hero h1 span{color:var(--gold)}
-.hero p{font-size:17px;line-height:1.75;color:#e2e7ef;max-width:560px}
-section{padding:64px 0}
+.hero p{font-size:17px;line-height:1.7;color:#e2e7ef;max-width:560px}
+.search-box{margin-top:28px;max-width:560px}
+.search-row{display:flex;gap:8px;flex-wrap:wrap}
+.search-row input{flex:1;min-width:160px;padding:14px 16px;border-radius:12px;border:0;font:inherit;background:#fff;color:#172033}
+.search-row button{padding:14px 16px;border-radius:12px;border:0;font-weight:800;cursor:pointer;font:inherit}
+.btn-site{background:linear-gradient(135deg,#f3dfa9,#d8b46a);color:#182235}
+.btn-ai{background:#fff;color:#172033}
+.search-results{margin-top:8px;background:#fff;color:#172033;border-radius:12px;overflow:hidden;box-shadow:0 12px 40px #0005;display:none;max-height:280px;overflow-y:auto}
+.search-results.open{display:block}
+.search-results a{display:block;padding:12px 14px;border-bottom:1px solid #eee;font-size:14px}
+.search-results a:hover{background:#f6f7fb}
+.search-results .tag{font-size:11px;color:#8a6b2a;font-weight:700}
+section{padding:56px 0}
 .head small{color:var(--gold);font-weight:800;letter-spacing:2px;font-size:11px}
-.head h2{margin:8px 0 10px;font-size:clamp(24px,4vw,34px)}
-.head p{color:var(--muted);max-width:520px}
-.articles{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:24px}
+.head h2{margin:8px 0 10px;font-size:clamp(22px,4vw,32px)}
+.articles{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:20px}
 .article{background:#fff;border:1px solid #e6eaf2;border-radius:14px;padding:18px;transition:.2s;display:flex;flex-direction:column;gap:8px}
-.article:hover{transform:translateY(-2px);box-shadow:0 10px 28px #101a2c12;border-color:#d8b46a55}
-.article .tag{font-size:11px;color:#8a6b2a;font-weight:700;letter-spacing:.5px}
+.article:hover{transform:translateY(-2px);box-shadow:0 10px 28px #101a2c12}
+.article .tag{font-size:11px;color:#8a6b2a;font-weight:700}
 .article h3{margin:0;font-size:17px;line-height:1.35}
 .article p{margin:0;color:var(--muted);font-size:14px;line-height:1.5;flex:1}
 .article .more{color:#8a6b2a;font-weight:700;font-size:13px}
-.explore-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
-.explore-links a{padding:10px 14px;background:#fff;border:1px solid #e2e6ef;border-radius:10px;font-size:14px}
-.explore-links a:hover{border-color:var(--gold)}
-.about-box{background:#fff;border:1px solid #e6eaf2;border-radius:18px;padding:28px 24px}
-.about-box p{line-height:1.75;color:#334;max-width:720px}
-.contact-toggle{margin-top:18px}
-.btn{display:inline-block;padding:12px 18px;border-radius:11px;font-weight:800;background:linear-gradient(135deg,#f3dfa9,#d8b46a);color:#182235;border:0;cursor:pointer}
-.btn.ghost{background:#101a2c;color:#fff}
-.contact-panel{display:none;margin-top:18px;padding-top:18px;border-top:1px solid #e8ecf3}
-.contact-panel.open{display:block}
-.form label{display:block;font-size:12px;font-weight:700;margin:10px 0 4px}
-.form input,.form select,.form textarea{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #dfe4ec;font:inherit;background:#fff}
-.form textarea{min-height:100px;resize:vertical}
-.form .ok{color:#1b7a3d;font-size:14px;margin-top:10px}
-.form .err{color:#a83333;font-size:14px;margin-top:10px}
+.panel-bg{display:none;position:fixed;inset:0;background:#0006;z-index:40}
+.panel-bg.open{display:block}
+.explore-panel{display:none;position:fixed;z-index:41;left:50%;top:12%;transform:translateX(-50%);width:min(480px,92%);max-height:70vh;overflow:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 20px 60px #0005}
+.explore-panel.open{display:block}
+.explore-panel h3{margin:0 0 12px}
+.explore-panel a{display:block;padding:12px;border:1px solid #e8ecf3;border-radius:10px;margin:8px 0}
+.explore-panel a:hover{border-color:var(--gold)}
 footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
-.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:24px}
+.footer-grid{display:grid;grid-template-columns:2fr 1fr;gap:28px}
 .footer-grid h4{color:#fff;margin:0 0 12px;font-size:14px}
 .footer-grid a{display:block;margin:6px 0;color:#aab}
 .footer-grid a:hover{color:var(--gold)}
 .foot-bottom{margin-top:24px;padding-top:16px;border-top:1px solid #ffffff18;font-size:13px}
 @media(max-width:760px){
-  .navlinks{display:none;flex-direction:column;position:absolute;top:72px;left:0;right:0;background:#101a2c;padding:16px;gap:14px;border-bottom:1px solid #ffffff20}
-  .navlinks.open{display:flex}
-  .hamb{display:block}
-  .footer-grid{grid-template-columns:1fr}
-  .hero{min-height:420px}
+.navlinks{display:none;flex-direction:column;position:absolute;top:72px;left:0;right:0;background:#101a2c;padding:16px;gap:14px}
+.navlinks.open{display:flex}
+.hamb{display:block}
+.footer-grid{grid-template-columns:1fr}
+.hero{min-height:480px}
 }
 </style>
 </head>
@@ -88,6 +90,14 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
     <div class="eyebrow">ONE WORLD · ENDLESS POSSIBILITIES</div>
     <h1 id="heroTitle">Explore Your<br><span>Digital World.</span></h1>
     <p id="heroDesc">Knowledge, learning, creativity and technology — connected in one place.</p>
+    <div class="search-box">
+      <div class="search-row">
+        <input id="siteSearch" type="search" placeholder="Search Granshi pages and departments..." autocomplete="off">
+        <button type="button" class="btn-site" id="btnSite">Search</button>
+        <button type="button" class="btn-ai" id="btnAi">AI Ask</button>
+      </div>
+      <div class="search-results" id="searchResults"></div>
+    </div>
   </div>
 </section>
 
@@ -105,62 +115,26 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
   </div>
 </section>
 
-<section id="explore">
-  <div class="wrap">
-    <div class="head"><small>EXPLORE</small><h2 id="exploreHead">Departments</h2>
-      <p id="exploreSub">Browse content by department from the menu or links below.</p>
-    </div>
-    <div class="explore-links" id="exploreLinks"></div>
+<div class="panel-bg" id="panelBg"></div>
+<div class="explore-panel" id="explorePanel">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h3 id="exploreTitle">Departments</h3>
+    <button type="button" id="closeExplore" style="border:0;background:#eee;padding:8px 12px;border-radius:8px;cursor:pointer">X</button>
   </div>
-</section>
-
-<section id="about">
-  <div class="wrap">
-    <div class="about-box">
-      <div class="head"><small>ABOUT</small><h2 id="aboutHead">About Granshi</h2></div>
-      <p id="aboutText"></p>
-      <div class="contact-toggle">
-        <button type="button" class="btn" id="openContact">Contact →</button>
-      </div>
-      <div class="contact-panel" id="contactPanel">
-        <form class="form" id="contactForm">
-          <label>Your name</label>
-          <input id="c_name" required maxlength="120" autocomplete="name">
-          <label>Your email</label>
-          <input id="c_email" type="email" required maxlength="180" autocomplete="email">
-          <label>Department (optional)</label>
-          <select id="c_dept"><option value="">General</option></select>
-          <label>Subject</label>
-          <input id="c_subject" maxlength="200">
-          <label>Message</label>
-          <textarea id="c_body" required maxlength="5000"></textarea>
-          <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-            <button class="btn" type="submit" id="c_submit">Send message</button>
-            <button class="btn ghost" type="button" id="c_cancel">Cancel</button>
-          </div>
-          <div id="c_msg"></div>
-        </form>
-      </div>
-    </div>
-  </div>
-</section>
+  <div id="explorePanelList"></div>
+</div>
 
 <footer>
   <div class="wrap">
     <div class="footer-grid">
       <div>
         <h4>GRANSHI</h4>
-        <p id="footerTag" style="margin:0;line-height:1.6">One World. Endless Possibilities.</p>
+        <p id="aboutText" style="margin:0;line-height:1.7;max-width:420px"></p>
+        <p id="footerTag" style="margin:12px 0 0;opacity:.85"></p>
       </div>
-      <div>
+      <div id="footerExploreBlock">
         <h4 id="footExplore">Explore</h4>
         <div id="footerDepts"></div>
-      </div>
-      <div>
-        <h4 id="footLinks">Links</h4>
-        <a href="/">Home</a>
-        <a href="#about">About</a>
-        <a href="#about" id="footContact">Contact</a>
       </div>
     </div>
     <div class="foot-bottom" id="footerText">© Granshi — My Digital World</div>
@@ -168,115 +142,141 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 </footer>
 
 <script>
-let lang='en', settings={}, menus=[], departments=[], latest=[], popular=[];
-function t(en,ne){return lang==='ne'&&ne?ne:en}
-function closeMobileNav(){document.getElementById('nav').classList.remove('open')}
+let lang="en",settings={},menus=[],departments=[],latest=[],popular=[],allPages=[];
+function t(en,ne){return lang==="ne"&&ne?ne:en}
+function closeMobileNav(){document.getElementById("nav").classList.remove("open")}
+function deptUrl(d){
+  if(d.slug)return "/dept/"+d.slug;
+  if(d.url&&d.url!=="#"&&d.url.indexOf("#")!==0)return d.url;
+  return "/dept/"+d.id;
+}
+function openExplore(){
+  document.getElementById("panelBg").classList.add("open");
+  document.getElementById("explorePanel").classList.add("open");
+  closeMobileNav();
+}
+function closeExplore(){
+  document.getElementById("panelBg").classList.remove("open");
+  document.getElementById("explorePanel").classList.remove("open");
+}
 function renderNav(){
-  const items=menus.length?menus:[
-    {label_en:'Home',label_ne:'गृहपृष्ठ',url:'/'},
-    {label_en:'Explore',label_ne:'अन्वेषण',url:'#explore'},
-    {label_en:'About',label_ne:'हाम्रोबारे',url:'#about'}
+  var items=menus.length?menus:[
+    {label_en:"Home",label_ne:"गृहपृष्ठ",url:"/"},
+    {label_en:"Explore",label_ne:"अन्वेषण",url:"#explore"},
+    {label_en:"About",label_ne:"हाम्रोबारे",url:"#about"}
   ];
-  document.getElementById('nav').innerHTML=items.map(m=>`<a href="${m.url}">${t(m.label_en,m.label_ne)}</a>`).join('');
-  document.querySelectorAll('#nav a').forEach(a=>a.addEventListener('click',closeMobileNav));
+  document.getElementById("nav").innerHTML=items.map(function(m){
+    var label=t(m.label_en,m.label_ne);
+    var u=(m.url||"").toLowerCase();
+    if(u==="#explore"||u==="/explore"||label.toLowerCase().indexOf("explore")>=0||label.indexOf("अन्वेषण")>=0)
+      return '<a href="#explore" data-explore="1">'+label+"</a>";
+    if(u==="#about"||label.toLowerCase().indexOf("about")>=0||label.indexOf("हाम्रो")>=0)
+      return '<a href="#footerExploreBlock" data-about="1">'+label+"</a>";
+    return '<a href="'+(m.url||"/")+'">'+label+"</a>";
+  }).join("");
+  document.querySelectorAll("#nav a").forEach(function(a){
+    a.addEventListener("click",function(e){
+      if(a.getAttribute("data-explore")){e.preventDefault();openExplore()}
+      else if(a.getAttribute("data-about")){
+        e.preventDefault();
+        document.getElementById("footerExploreBlock").scrollIntoView({behavior:"smooth"});
+        closeMobileNav();
+      }else closeMobileNav();
+    });
+  });
 }
 function articleCard(a){
-  const title=t(a.title_en,a.title_ne);
-  const desc=t(a.description_en,a.description_ne)||'';
-  const dept=t(a.dept_en,a.dept_ne)||'';
-  return `<a class="article" href="/${a.slug}${lang==='ne'?'?lang=ne':''}">
-    ${dept?`<span class="tag">${dept}</span>`:''}
-    <h3>${title}</h3>
-    <p>${desc.slice(0,120)}${desc.length>120?'…':''}</p>
-    <span class="more">${t('Read →','पढ्नुहोस् →')}</span>
-  </a>`;
+  var title=t(a.title_en,a.title_ne);
+  var desc=t(a.description_en,a.description_ne)||"";
+  var dept=t(a.dept_en,a.dept_ne)||"";
+  return '<a class="article" href="/'+a.slug+(lang==="ne"?"?lang=ne":"")+'">'+
+    (dept?'<span class="tag">'+dept+"</span>":"")+
+    "<h3>"+title+"</h3><p>"+desc.slice(0,120)+(desc.length>120?"…":"")+"</p>"+
+    '<span class="more">'+t("Read →","पढ्नुहोस् →")+"</span></a>";
 }
 function renderArticles(){
-  const L=document.getElementById('latestList');
-  const P=document.getElementById('popularList');
-  L.innerHTML=latest.length?latest.map(articleCard).join(''):`<p class="muted">${t('No articles yet. Publish pages from Admin.','अहिले लेख छैन।')}</p>`;
-  P.innerHTML=popular.length?popular.map(articleCard).join(''):`<p style="color:var(--muted)">${t('Mark pages as Popular in Admin.','Admin मा Popular चिन्ह लगाउनुहोस्।')}</p>`;
+  document.getElementById("latestList").innerHTML=latest.length?latest.map(articleCard).join(""):
+    '<p style="color:var(--muted)">'+t("No articles yet.","अहिले लेख छैन।")+"</p>";
+  document.getElementById("popularList").innerHTML=popular.length?popular.map(articleCard).join(""):
+    '<p style="color:var(--muted)">'+t("Mark pages as Popular in Admin.","Admin मा Popular चिन्ह लगाउनुहोस्।")+"</p>";
 }
-function renderExplore(){
-  const links=document.getElementById('exploreLinks');
-  const foot=document.getElementById('footerDepts');
-  const html=(departments||[]).map(d=>{
-    const href=d.slug?`/dept/${d.slug}`:(d.url&&d.url!=='#'?d.url:`/dept/${d.id}`);
-    return `<a href="${href}">${d.icon||'✦'} ${t(d.name_en,d.name_ne)}</a>`;
-  }).join('');
-  links.innerHTML=html||'—';
-  foot.innerHTML=html||'—';
-  document.getElementById('c_dept').innerHTML=`<option value="">${t('General','सामान्य')}</option>`+
-    (departments||[]).map(d=>`<option value="${d.id}">${t(d.name_en,d.name_ne)}</option>`).join('');
+function renderExploreLists(){
+  var html=(departments||[]).map(function(d){
+    return '<a href="'+deptUrl(d)+'">'+(d.icon||"✦")+" "+t(d.name_en,d.name_ne)+"</a>";
+  }).join("")||'<p style="color:#667">—</p>';
+  document.getElementById("explorePanelList").innerHTML=html;
+  document.getElementById("footerDepts").innerHTML=html;
 }
 function applyTexts(){
-  document.getElementById('lang').textContent=lang==='en'?'नेपाली':'English';
-  const ht=settings.hero_title_en||'Explore Your Digital World.';
-  document.getElementById('heroTitle').innerHTML=lang==='en'
-    ?ht.replace(/Digital World\.?/,'<span>Digital World.</span>')
+  document.getElementById("lang").textContent=lang==="en"?"नेपाली":"English";
+  var ht=settings.hero_title_en||"Explore Your Digital World.";
+  document.getElementById("heroTitle").innerHTML=lang==="en"
+    ?ht.replace(/Digital World\.?/,"<span>Digital World.</span>")
     :(settings.hero_title_ne||ht);
-  document.getElementById('heroDesc').textContent=t(
-    settings.hero_desc_en||'Knowledge, learning, creativity and technology — connected in one place.',
-    settings.hero_desc_ne||'ज्ञान, सिकाइ, सिर्जनशीलता र प्रविधि — सबै एउटै ठाउँमा।'
+  document.getElementById("heroDesc").textContent=t(
+    settings.hero_desc_en||"Knowledge, learning, creativity and technology — connected in one place.",
+    settings.hero_desc_ne||"ज्ञान, सिकाइ, सिर्जनशीलता र प्रविधि — सबै एउटै ठाउँमा।"
   );
-  document.getElementById('latestHead').textContent=t('Latest Articles','नयाँ लेखहरू');
-  document.getElementById('popularHead').textContent=t('Popular Articles','लोकप्रिय लेखहरू');
-  document.getElementById('exploreHead').textContent=t('Departments','विभागहरू');
-  document.getElementById('exploreSub').textContent=t('Browse content by department from the menu or links below.','मेनु वा तलका लिङ्कबाट विभागअनुसार सामग्री हेर्नुहोस्।');
-  document.getElementById('aboutHead').textContent=t('About Granshi','Granshi बारे');
-  document.getElementById('aboutText').textContent=t(
-    settings.about_en||'Granshi is a growing digital platform for knowledge, learning, creativity and technology.',
-    settings.about_ne||'Granshi ज्ञान, सिकाइ, सिर्जनशीलता र प्रविधिको लागि बढ्दो डिजिटल प्लेटफर्म हो।'
+  document.getElementById("latestHead").textContent=t("Latest Articles","नयाँ लेखहरू");
+  document.getElementById("popularHead").textContent=t("Popular Articles","लोकप्रिय लेखहरू");
+  document.getElementById("exploreTitle").textContent=t("Departments","विभागहरू");
+  document.getElementById("footExplore").textContent=t("Explore","अन्वेषण");
+  document.getElementById("aboutText").textContent=t(
+    settings.about_en||"Granshi is a growing digital platform for knowledge, learning, creativity and technology.",
+    settings.about_ne||"Granshi ज्ञान, सिकाइ, सिर्जनशीलता र प्रविधिको लागि बढ्दो डिजिटल प्लेटफर्म हो।"
   );
-  document.getElementById('openContact').textContent=t('Contact →','सम्पर्क →');
-  document.getElementById('footerText').textContent=settings.footer_text||'© Granshi — My Digital World';
-  document.getElementById('footerTag').textContent=settings.tagline||'One World. Endless Possibilities.';
-  if(settings.brand_name) document.title=settings.brand_name;
-  if(settings.primary_color) document.documentElement.style.setProperty('--navy',settings.primary_color);
-  if(settings.accent_color) document.documentElement.style.setProperty('--gold',settings.accent_color);
-  renderNav();renderArticles();renderExplore();
+  document.getElementById("footerText").textContent=settings.footer_text||"© Granshi — My Digital World";
+  document.getElementById("footerTag").textContent=settings.tagline||"One World. Endless Possibilities.";
+  document.getElementById("siteSearch").placeholder=t("Search Granshi pages and departments...","Granshi का page र विभाग खोज्नुहोस्...");
+  if(settings.brand_name)document.title=settings.brand_name;
+  if(settings.primary_color)document.documentElement.style.setProperty("--navy",settings.primary_color);
+  if(settings.accent_color)document.documentElement.style.setProperty("--gold",settings.accent_color);
+  renderNav();renderArticles();renderExploreLists();
 }
-document.getElementById('lang').onclick=()=>{lang=lang==='en'?'ne':'en';applyTexts()};
-document.getElementById('hamb').onclick=()=>document.getElementById('nav').classList.toggle('open');
-document.getElementById('openContact').onclick=()=>{
-  document.getElementById('contactPanel').classList.add('open');
-  document.getElementById('contactPanel').scrollIntoView({behavior:'smooth',block:'nearest'});
-};
-document.getElementById('c_cancel').onclick=()=>{
-  document.getElementById('contactPanel').classList.remove('open');
-  document.getElementById('c_msg').textContent='';
-  document.getElementById('contactForm').reset();
-};
-document.getElementById('footContact').onclick=(e)=>{
-  e.preventDefault();
-  document.getElementById('about').scrollIntoView({behavior:'smooth'});
-  document.getElementById('contactPanel').classList.add('open');
-};
-document.getElementById('contactForm').onsubmit=async e=>{
-  e.preventDefault();
-  const msg=document.getElementById('c_msg'),btn=document.getElementById('c_submit');
-  btn.disabled=true;msg.textContent='';msg.className='';
-  try{
-    const r=await fetch('/api/contact',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
-      name:document.getElementById('c_name').value.trim(),
-      email:document.getElementById('c_email').value.trim(),
-      subject:document.getElementById('c_subject').value.trim(),
-      body:document.getElementById('c_body').value.trim(),
-      department_id:document.getElementById('c_dept').value||null
-    })});
-    const d=await r.json();if(!r.ok)throw new Error(d.error||'Failed');
-    msg.className='ok';msg.textContent=t('Message sent. Thank you!','सन्देश पठाइयो। धन्यवाद!');
-    document.getElementById('contactForm').reset();
-    setTimeout(()=>{document.getElementById('contactPanel').classList.remove('open');msg.textContent='';},1800);
-  }catch(err){msg.className='err';msg.textContent=err.message||'Error'}
-  finally{btn.disabled=false}
-};
-fetch('/api/public').then(r=>r.ok?r.json():null).then(d=>{
+function doSiteSearch(){
+  var q=(document.getElementById("siteSearch").value||"").trim().toLowerCase();
+  var box=document.getElementById("searchResults");
+  if(!q){box.classList.remove("open");box.innerHTML="";return}
+  var hits=[];
+  (departments||[]).forEach(function(d){
+    var name=(d.name_en||"")+" "+(d.name_ne||"")+" "+(d.description_en||"");
+    if(name.toLowerCase().indexOf(q)>=0)hits.push({type:"Department",title:t(d.name_en,d.name_ne),href:deptUrl(d)});
+  });
+  (allPages||[]).forEach(function(p){
+    var name=(p.title_en||"")+" "+(p.title_ne||"")+" "+(p.description_en||"");
+    if(name.toLowerCase().indexOf(q)>=0)hits.push({type:"Page",title:t(p.title_en,p.title_ne),href:"/"+p.slug+(lang==="ne"?"?lang=ne":"")});
+  });
+  if(!hits.length){
+    box.innerHTML='<div style="padding:12px;color:#667">'+t("No results","नतिजा छैन")+"</div>";
+    box.classList.add("open");return;
+  }
+  box.innerHTML=hits.slice(0,12).map(function(h){
+    return '<a href="'+h.href+'"><span class="tag">'+h.type+"</span><br>"+h.title+"</a>";
+  }).join("");
+  box.classList.add("open");
+}
+function doAiSearch(){
+  var q=(document.getElementById("siteSearch").value||"").trim();
+  if(!q){document.getElementById("siteSearch").focus();return}
+  window.open("https://www.google.com/search?udm=50&q="+encodeURIComponent(q),"_blank","noopener");
+}
+document.getElementById("lang").onclick=function(){lang=lang==="en"?"ne":"en";applyTexts()};
+document.getElementById("hamb").onclick=function(){document.getElementById("nav").classList.toggle("open")};
+document.getElementById("btnSite").onclick=doSiteSearch;
+document.getElementById("btnAi").onclick=doAiSearch;
+document.getElementById("siteSearch").addEventListener("input",doSiteSearch);
+document.getElementById("siteSearch").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();doSiteSearch()}});
+document.getElementById("closeExplore").onclick=closeExplore;
+document.getElementById("panelBg").onclick=closeExplore;
+document.addEventListener("click",function(e){
+  if(!e.target.closest(".search-box"))document.getElementById("searchResults").classList.remove("open");
+});
+fetch("/api/public").then(function(r){return r.ok?r.json():null}).then(function(d){
   if(!d)return;
   settings=d.settings||{};menus=d.menus||[];departments=d.departments||[];
-  latest=d.latest||[];popular=d.popular||[];
+  latest=d.latest||[];popular=d.popular||[];allPages=d.pages||[];
   applyTexts();
-}).catch(()=>applyTexts());
+}).catch(function(){applyTexts()});
 applyTexts();
 </script>
 </body>
