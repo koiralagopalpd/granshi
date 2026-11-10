@@ -71,6 +71,19 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 .footer-grid{grid-template-columns:1fr}
 .hero{min-height:480px}
 }
+
+.footer-about{margin:0;line-height:1.7;max-width:420px}
+.contact-btn{margin-top:14px;padding:10px 14px;border-radius:10px;border:0;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#f3dfa9,#d8b46a);color:#182235;font:inherit}
+.contact-panel{display:none;margin-top:14px;padding:14px;background:#ffffff12;border:1px solid #ffffff25;border-radius:12px}
+.contact-panel.open{display:block}
+.contact-panel label{display:block;font-size:12px;font-weight:700;margin:8px 0 4px;color:#dde}
+.contact-panel input,.contact-panel select,.contact-panel textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #ffffff30;background:#fff;color:#172033;font:inherit;box-sizing:border-box}
+.contact-panel textarea{min-height:90px;resize:vertical}
+.contact-panel .row-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.contact-panel .btn-send{padding:10px 14px;border:0;border-radius:8px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#f3dfa9,#d8b46a);color:#182235}
+.contact-panel .btn-cancel{padding:10px 14px;border:0;border-radius:8px;font-weight:700;cursor:pointer;background:#ffffff22;color:#fff}
+.contact-panel .ok{color:#8fdf9f;font-size:13px;margin-top:8px}
+.contact-panel .err{color:#ffb4b4;font-size:13px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -129,8 +142,29 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
     <div class="footer-grid">
       <div>
         <h4>GRANSHI</h4>
-        <p id="aboutText" style="margin:0;line-height:1.7;max-width:420px"></p>
+        <p class="footer-about"><b id="aboutHeadLabel">About us</b></p>
+        <p id="aboutText" class="footer-about"></p>
         <p id="footerTag" style="margin:12px 0 0;opacity:.85"></p>
+        <button type="button" class="contact-btn" id="openContact">Contact us</button>
+        <div class="contact-panel" id="contactPanel">
+          <form id="contactForm">
+            <label>Your name</label>
+            <input id="c_name" required maxlength="120" autocomplete="name">
+            <label>Your email</label>
+            <input id="c_email" type="email" required maxlength="180" autocomplete="email">
+            <label>Department (optional)</label>
+            <select id="c_dept"><option value="">General</option></select>
+            <label>Subject</label>
+            <input id="c_subject" maxlength="200">
+            <label>Message</label>
+            <textarea id="c_body" required maxlength="5000"></textarea>
+            <div class="row-btns">
+              <button class="btn-send" type="submit" id="c_submit">Send</button>
+              <button class="btn-cancel" type="button" id="c_cancel">Cancel</button>
+            </div>
+            <div id="c_msg"></div>
+          </form>
+        </div>
       </div>
       <div id="footerExploreBlock">
         <h4 id="footExplore">Explore</h4>
@@ -206,6 +240,11 @@ function renderExploreLists(){
   }).join("")||'<p style="color:#667">—</p>';
   document.getElementById("explorePanelList").innerHTML=html;
   document.getElementById("footerDepts").innerHTML=html;
+  var sel=document.getElementById("c_dept");
+  if(sel){
+    sel.innerHTML='<option value="">'+t("General","सामान्य")+"</option>"+
+      (departments||[]).map(function(d){return '<option value="'+d.id+'">'+t(d.name_en,d.name_ne)+"</option>";}).join("");
+  }
 }
 function applyTexts(){
   document.getElementById("lang").textContent=lang==="en"?"नेपाली":"English";
@@ -221,10 +260,13 @@ function applyTexts(){
   document.getElementById("popularHead").textContent=t("Popular Articles","लोकप्रिय लेखहरू");
   document.getElementById("exploreTitle").textContent=t("Departments","विभागहरू");
   document.getElementById("footExplore").textContent=t("Explore","अन्वेषण");
+  document.getElementById("aboutHeadLabel").textContent=t("About us","हाम्रो बारे");
   document.getElementById("aboutText").textContent=t(
     settings.about_en||"Granshi is a growing digital platform for knowledge, learning, creativity and technology.",
     settings.about_ne||"Granshi ज्ञान, सिकाइ, सिर्जनशीलता र प्रविधिको लागि बढ्दो डिजिटल प्लेटफर्म हो।"
   );
+  var oc=document.getElementById("openContact");
+  if(oc) oc.textContent=t("Contact us","सम्पर्क गर्नुहोस्");
   document.getElementById("footerText").textContent=settings.footer_text||"© Granshi — My Digital World";
   document.getElementById("footerTag").textContent=settings.tagline||"One World. Endless Possibilities.";
   document.getElementById("siteSearch").placeholder=t("Search Granshi pages and departments...","Granshi का page र विभाग खोज्नुहोस्...");
@@ -260,6 +302,33 @@ function doAiSearch(){
   if(!q){document.getElementById("siteSearch").focus();return}
   window.open("https://www.google.com/search?udm=50&q="+encodeURIComponent(q),"_blank","noopener");
 }
+
+document.getElementById("openContact").onclick=function(){
+  document.getElementById("contactPanel").classList.add("open");
+  document.getElementById("contactPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
+};
+document.getElementById("c_cancel").onclick=function(){
+  document.getElementById("contactPanel").classList.remove("open");
+  document.getElementById("c_msg").textContent="";
+  document.getElementById("contactForm").reset();
+};
+document.getElementById("contactForm").onsubmit=function(e){
+  e.preventDefault();
+  var msg=document.getElementById("c_msg"),btn=document.getElementById("c_submit");
+  btn.disabled=true;msg.className="";msg.textContent="";
+  fetch("/api/contact",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+    name:document.getElementById("c_name").value.trim(),
+    email:document.getElementById("c_email").value.trim(),
+    subject:document.getElementById("c_subject").value.trim(),
+    body:document.getElementById("c_body").value.trim(),
+    department_id:document.getElementById("c_dept").value||null
+  })}).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d}})}).then(function(x){
+    if(!x.ok)throw new Error(x.d.error||"Failed");
+    msg.className="ok";msg.textContent=t("Message sent. Thank you!","सन्देश पठाइयो। धन्यवाद!");
+    document.getElementById("contactForm").reset();
+    setTimeout(function(){document.getElementById("contactPanel").classList.remove("open");msg.textContent=""},1800);
+  }).catch(function(err){msg.className="err";msg.textContent=err.message||"Error"}).finally(function(){btn.disabled=false});
+};
 document.getElementById("lang").onclick=function(){lang=lang==="en"?"ne":"en";applyTexts()};
 document.getElementById("hamb").onclick=function(){document.getElementById("nav").classList.toggle("open")};
 document.getElementById("btnSite").onclick=doSiteSearch;
