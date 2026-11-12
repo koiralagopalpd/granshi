@@ -300,6 +300,19 @@ function openPageEditor(page,dept,cats){
     </div>
     <label>Description EN</label><textarea id="p_de" rows="2">${esc(page?.description_en||'')}</textarea>
     <label>Description NE</label><textarea id="p_dn" rows="2">${esc(page?.description_ne||'')}</textarea>
+    <div class="box" style="background:#f7f8fb;margin:12px 0">
+      <h4 style="margin:0 0 8px">Thumbnail / Homepage & Department Card</h4>
+      <p class="muted">खाली छोड्दा system ले page भित्रको पहिलो उपयुक्त image छान्छ। चाहनु भए यहाँ आफैँ image र छोटो teaser राख्न सक्नुहुन्छ।</p>
+      <label>Thumbnail image URL (optional override)</label><input id="p_thumb" value="${esc(page?.thumbnail_image||'')}" placeholder="/media/... or /_p/...">
+      <div class="grid2">
+        <div><label>Card title EN</label><input id="p_ttitle_en" value="${esc(page?.thumbnail_title_en||'')}"></div>
+        <div><label>Card title NE</label><input id="p_ttitle_ne" value="${esc(page?.thumbnail_title_ne||'')}"></div>
+        <div><label>Short summary EN</label><textarea id="p_tsum_en" rows="2">${esc(page?.thumbnail_summary_en||'')}</textarea></div>
+        <div><label>Short summary NE</label><textarea id="p_tsum_ne" rows="2">${esc(page?.thumbnail_summary_ne||'')}</textarea></div>
+      </div>
+      <label>Image alt text</label><input id="p_talt" value="${esc(page?.thumbnail_alt||'')}">
+      <div class="grid2"><div><label>Image focus X (0–100)</label><input id="p_fx" type="number" min="0" max="100" value="${Number(page?.thumbnail_focal_x??50)}"></div><div><label>Image focus Y (0–100)</label><input id="p_fy" type="number" min="0" max="100" value="${Number(page?.thumbnail_focal_y??50)}"></div></div>
+    </div>
     <label><input type="checkbox" id="p_pub" ${page?.published?'checked':''}> Published (live)</label>
     <label><input type="checkbox" id="p_pop" ${page?.is_popular?'checked':''}> Popular on homepage</label>
 
@@ -405,6 +418,9 @@ function openPageEditor(page,dept,cats){
         description_en:$('#p_de').value.trim(),description_ne:$('#p_dn').value.trim(),
         department_id:dept.id,category_id:$('#p_cat').value?Number($('#p_cat').value):null,
         published:false,is_popular:$('#p_pop').checked,
+        thumbnail_image:$('#p_thumb').value.trim(),thumbnail_title_en:$('#p_ttitle_en').value.trim(),thumbnail_title_ne:$('#p_ttitle_ne').value.trim(),
+        thumbnail_summary_en:$('#p_tsum_en').value.trim(),thumbnail_summary_ne:$('#p_tsum_ne').value.trim(),thumbnail_alt:$('#p_talt').value.trim(),
+        thumbnail_focal_x:Number($('#p_fx').value||50),thumbnail_focal_y:Number($('#p_fy').value||50),
         source_type:'zip',entry_file:entryFile,
         content:{files:names,entry:entryFile}
       })});
@@ -477,7 +493,10 @@ function openPageEditor(page,dept,cats){
         slug,title_en:$('#p_te').value.trim(),title_ne:$('#p_tn').value.trim(),
         description_en:$('#p_de').value.trim(),description_ne:$('#p_dn').value.trim(),
         department_id:dept.id,category_id:$('#p_cat').value?Number($('#p_cat').value):null,
-        published:$('#p_pub').checked,is_popular:$('#p_pop').checked
+        published:$('#p_pub').checked,is_popular:$('#p_pop').checked,
+        thumbnail_image:$('#p_thumb').value.trim(),thumbnail_title_en:$('#p_ttitle_en').value.trim(),thumbnail_title_ne:$('#p_ttitle_ne').value.trim(),
+        thumbnail_summary_en:$('#p_tsum_en').value.trim(),thumbnail_summary_ne:$('#p_tsum_ne').value.trim(),thumbnail_alt:$('#p_talt').value.trim(),
+        thumbnail_focal_x:Number($('#p_fx').value||50),thumbnail_focal_y:Number($('#p_fy').value||50)
       };
       if(useZip||zipReady||isZipExisting){
         payload.source_type='zip';
