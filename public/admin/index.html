@@ -575,6 +575,31 @@ function parseReplyDisplay(raw){
   if(!m)return {text:raw,atts:[],inbound:false};
   try{return {text:raw.slice(0,m.index),atts:JSON.parse(m[1]),inbound:false}}catch{return {text:raw,atts:[],inbound:false}}
 }
+async function compressMailImage(file){
+  if(!file.type||!file.type.startsWith('image/')||file.type==='image/gif'||file.type==='image/svg+xml')return file;
+  try{
+    const bmp=await createImageBitmap(file);
+    let scale=Math.min(1,1800/Math.max(bmp.width,bmp.height));
+    let canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+    let blob=null;
+    for(let pass=0;pass<8;pass++){
+      canvas.width=Math.max(1,Math.round(bmp.width*scale));
+      canvas.height=Math.max(1,Math.round(bmp.height*scale));
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(bmp,0,0,canvas.width,canvas.height);
+      for(const q of [.78,.65,.52,.4,.3]){
+        blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',q));
+        if(blob&&blob.size<=100*1024)break;
+      }
+      if(blob&&blob.size<=100*1024)break;
+      scale*=.78;
+    }
+    bmp.close();
+    if(!blob)return file;
+    const base=file.name.replace(/\.[^.]+$/,'')||'image';
+    return new File([blob],base+'.jpg',{type:'image/jpeg',lastModified:Date.now()});
+  }catch{return file}
+}
 async function renderMessages(v){
   const list=await api('/admin/messages');
   v.innerHTML=`<div class="box"><h3>Inbox</h3>
@@ -627,7 +652,8 @@ async function renderMessages(v){
     try{
       const files=$('#ra-'+id).files||[];
       const attachments=[];
-      for(const f of files){
+      for(const original of files){
+        const f=await compressMailImage(original);
         const r=await fetch('/api/admin/messages/attach',{method:'POST',headers:{
           'content-type':f.type||'application/octet-stream','x-file-name':encodeURIComponent(f.name)
         },body:f});
