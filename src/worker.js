@@ -132,7 +132,7 @@ function searchablePageText(content) {
       if (b.type === "hero") return [b.title,b.subtitle].join(" ");
       if (b.type === "button") return b.text || "";
       return "";
-    }).join(" ").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim().slice(0,30000);
+    }).join(" ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,30000);
   } catch { return ""; }
 }
 function htmlToSearchText(html) {
