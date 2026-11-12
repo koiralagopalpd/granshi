@@ -324,21 +324,27 @@ function openPageEditor(page,dept,cats){
       <div class="builder">
         <div><div class="canvas" id="canvas"></div></div>
         <div class="palette">
-          <button data-add="heading">Heading</button>
-          <button data-add="paragraph">Paragraph</button>
-          <button data-add="image">Image</button>
-          <button data-add="html">HTML</button>
+          <p><b>Tap to add blocks</b></p>
+          <button type="button" data-add="heading">＋ Heading</button>
+          <button type="button" data-add="paragraph">＋ Paragraph</button>
+          <button type="button" data-add="image">＋ Image</button>
+          <button type="button" data-add="video">＋ Video</button>
+          <button type="button" data-add="button">＋ Button / Link</button>
+          <button type="button" data-add="quote">＋ Quote</button>
+          <button type="button" data-add="divider">＋ Divider</button>
+          <button type="button" data-add="html">＋ Custom HTML</button>
+          <p class="muted">On mobile use ↑ / ↓ to reorder blocks.</p>
         </div>
       </div>
     </div>`;
 
   let blocks=[];
   try{if(page&&!isZipExisting)blocks=typeof page.content==='string'?JSON.parse(page.content):page.content||[]}catch{blocks=[]}
-  let useZip=isZipExisting||true; // default zip workflow
+  let useZip=isZipExisting; // ZIP remains primary; choose block editor when needed
   let entryFile='index.html';
   if(isZipExisting) entryFile=String(page.template).slice(4)||'index.html';
 
-  $('#toggleBlocks').onclick=()=>$('#blocksWrap').classList.toggle('hidden');
+  $('#toggleBlocks').onclick=()=>{useZip=false;$('#blocksWrap').classList.toggle('hidden')};
   $('#canP').onclick=()=>ed.classList.add('hidden');
   $('#prevP').onclick=(e)=>{
     const slug=$('#p_sl').value.trim()||$('#p_te').value.trim();
@@ -412,15 +418,41 @@ function openPageEditor(page,dept,cats){
   const canvas=$('#canvas');
   function drawBlocks(){
     if(!canvas)return;
-    canvas.innerHTML=blocks.map((b,i)=>`<div class="block"><button class="rm" data-rm="${i}">×</button><div class="body"><b>${esc(b.type)}</b>
-      <textarea data-i="${i}" rows="2">${esc(b.text||b.html||b.url||'')}</textarea></div></div>`).join('')||'<p class="muted">No blocks</p>';
-    $$('[data-rm]',canvas).forEach(btn=>btn.onclick=()=>{blocks.splice(+btn.dataset.rm,1);drawBlocks()});
-    $$('[data-i]',canvas).forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.i];if(b.type==='html')b.html=el.value;else if(b.type==='image')b.url=el.value;else b.text=el.value});
+    canvas.innerHTML=blocks.map((b,i)=>{
+      const field=(key,label,val,area=false)=>'<label>'+label+'</label>'+(area?'<textarea data-field="'+key+'" data-i="'+i+'" rows="3">'+esc(val||'')+'</textarea>':'<input data-field="'+key+'" data-i="'+i+'" value="'+esc(val||'')+'">');
+      let fields='';
+      if(b.type==='heading')fields=field('text','Heading text',b.text)+field('level','Level (1–4)',b.level||2);
+      else if(b.type==='paragraph'||b.type==='quote')fields=field('text',b.type==='quote'?'Quote':'Paragraph',b.text,true)+(b.type==='quote'?field('cite','Citation',b.cite):'');
+      else if(b.type==='image')fields=field('url','Image URL',b.url)+field('alt','Alt text',b.alt)+field('caption','Caption',b.caption)+'<label class="btn" style="display:inline-block">Choose image<input type="file" accept="image/*" data-upload="'+i+'" hidden></label>';
+      else if(b.type==='video')fields=field('url','Video URL or uploaded video URL',b.url)+'<label class="btn" style="display:inline-block">Choose video<input type="file" accept="video/*" data-upload="'+i+'" hidden></label>';
+      else if(b.type==='button')fields=field('text','Button label',b.text)+field('url','Button link',b.url);
+      else if(b.type==='html')fields=field('html','HTML code',b.html,true);
+      else fields='<p class="muted">Divider block</p>';
+      return '<div class="block" style="display:block;margin:10px 0;padding:12px;border:1px solid #dce3ed;border-radius:10px;background:#fff"><div class="row" style="justify-content:space-between"><b>'+esc(b.type.toUpperCase())+'</b><div class="row"><button type="button" class="btn" data-up="'+i+'" '+(i===0?'disabled':'')+'>↑</button><button type="button" class="btn" data-down="'+i+'" '+(i===blocks.length-1?'disabled':'')+'>↓</button><button type="button" class="btn danger" data-rm="'+i+'">Remove</button></div></div><div style="margin-top:8px">'+fields+'</div></div>';
+    }).join('')||'<p class="muted">No blocks yet. Add a block from the buttons.</p>';
+    $('[data-rm]',canvas).forEach(btn=>btn.onclick=()=>{blocks.splice(+btn.dataset.rm,1);drawBlocks()});
+    $('[data-up]',canvas).forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.up;if(i>0){[blocks[i-1],blocks[i]]=[blocks[i],blocks[i-1]];drawBlocks()}});
+    $('[data-down]',canvas).forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.down;if(i<blocks.length-1){[blocks[i+1],blocks[i]]=[blocks[i],blocks[i+1]];drawBlocks()}});
+    $('[data-field]',canvas).forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.i],k=el.dataset.field;b[k]=k==='level'?Number(el.value):el.value});
+    $('[data-upload]',canvas).forEach(el=>el.onchange=async()=>{
+      const file=el.files&&el.files[0];if(!file)return;
+      const idx=+el.dataset.upload,st=$('#zipStatus');if(st)st.textContent='Uploading '+file.name+'…';
+      try{
+        const slug=slugifyClient($('#p_sl').value.trim()||$('#p_te').value.trim());
+        if(!slug)throw new Error('Set page title/slug first.');
+        const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_'),rel='builder/'+Date.now()+'-'+safe;
+        const r=await fetch('/api/admin/pages/asset',{method:'POST',headers:{'content-type':file.type||'application/octet-stream','x-page-slug':slug,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent(rel)},body:file});
+        const d=await r.json();if(!r.ok)throw new Error(d.error||'Upload failed');
+        blocks[idx].url=d.url||('/media/pages/'+slug+'/'+rel);drawBlocks();if(st)st.textContent='Uploaded '+file.name;
+      }catch(err){alert(err.message)}
+    });
   }
   drawBlocks();
   $$('[data-add]',ed).forEach(btn=>btn.onclick=()=>{
     const t=btn.dataset.add;
-    blocks.push(t==='html'?{type:'html',html:''}:t==='image'?{type:'image',url:''}:{type:t,text:''});
+    useZip=false;
+    const defaults={heading:{type:t,text:'New heading',level:2},paragraph:{type:t,text:'Write your paragraph here.'},image:{type:t,url:'',alt:'',caption:''},video:{type:t,url:''},button:{type:t,text:'Learn more',url:'#'},quote:{type:t,text:'Quote text',cite:''},divider:{type:t},html:{type:t,html:''}};
+    blocks.push(defaults[t]||{type:t,text:''});
     drawBlocks();
   });
 
