@@ -149,12 +149,12 @@ async function renderUsefulLinks(v){
         </div>`).join('')||'<p class="muted">अहिलेसम्म Useful Links थपिएको छैन।</p>'}</div>
       <button class="btn gold" id="ulSave">Save Useful Links</button><span id="ulStatus" class="muted" style="margin-left:10px"></span>
     </div>`;
-    $v.querySelectorAll('[data-ultitle]').forEach(el=>el.oninput=()=>links[+el.dataset.ultitle].title=el.value);
-    $v.querySelectorAll('[data-uldesc]').forEach(el=>el.oninput=()=>links[+el.dataset.uldesc].description=el.value);
-    $v.querySelectorAll('[data-ulurl]').forEach(el=>el.oninput=()=>links[+el.dataset.ulurl].url=el.value);
-    $v.querySelectorAll('[data-uldel]').forEach(el=>el.onclick=()=>{links.splice(+el.dataset.uldel,1);draw()});
-    $v.querySelectorAll('[data-ulup]').forEach(el=>el.onclick=()=>{const i=+el.dataset.ulup;[links[i-1],links[i]]=[links[i],links[i-1]];draw()});
-    $v.querySelectorAll('[data-uldn]').forEach(el=>el.onclick=()=>{const i=+el.dataset.uldn;[links[i+1],links[i]]=[links[i],links[i+1]];draw()});
+    v.querySelectorAll('[data-ultitle]').forEach(el=>el.oninput=()=>links[+el.dataset.ultitle].title=el.value);
+    v.querySelectorAll('[data-uldesc]').forEach(el=>el.oninput=()=>links[+el.dataset.uldesc].description=el.value);
+    v.querySelectorAll('[data-ulurl]').forEach(el=>el.oninput=()=>links[+el.dataset.ulurl].url=el.value);
+    v.querySelectorAll('[data-uldel]').forEach(el=>el.onclick=()=>{links.splice(+el.dataset.uldel,1);draw()});
+    v.querySelectorAll('[data-ulup]').forEach(el=>el.onclick=()=>{const i=+el.dataset.ulup;[links[i-1],links[i]]=[links[i],links[i-1]];draw()});
+    v.querySelectorAll('[data-uldn]').forEach(el=>el.onclick=()=>{const i=+el.dataset.uldn;[links[i+1],links[i]]=[links[i],links[i+1]];draw()});
     $('#ulAdd').onclick=()=>{links.push({title:'',description:'',url:''});draw()};
     $('#ulSave').onclick=async()=>{
       const status=$('#ulStatus');
