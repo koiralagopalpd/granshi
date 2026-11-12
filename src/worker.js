@@ -300,7 +300,7 @@ async function sendEmail(env, { to, subject, html, replyTo, attachments = [] }) 
         from: "Granshi <noreply.info@gopalkoirala.com.np>",
         to: [to],
         subject,
-        html,
+        html: finalHtml,
         reply_to: replyTo,
         ...(outbound.length ? { attachments: outbound } : {}),
       }),
