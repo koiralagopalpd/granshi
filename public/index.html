@@ -220,7 +220,7 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 </footer>
 
 <script>
-let lang="en",settings={},menus=[],departments=[],latest=[],popular=[],allPages=[],pageCursor=0;
+let lang="en",settings={},menus=[],departments=[],latest=[],popular=[],allPages=[],pageCursor=0,pagesHasMore=false,pagesLoading=false;
 function t(en,ne){return lang==="ne"&&ne?ne:en}
 function closeMobileNav(){document.getElementById("nav").classList.remove("open")}
 function deptUrl(d){
@@ -296,7 +296,19 @@ function renderAllPages(reset){
   list.insertAdjacentHTML("beforeend",next.map(articleCard).join(""));
   pageCursor+=next.length;
   const more=document.getElementById("loadMorePages");
-  if(more)more.style.display=pageCursor<allPages.length?"inline-flex":"none";
+  if(more)more.style.display=pageCursor<allPages.length||pagesHasMore?"inline-flex":"none";
+}
+async function loadMorePages(){
+  if(pagesLoading)return;
+  if(pageCursor>=allPages.length&&pagesHasMore){
+    pagesLoading=true;const btn=document.getElementById("loadMorePages");btn.disabled=true;btn.textContent=t("Loading…","लोड हुँदैछ…");
+    try{
+      const r=await fetch("/api/pages?offset="+allPages.length+"&limit=60");if(!r.ok)throw new Error("Could not load more pages");
+      const d=await r.json();allPages=allPages.concat(d.pages||[]);pagesHasMore=!!d.hasMore;
+    }catch(e){btn.textContent=t("Try again","फेरि प्रयास गर्नुहोस्");btn.disabled=false;pagesLoading=false;return}
+    pagesLoading=false;btn.disabled=false;btn.textContent=t("Load more","थप हेर्नुहोस्");
+  }
+  renderAllPages(false);
 }
 function renderUsefulLinks(){
   var items=[];try{items=JSON.parse(settings.useful_links||"[]");if(!Array.isArray(items))items=[]}catch(e){items=[]}
@@ -406,14 +418,14 @@ document.getElementById("contactForm").onsubmit=function(e){
 document.getElementById("lang").onclick=function(){lang=lang==="en"?"ne":"en";applyTexts()};
 document.getElementById("hamb").onclick=function(){document.getElementById("nav").classList.toggle("open")};
  
-document.getElementById("loadMorePages").onclick=function(){renderAllPages(false)};
+document.getElementById("loadMorePages").onclick=loadMorePages;
 document.getElementById("closeExplore").onclick=closeExplore;
 document.getElementById("panelBg").onclick=closeExplore;
 
 fetch("/api/public").then(function(r){return r.ok?r.json():null}).then(function(d){
   if(!d)return;
   settings=d.settings||{};menus=d.menus||[];departments=d.departments||[];
-  latest=d.latest||[];popular=d.popular||[];allPages=d.pages||[];
+  latest=d.latest||[];popular=d.popular||[];allPages=d.pages||[];pagesHasMore=allPages.length>=300;
   applyTexts();
 }).catch(function(){applyTexts()});
 applyTexts();
