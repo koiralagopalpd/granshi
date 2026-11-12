@@ -149,12 +149,12 @@ async function renderUsefulLinks(v){
         </div>`).join('')||'<p class="muted">अहिलेसम्म Useful Links थपिएको छैन।</p>'}</div>
       <button class="btn gold" id="ulSave">Save Useful Links</button><span id="ulStatus" class="muted" style="margin-left:10px"></span>
     </div>`;
-    $$('[data-ultitle]').forEach(el=>el.oninput=()=>links[+el.dataset.ultitle].title=el.value);
-    $$('[data-uldesc]').forEach(el=>el.oninput=()=>links[+el.dataset.uldesc].description=el.value);
-    $$('[data-ulurl]').forEach(el=>el.oninput=()=>links[+el.dataset.ulurl].url=el.value);
-    $$('[data-uldel]').forEach(el=>el.onclick=()=>{links.splice(+el.dataset.uldel,1);draw()});
-    $$('[data-ulup]').forEach(el=>el.onclick=()=>{const i=+el.dataset.ulup;[links[i-1],links[i]]=[links[i],links[i-1]];draw()});
-    $$('[data-uldn]').forEach(el=>el.onclick=()=>{const i=+el.dataset.uldn;[links[i+1],links[i]]=[links[i],links[i+1]];draw()});
+    $v.querySelectorAll('[data-ultitle]').forEach(el=>el.oninput=()=>links[+el.dataset.ultitle].title=el.value);
+    $v.querySelectorAll('[data-uldesc]').forEach(el=>el.oninput=()=>links[+el.dataset.uldesc].description=el.value);
+    $v.querySelectorAll('[data-ulurl]').forEach(el=>el.oninput=()=>links[+el.dataset.ulurl].url=el.value);
+    $v.querySelectorAll('[data-uldel]').forEach(el=>el.onclick=()=>{links.splice(+el.dataset.uldel,1);draw()});
+    $v.querySelectorAll('[data-ulup]').forEach(el=>el.onclick=()=>{const i=+el.dataset.ulup;[links[i-1],links[i]]=[links[i],links[i-1]];draw()});
+    $v.querySelectorAll('[data-uldn]').forEach(el=>el.onclick=()=>{const i=+el.dataset.uldn;[links[i+1],links[i]]=[links[i],links[i+1]];draw()});
     $('#ulAdd').onclick=()=>{links.push({title:'',description:'',url:''});draw()};
     $('#ulSave').onclick=async()=>{
       const status=$('#ulStatus');
@@ -423,18 +423,31 @@ function openPageEditor(page,dept,cats){
       let fields='';
       if(b.type==='heading')fields=field('text','Heading text',b.text)+field('level','Level (1–4)',b.level||2);
       else if(b.type==='paragraph'||b.type==='quote')fields=field('text',b.type==='quote'?'Quote':'Paragraph',b.text,true)+(b.type==='quote'?field('cite','Citation',b.cite):'');
-      else if(b.type==='image')fields=field('url','Image URL',b.url)+field('alt','Alt text',b.alt)+field('caption','Caption',b.caption)+'<label class="btn" style="display:inline-block">Choose image<input type="file" accept="image/*" data-upload="'+i+'" hidden></label>';
-      else if(b.type==='video')fields=field('url','Video URL or uploaded video URL',b.url)+'<label class="btn" style="display:inline-block">Choose video<input type="file" accept="video/*" data-upload="'+i+'" hidden></label>';
+      else if(b.type==='image')fields=field('url','Image URL',b.url)+field('alt','Alt text',b.alt)+field('caption','Caption',b.caption)+'<div class="row"><label class="btn" style="display:inline-block">Choose image<input type="file" accept="image/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
+      else if(b.type==='video')fields=field('url','Video URL or uploaded video URL',b.url)+'<div class="row"><label class="btn" style="display:inline-block">Choose video<input type="file" accept="video/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
       else if(b.type==='button')fields=field('text','Button label',b.text)+field('url','Button link',b.url);
       else if(b.type==='html')fields=field('html','HTML code',b.html,true);
       else fields='<p class="muted">Divider block</p>';
       return '<div class="block" style="display:block;margin:10px 0;padding:12px;border:1px solid #dce3ed;border-radius:10px;background:#fff"><div class="row" style="justify-content:space-between"><b>'+esc(b.type.toUpperCase())+'</b><div class="row"><button type="button" class="btn" data-up="'+i+'" '+(i===0?'disabled':'')+'>↑</button><button type="button" class="btn" data-down="'+i+'" '+(i===blocks.length-1?'disabled':'')+'>↓</button><button type="button" class="btn danger" data-rm="'+i+'">Remove</button></div></div><div style="margin-top:8px">'+fields+'</div></div>';
     }).join('')||'<p class="muted">No blocks yet. Add a block from the buttons.</p>';
-    $('[data-rm]',canvas).forEach(btn=>btn.onclick=()=>{blocks.splice(+btn.dataset.rm,1);drawBlocks()});
-    $('[data-up]',canvas).forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.up;if(i>0){[blocks[i-1],blocks[i]]=[blocks[i],blocks[i-1]];drawBlocks()}});
-    $('[data-down]',canvas).forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.down;if(i<blocks.length-1){[blocks[i+1],blocks[i]]=[blocks[i],blocks[i+1]];drawBlocks()}});
-    $('[data-field]',canvas).forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.i],k=el.dataset.field;b[k]=k==='level'?Number(el.value):el.value});
-    $('[data-upload]',canvas).forEach(el=>el.onchange=async()=>{
+    canvas.querySelectorAll('[data-rm]').forEach(btn=>btn.onclick=()=>{blocks.splice(+btn.dataset.rm,1);drawBlocks()});
+    canvas.querySelectorAll('[data-up]').forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.up;if(i>0){[blocks[i-1],blocks[i]]=[blocks[i],blocks[i-1]];drawBlocks()}});
+    canvas.querySelectorAll('[data-down]').forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.down;if(i<blocks.length-1){[blocks[i+1],blocks[i]]=[blocks[i],blocks[i+1]];drawBlocks()}});
+    canvas.querySelectorAll('[data-field]').forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.i],k=el.dataset.field;b[k]=k==='level'?Number(el.value):el.value});
+    canvas.querySelectorAll('[data-library]').forEach(btn=>btn.onclick=async()=>{
+      const idx=+btn.dataset.library,block=blocks[idx];
+      try{
+        const all=await api('/admin/media?department_id='+encodeURIComponent(dept.id));
+        const allowed=all.filter(m=>block.type==='image'?(m.content_type||'').startsWith('image/'):(m.content_type||'').startsWith('video/'));
+        if(!allowed.length){alert('No matching uploads in Media Library yet. Upload a file first.');return}
+        const card=btn.closest('.block'),select=document.createElement('select');
+        select.style.marginTop='8px';select.innerHTML='<option value="">Choose an uploaded '+block.type+'…</option>'+allowed.map(m=>'<option value="'+esc(m.url)+'">'+esc(m.name)+' · '+Math.ceil((m.size||0)/1024)+' KB</option>').join('');
+        const previous=card.querySelector('[data-library-select]');if(previous)previous.remove();
+        select.setAttribute('data-library-select','');card.appendChild(select);
+        select.onchange=()=>{if(select.value){block.url=select.value;drawBlocks()}};
+      }catch(e){alert(e.message)}
+    });
+    canvas.querySelectorAll('[data-upload]').forEach(el=>el.onchange=async()=>{
       const file=el.files&&el.files[0];if(!file)return;
       const idx=+el.dataset.upload,st=$('#zipStatus');if(st)st.textContent='Uploading '+file.name+'…';
       try{
