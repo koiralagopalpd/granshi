@@ -731,7 +731,7 @@ async function api(req, env) {
         const html = await entryObject.text();
         searchText = htmlToSearchText(html);
         const extractedCover = zipCoverFromHtml(html,slug);
-        if (extractedCover) thumbnailImage = extractedCover;
+        if (!x.thumbnail_image && extractedCover) thumbnailImage = extractedCover;
       }
     }
     await env.DB.prepare(
