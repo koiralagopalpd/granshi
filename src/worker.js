@@ -351,6 +351,28 @@ async function api(req, env) {
   if (p === "/api/health") return json({ ok: true, v: 4 });
   if (p === "/api/public" && method === "GET")
     return json(await allPublic(env));
+  if (p === "/api/search" && method === "POST") {
+    const x = await body(req);
+    const query = String(x.query || "").trim().slice(0,240);
+    if (query.length < 2) return json({ answer:"", results:[], message:"Type at least two characters." },400);
+    const words = [...new Set(query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w=>w.length>1))].slice(0,8);
+    if (!words.length) return json({ answer:"", results:[] });
+    const where = words.map(()=>"(i.title LIKE ? OR i.description LIKE ? OR i.body_text LIKE ?)").join(" OR ");
+    const binds = words.flatMap(w=>{const q="%"+w+"%";return [q,q,q]});
+    const rows = await safeAll(env,
+      "SELECT i.page_slug,i.title,i.description,i.body_text,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.department_id,d.name_en AS dept_en,d.name_ne AS dept_ne FROM page_search_index i JOIN pages p ON p.slug=i.page_slug LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 AND ("+where+") ORDER BY p.updated_at DESC LIMIT 8",
+      ...binds);
+    const results = rows.map(r=>({
+      slug:r.page_slug,title:r.thumbnail_title_en||r.title,title_ne:r.thumbnail_title_ne||"",
+      summary:r.thumbnail_summary_en||r.description||pageExcerpt(r.body_text,query),
+      summary_ne:r.thumbnail_summary_ne||"",image:r.thumbnail_image||"",department:r.dept_en||"",
+      excerpt:pageExcerpt(r.body_text,query),url:"/"+encodeURIComponent(r.page_slug)
+    }));
+    const answer = results.slice(0,3).map(r=>r.excerpt||r.summary).filter(Boolean).join(" ");
+    return json({ query, answer, results, grounded:results.length>0,
+      message:results.length ? "" : "Granshi मा यस प्रश्नको पर्याप्त प्रकाशित जानकारी भेटिएन।" });
+  }
+
 
   // Public comments / feedback on pages
   if (p === "/api/comments" && method === "GET") {
