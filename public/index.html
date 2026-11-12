@@ -39,6 +39,16 @@ header{position:sticky;top:0;z-index:30;background:#101a2cf5;color:#fff;border-b
 .dept-card>*{position:relative}.dept-card .ico{font-size:28px;color:var(--gold);margin-bottom:12px}.dept-card h3{margin:0 0 7px;font-size:19px}.dept-card p{margin:0;color:#d3dbe6;font-size:13px;line-height:1.5}.dept-card b{margin-top:14px;color:var(--gold);font-size:12px}
 .article{padding:0;overflow:hidden;border-radius:17px;gap:0}
 .article .thumb{height:174px;width:100%;object-fit:cover;background:linear-gradient(135deg,#1a3450,#101a2c);display:grid;place-items:center;color:#e5c77e;font-size:42px}
+.article .thumb-art{position:relative;overflow:hidden;background:linear-gradient(135deg,#193b57,#101a2c)}
+.article .thumb-art:before{content:"";position:absolute;width:190px;height:190px;border:1px solid #e5c77e55;border-radius:50%;right:-42px;top:-88px;box-shadow:0 0 0 22px #e5c77e10,0 0 0 48px #e5c77e08}
+.article .thumb-art span{position:relative;font-size:54px;color:#e5c77e;text-shadow:0 8px 22px #0006}
+.article .thumb-art.dept-learning{background:linear-gradient(135deg,#234b48,#101a2c)}
+.article .thumb-art.dept-smart-tools{background:linear-gradient(135deg,#3b3155,#101a2c)}
+.article .thumb-art.dept-games{background:linear-gradient(135deg,#47394b,#101a2c)}
+.article .thumb-art.dept-creative-studio{background:linear-gradient(135deg,#4b3548,#101a2c)}
+.article .thumb-art.dept-world{background:linear-gradient(135deg,#24465d,#101a2c)}
+.article .thumb-art.dept-community{background:linear-gradient(135deg,#25463c,#101a2c)}
+.article .thumb-art.dept-advanced-services{background:linear-gradient(135deg,#4a332c,#101a2c)}
 .article .card-copy{padding:16px;display:flex;flex-direction:column;gap:8px;min-height:155px}
 .article h3{font-size:17px}.article p{min-height:42px}
 .market-cta{display:inline-flex;margin-top:18px;padding:12px 18px;border-radius:12px;background:linear-gradient(135deg,#f3dfa9,#d8b46a);color:#182235;font-weight:850}
@@ -271,7 +281,9 @@ function articleCard(a){
   var title=lang==="ne"?(a.thumbnail_title_ne||a.title_ne||a.title_en):(a.thumbnail_title_en||a.title_en);
   var desc=lang==="ne"?(a.thumbnail_summary_ne||a.description_ne||a.description_en):(a.thumbnail_summary_en||a.description_en)||"";
   var dept=t(a.dept_en,a.dept_ne)||"";
-  var img=a.thumbnail_image?'<img class="thumb" src="'+escText(a.thumbnail_image)+'" alt="'+escText(a.thumbnail_alt||title)+'" loading="lazy" style="object-position:'+(a.thumbnail_focal_x??50)+'% '+(a.thumbnail_focal_y??50)+'%">':'<div class="thumb" aria-hidden="true">✦</div>';
+  var deptKey=String(a.dept_slug||"").toLowerCase().replace(/[^a-z0-9-]/g,"");
+  var deptIcons={"knowledge":"✦","learning":"◈","smart-tools":"⚙","games":"♟","creative-studio":"✧","world":"◎","community":"♧","advanced-services":"⌘"};
+  var img=a.thumbnail_image?'<img class="thumb" src="'+escText(a.thumbnail_image)+'" alt="'+escText(a.thumbnail_alt||title)+'" loading="lazy" style="object-position:'+(a.thumbnail_focal_x??50)+'% '+(a.thumbnail_focal_y??50)+'%">':'<div class="thumb thumb-art dept-'+deptKey+'" aria-hidden="true"><span>'+(deptIcons[deptKey]||"✦")+'</span></div>';
   return '<a class="article" href="/'+encodeURIComponent(a.slug)+(lang==="ne"?"?lang=ne":"")+'">'+img+'<div class="card-copy">'+
     (dept?'<span class="tag">'+escText(dept)+"</span>":"")+
     "<h3>"+escText(title)+"</h3><p>"+escText(desc.slice(0,135))+(desc.length>135?"…":"")+"</p>"+
@@ -387,7 +399,7 @@ document.getElementById("askForm").onsubmit=async function(e){
     const data=await response.json();if(!response.ok)throw new Error(data.error||"Search failed");
     if(!data.results||!data.results.length){area.innerHTML='<div class="answer-box">'+escText(data.message||t("No matching published content was found.","मिल्दो प्रकाशित सामग्री भेटिएन।"))+'</div>';return}
     const answer=data.answer||data.results.map(x=>x.excerpt||x.summary).filter(Boolean).join(" ");
-    area.innerHTML='<div class="answer-box"><b>'+t("What Granshi found","Granshi ले भेटेको जानकारी")+'</b><div style="margin-top:8px">'+escText(answer)+'</div><div class="answer-note">'+t("This is an extractive summary assembled from matching published pages, not an AI-generated answer.","यो मिल्दो प्रकाशित पृष्ठबाट निकालिएको सार हो, AI ले सिर्जना गरेको उत्तर होइन।")+'</div></div><div class="search-sources"><b>'+t("Sources on Granshi","Granshi का स्रोतहरू")+'</b>'+data.results.map(x=>'<a class="search-source" href="'+escText(x.url)+(lang==="ne"?"?lang=ne":"")+'">'+(x.image?'<img src="'+escText(x.image)+'" alt="">':'<img alt="" src="/assets-brand.png">')+'<span><b>'+escText(lang==="ne"?(x.title_ne||x.title):x.title)+'</b><small>'+escText(lang==="ne"?(x.summary_ne||x.summary||""):(x.summary||""))+'</small></span></a>').join("")+'</div><p class="answer-note">'+t("यो उत्तर Granshi मा उपलब्ध सामग्रीका आधारमा तयार गरिएको हो। जानकारी पूर्ण वा १००% सही नहुन सक्छ। थप पुष्टि गर्नुहोस्।","यो उत्तर Granshi मा उपलब्ध सामग्रीका आधारमा तयार गरिएको हो। जानकारी पूर्ण वा १००% सही नहुन सक्छ। थप पुष्टि गर्नुहोस्।")+'</p>';
+    area.innerHTML='<div class="answer-box"><b>'+t("What Granshi found","Granshi ले भेटेको जानकारी")+'</b><div style="margin-top:8px">'+escText(answer)+'</div><div class="answer-note">'+t("This is an extractive summary assembled from matching published pages, not an AI-generated answer.","यो मिल्दो प्रकाशित पृष्ठबाट निकालिएको सार हो, AI ले सिर्जना गरेको उत्तर होइन।")+'</div></div><div class="search-sources"><b>'+t("Sources on Granshi","Granshi का स्रोतहरू")+'</b>'+data.results.map(x=>'<a class="search-source" href="'+escText(x.url)+(lang==="ne"?"?lang=ne":"")+'">'+(x.image?'<img src="'+escText(x.image)+'" alt="">':'<img alt="" src="/assets-brand.png">')+'<span><b>'+escText(lang==="ne"?(x.title_ne||x.title):x.title)+'</b><small>'+escText(lang==="ne"?(x.summary_ne||x.summary||""):(x.summary||""))+'</small></span></a>').join("")+'</div><p class="answer-note">'+t("This answer is based on content available on Granshi. Information may be incomplete or not 100% accurate. Please verify important details.","यो उत्तर Granshi मा उपलब्ध सामग्रीका आधारमा तयार गरिएको हो। जानकारी पूर्ण वा १००% सही नहुन सक्छ। थप पुष्टि गर्नुहोस्।")+'</p>';
   }catch(err){area.innerHTML='<div class="answer-box">'+escText(err.message)+'</div>'}
   finally{btn.disabled=false;btn.textContent=t("Ask","सोध्नुहोस्")}
 };
