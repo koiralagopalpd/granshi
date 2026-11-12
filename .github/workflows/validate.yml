@@ -20,7 +20,7 @@ jobs:
           import re, pathlib
           for file in [pathlib.Path("public/index.html"), pathlib.Path("public/admin/index.html")]:
               html=file.read_text()
-              scripts=re.findall(r"<script(?:\\s[^>]*)?>([\\s\\S]*?)</script>", html, re.I)
+              scripts=re.findall(r"<script(?:\s[^>]*)?>([\s\S]*?)</script>", html, re.I)
               for i, script in enumerate(scripts):
                   if script.strip():
                       out=pathlib.Path("/tmp") / f"{file.stem}-{i}.js"
