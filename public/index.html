@@ -244,7 +244,7 @@ function renderUsefulLinks(){
   if(!box)return;
   box.innerHTML=items.filter(function(x){return x&&x.title&&x.url}).map(function(x){
     var url=String(x.url||"").trim();
-    if(!/^https?:\\/\\//i.test(url))return "";
+    if(!(url.indexOf("https://")===0||url.indexOf("http://")===0))return "";
     return '<a href="'+url.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener noreferrer" title="'+String(x.description||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;")+'">'+String(x.title).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</a>'+
       (x.description?'<small style="display:block;color:#9da8b9;margin:0 0 8px;line-height:1.4">'+String(x.description).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</small>':"");
   }).join("")||'<span style="color:#9da8b9">—</span>';
