@@ -957,6 +957,7 @@ async function api(req, env) {
     const delivery = await sendEmail(env, {
       to: msg.email,
       subject: `Re: ${msg.subject || "Your message to Granshi"}`,
+      replyTo: "info@gopalkoirala.com.np",
       html: `<p>Hello ${escapeHtml(msg.name)},</p><p>${escapeHtml( reply ).replace(/\n/g, "<br>")}</p>${attHtml}<hr><p>Original: ${escapeHtml( msg.body || "" )}</p>`,
       attachments,
     });
