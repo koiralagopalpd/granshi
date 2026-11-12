@@ -760,7 +760,8 @@ async function api(req, env) {
   }
   if (p.startsWith("/api/admin/pages/") && method === "DELETE") {
     const slug = decodeURIComponent(p.split("/").pop());
-    await env.DB.prepare("DELETE FROM pages WHERE slug=?").bind(slug).run();\n    await env.DB.prepare("DELETE FROM page_search_index WHERE page_slug=?").bind(slug).run();
+    await env.DB.prepare("DELETE FROM pages WHERE slug=?").bind(slug).run();
+    await env.DB.prepare("DELETE FROM page_search_index WHERE page_slug=?").bind(slug).run();
     // best-effort: list/delete R2 not available without list permission pattern — leave orphans ok
     return json({ ok: true });
   }
