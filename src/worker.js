@@ -252,12 +252,73 @@ async function sendEmail(env, { to, subject, html, replyTo, attachments = [] }) 
   }
 }
 
+async function verifyResendWebhook(req, raw, secret) {
+  if (!secret) return false;
+  const id = req.headers.get("svix-id") || "";
+  const timestamp = req.headers.get("svix-timestamp") || "";
+  const signatures = req.headers.get("svix-signature") || "";
+  if (!id || !timestamp || !signatures) return false;
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts) || Math.abs(Date.now()/1000-ts)>300) return false;
+  const keyText = secret.startsWith("whsec_") ? secret.slice(6) : secret;
+  let key;
+  try { key = Uint8Array.from(atob(keyText), ch => ch.charCodeAt(0)); } catch { return false; }
+  const cryptoKey = await crypto.subtle.importKey("raw", key, {name:"HMAC",hash:"SHA-256"}, false, ["sign"]);
+  const signed = new TextEncoder().encode(id+"."+timestamp+"."+raw);
+  const digest = new Uint8Array(await crypto.subtle.sign("HMAC",cryptoKey,signed));
+  let binary=""; digest.forEach(v=>binary+=String.fromCharCode(v));
+  const expected=btoa(binary);
+  return signatures.split(" ").some(part=>part.startsWith("v1,") && part.slice(3)===expected);
+}
+async function handleResendWebhook(req, env) {
+  const raw=await req.text();
+  if (!(await verifyResendWebhook(req,raw,env.RESEND_WEBHOOK_SECRET))) return json({error:"Invalid webhook signature."},401);
+  let event; try { event=JSON.parse(raw); } catch { return json({error:"Invalid JSON."},400); }
+  if (event.type!=="email.received") return json({received:true,ignored:true});
+  const meta=event.data||{}, emailId=String(meta.email_id||"");
+  if (!emailId || !env.RESEND_API_KEY || !env.DB) return json({error:"Receiving is not configured."},503);
+  const exists=await env.DB.prepare("SELECT id FROM inbound_email_events WHERE resend_email_id=?").bind(emailId).first();
+  if (exists) return json({received:true,duplicate:true});
+  const response=await fetch("https://api.resend.com/emails/receiving/"+encodeURIComponent(emailId),{headers:{Authorization:"Bearer "+env.RESEND_API_KEY}});
+  if(!response.ok) return json({error:"Could not retrieve received email from Resend."},502);
+  const payload=await response.json(), mail=payload.data||payload;
+  const from=String(mail.from||meta.from||"").slice(0,250);
+  const match=from.match(/<([^>]+)>/), address=(match?match[1]:from).trim();
+  const name=(match?from.replace(match[0],"").replace(/["']/g,"").trim():address).slice(0,120)||address;
+  const to=Array.isArray(mail.to)?mail.to:(Array.isArray(meta.to)?meta.to:[String(mail.to||"")]);
+  const subject=String(mail.subject||meta.subject||"Incoming email").slice(0,200);
+  const textBody=String(mail.text||"").slice(0,30000);
+  const htmlBody=String(mail.html||"").slice(0,60000);
+  const received=String(mail.created_at||event.created_at||new Date().toISOString());
+  const attachmentRows=[];
+  const listed=Array.isArray(mail.attachments)?mail.attachments:[];
+  for(const item of listed.slice(0,10)){
+    if(!env.MEDIA) break;
+    const aid=String(item.id||""); if(!aid) continue;
+    const ar=await fetch("https://api.resend.com/emails/receiving/"+encodeURIComponent(emailId)+"/attachments/"+encodeURIComponent(aid),{headers:{Authorization:"Bearer "+env.RESEND_API_KEY}});
+    if(!ar.ok) continue;
+    const ad=await ar.json(), obj=ad.data||ad, download=obj.download_url||obj.url;
+    if(!download) continue;
+    const file=await fetch(download); if(!file.ok) continue;
+    const bytes=await file.arrayBuffer(); if(bytes.byteLength>15*1024*1024) continue;
+    const filename=String(item.filename||obj.filename||"attachment").replace(/[^a-zA-Z0-9._-]/g,"_");
+    const key="inbound/"+crypto.randomUUID()+"-"+filename;
+    await env.MEDIA.put(key,bytes,{httpMetadata:{contentType:item.content_type||"application/octet-stream"}});
+    attachmentRows.push({key,url:"/media/"+key,name:filename,content_type:item.content_type||"",size:bytes.byteLength});
+  }
+  const inserted=await env.DB.prepare("INSERT INTO messages(name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(?,?,?,?,?,?,?,?)")
+    .bind(name,address,subject,textBody||htmlBody||"(No plain-text body)", "new",received, JSON.stringify({inbound:true,html:htmlBody,attachments:attachmentRows}),null).run();
+  await env.DB.prepare("INSERT INTO inbound_email_events(id,resend_email_id,message_id,sender,recipients,subject,body_text,body_html,headers_json,attachments_json,received_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(),emailId,inserted.meta?.last_row_id||null,from,JSON.stringify(to),subject,textBody,htmlBody,JSON.stringify(mail.headers||{}),JSON.stringify(attachmentRows),received,new Date().toISOString()).run();
+  return json({received:true});
+}
+
 async function api(req, env) {
   const u = new URL(req.url);
   const p = u.pathname;
   const method = req.method;
 
-  if (p === "/api/health") return json({ ok: true, v: 4 });
+  if (p === "/api/webhooks/resend" && method === "POST") return handleResendWebhook(req,env);\n  if (p === "/api/health") return json({ ok: true, v: 4 });
   if (p === "/api/public" && method === "GET")
     return json(await allPublic(env));
 
