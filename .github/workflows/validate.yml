@@ -36,6 +36,7 @@ jobs:
           db=sqlite3.connect(":memory:")
           db.executescript(pathlib.Path("database/0001_initial.sql").read_text())
           db.executescript(pathlib.Path("database/0002_inbound_email.sql").read_text())
+          db.executescript(pathlib.Path("database/0003_schema_compatibility.sql").read_text())
           tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
           assert "messages" in tables and "inbound_email_events" in tables
           cols={r[1] for r in db.execute("PRAGMA table_info(messages)")}
