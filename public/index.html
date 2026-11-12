@@ -143,6 +143,9 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
   <div class="wrap"><div class="head"><small>EXPLORE BY INTEREST</small><h2 id="deptHead">Explore Departments</h2></div><div class="dept-grid" id="departmentGrid"></div></div>
 </section>
 
+<section id="allpages" style="padding-top:12px">
+  <div class="wrap"><div class="head"><small>THE GRANSHI LIBRARY</small><h2 id="allPagesHead">All Published Pages</h2></div><div class="articles" id="allPagesList"></div><div style="text-align:center;margin-top:22px"><button id="loadMorePages" class="market-cta" type="button" style="border:0;cursor:pointer">Load more</button></div></div>
+</section>
 <section id="latest">
   <div class="wrap">
     <div class="head"><small>LATEST</small><h2 id="latestHead">Latest Articles</h2></div>
@@ -217,7 +220,7 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 </footer>
 
 <script>
-let lang="en",settings={},menus=[],departments=[],latest=[],popular=[],allPages=[];
+let lang="en",settings={},menus=[],departments=[],latest=[],popular=[],allPages=[],pageCursor=0;
 function t(en,ne){return lang==="ne"&&ne?ne:en}
 function closeMobileNav(){document.getElementById("nav").classList.remove("open")}
 function deptUrl(d){
@@ -284,6 +287,16 @@ function renderArticles(){
     '<p style="color:var(--muted)">'+t("No articles yet.","अहिले लेख छैन।")+"</p>";
   document.getElementById("popularList").innerHTML=popular.length?popular.map(articleCard).join(""):
     '<p style="color:var(--muted)">'+t("Mark pages as Popular in Admin.","Admin मा Popular चिन्ह लगाउनुहोस्।")+"</p>";
+  renderAllPages(true);
+}
+function renderAllPages(reset){
+  const list=document.getElementById("allPagesList");if(!list)return;
+  if(reset){pageCursor=0;list.innerHTML=""}
+  const next=allPages.slice(pageCursor,pageCursor+12);
+  list.insertAdjacentHTML("beforeend",next.map(articleCard).join(""));
+  pageCursor+=next.length;
+  const more=document.getElementById("loadMorePages");
+  if(more)more.style.display=pageCursor<allPages.length?"inline-flex":"none";
 }
 function renderUsefulLinks(){
   var items=[];try{items=JSON.parse(settings.useful_links||"[]");if(!Array.isArray(items))items=[]}catch(e){items=[]}
@@ -320,6 +333,7 @@ function applyTexts(){
     settings.hero_desc_ne||"ज्ञान, सिकाइ, सिर्जनशीलता र प्रविधि — सबै एउटै ठाउँमा।"
   );
   document.getElementById("latestHead").textContent=t("Latest Articles","नयाँ लेखहरू");
+  document.getElementById("allPagesHead").textContent=t("All Published Pages","सबै प्रकाशित सामग्री");
   document.getElementById("deptHead").textContent=t("Explore Departments","विभागहरू अन्वेषण गर्नुहोस्");
   document.getElementById("searchHeading").textContent=t("Ask Granshi anything.","Granshi लाई जे पनि सोध्नुहोस्।");
   document.getElementById("searchIntro").textContent=t("Search across published Granshi knowledge, learning and resources. Answers are based only on content available on this website.","Granshi का प्रकाशित ज्ञान, सिकाइ र सामग्रीमा खोज्नुहोस्। उत्तर वेबसाइटमा उपलब्ध सामग्रीमा आधारित हुन्छन्।");
@@ -392,11 +406,10 @@ document.getElementById("contactForm").onsubmit=function(e){
 document.getElementById("lang").onclick=function(){lang=lang==="en"?"ne":"en";applyTexts()};
 document.getElementById("hamb").onclick=function(){document.getElementById("nav").classList.toggle("open")};
  
+document.getElementById("loadMorePages").onclick=function(){renderAllPages(false)};
 document.getElementById("closeExplore").onclick=closeExplore;
 document.getElementById("panelBg").onclick=closeExplore;
-document.addEventListener("click",function(e){
-  if(!e.target.closest(".search-box"))document.getElementById("searchResults").classList.remove("open");
-});
+
 fetch("/api/public").then(function(r){return r.ok?r.json():null}).then(function(d){
   if(!d)return;
   settings=d.settings||{};menus=d.menus||[];departments=d.departments||[];
