@@ -569,10 +569,11 @@ function renderDeptMedia(sv,dept,media){
 
 /* ---- Messages: reply opens only on click, closes after success ---- */
 function parseReplyDisplay(raw){
-  if(!raw)return {text:'',atts:[]};
+  if(!raw)return {text:'',atts:[],inbound:false};
+  try{const j=JSON.parse(raw);if(j&&j.inbound)return {text:'',atts:j.attachments||[],inbound:true}}catch{}
   const m=String(raw).match(/\n\n<!--ATTACH:([\s\S]*?)-->$/);
-  if(!m)return {text:raw,atts:[]};
-  try{return {text:raw.slice(0,m.index),atts:JSON.parse(m[1])}}catch{return {text:raw,atts:[]}}
+  if(!m)return {text:raw,atts:[],inbound:false};
+  try{return {text:raw.slice(0,m.index),atts:JSON.parse(m[1]),inbound:false}}catch{return {text:raw,atts:[],inbound:false}}
 }
 async function renderMessages(v){
   const list=await api('/admin/messages');
@@ -592,6 +593,7 @@ async function renderMessages(v){
         </div>
       </div>
       <div style="margin-top:8px"><b>${esc(m.subject||'(no subject)')}</b><div style="white-space:pre-wrap;margin-top:4px">${esc(m.body)}</div></div>
+      ${pr.inbound&&pr.atts.length?'<div class="notice" style="margin-top:8px"><b>Received attachments:</b>'+pr.atts.map(a=>'<div style="margin-top:5px"><a href="'+esc(a.url)+'" target="_blank" rel="noopener">'+esc(a.name||'file')+'</a> · '+Math.ceil((a.size||0)/1024)+' KB</div>').join('')+'</div>':''}
       ${pr.text?`<div class="notice" style="margin-top:8px"><b>Your reply:</b><div style="white-space:pre-wrap">${esc(pr.text)}</div>
         ${pr.atts.map(a=>`<div style="margin-top:6px"><a href="${esc(a.url)}" target="_blank">${esc(a.name||'file')}</a></div>`).join('')}
       </div>`:''}
