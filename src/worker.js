@@ -322,7 +322,8 @@ async function api(req, env) {
   const p = u.pathname;
   const method = req.method;
 
-  if (p === "/api/webhooks/resend" && method === "POST") return handleResendWebhook(req,env);\n  if (p === "/api/health") return json({ ok: true, v: 4 });
+  if (p === "/api/webhooks/resend" && method === "POST") return handleResendWebhook(req,env);
+  if (p === "/api/health") return json({ ok: true, v: 4 });
   if (p === "/api/public" && method === "GET")
     return json(await allPublic(env));
 
