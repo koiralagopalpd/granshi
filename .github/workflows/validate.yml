@@ -41,6 +41,7 @@ jobs:
           assert "messages" in tables and "inbound_email_events" in tables
           cols={r[1] for r in db.execute("PRAGMA table_info(messages)")}
           assert {"reply_text","replied_at"} <= cols
+          assert "inbound_email_events" in tables
           db.execute("INSERT INTO messages(name,email,body,status,created_at) VALUES('Test','test@example.com','Hello','new','2026-01-01')")
           print("Fresh database migrations passed.")
           PY
