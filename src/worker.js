@@ -289,7 +289,7 @@ async function sendEmail(env, { to, subject, html, replyTo, attachments = [] }) 
     }
 
     const brandedFooter = '<div style="margin:28px 0 0;padding:16px 0 0;border-top:1px solid #e7eaf0;font:13px Arial,sans-serif;color:#667085"><a href="https://gopalkoirala.com.np" style="font-weight:700;color:#172033;text-decoration:none">Granshi</a> · <a href="https://gopalkoirala.com.np/legal/about" style="color:#8a6b2a;text-decoration:none">About Granshi</a></div>';
-    const finalHtml = String(html || '').replace(/<\\/body>/i, brandedFooter + '</body>');
+    const finalHtml = String(html || '').replace(/<\/body>/i, brandedFooter + '</body>');
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
