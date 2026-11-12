@@ -213,6 +213,7 @@ async function sendEmail(env, { to, subject, html, replyTo, attachments = [] }) 
   if (!env.RESEND_API_KEY || !to) return { sent: false, error: "Email service is not configured." };
   try {
     const outbound = [];
+    let totalAttachmentBytes = 0;
     for (const item of attachments.slice(0, 10)) {
       const key = String(item.key || "");
       if (!key.startsWith("replies/") || !env.MEDIA) continue;
@@ -220,6 +221,8 @@ async function sendEmail(env, { to, subject, html, replyTo, attachments = [] }) 
       if (!object) throw new Error("An attachment is missing from storage.");
       const bytes = new Uint8Array(await object.arrayBuffer());
       if (bytes.byteLength > 15 * 1024 * 1024) throw new Error("An attachment exceeds 15 MB.");
+      totalAttachmentBytes += bytes.byteLength;
+      if (totalAttachmentBytes > 20 * 1024 * 1024) throw new Error("Combined attachments must be 20 MB or less.");
       let binary = "";
       const chunk = 0x8000;
       for (let i = 0; i < bytes.length; i += chunk) {
@@ -306,8 +309,9 @@ async function handleResendWebhook(req, env) {
     await env.MEDIA.put(key,bytes,{httpMetadata:{contentType:item.content_type||"application/octet-stream"}});
     attachmentRows.push({key,url:"/media/"+key,name:filename,content_type:item.content_type||"",size:bytes.byteLength});
   }
+  const cleanText = textBody || String(htmlBody||"").replace(/<\/(p|div|br|li|h[1-6])>/gi,"\n").replace(/<[^>]*>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").trim() || "(No message body)";
   const inserted=await env.DB.prepare("INSERT INTO messages(name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(?,?,?,?,?,?,?,?)")
-    .bind(name,address,subject,textBody||htmlBody||"(No plain-text body)", "new",received, JSON.stringify({inbound:true,html:htmlBody,attachments:attachmentRows}),null).run();
+    .bind(name,address,subject,cleanText.slice(0,30000), "new",received, JSON.stringify({inbound:true,html:htmlBody,attachments:attachmentRows}),null).run();
   await env.DB.prepare("INSERT INTO inbound_email_events(id,resend_email_id,message_id,sender,recipients,subject,body_text,body_html,headers_json,attachments_json,received_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
     .bind(crypto.randomUUID(),emailId,inserted.meta?.last_row_id||null,from,JSON.stringify(to),subject,textBody,htmlBody,JSON.stringify(mail.headers||{}),JSON.stringify(attachmentRows),received,new Date().toISOString()).run();
   return json({received:true});
