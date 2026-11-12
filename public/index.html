@@ -234,12 +234,23 @@ function renderArticles(){
   document.getElementById("popularList").innerHTML=popular.length?popular.map(articleCard).join(""):
     '<p style="color:var(--muted)">'+t("Mark pages as Popular in Admin.","Admin मा Popular चिन्ह लगाउनुहोस्।")+"</p>";
 }
+function renderUsefulLinks(){
+  var items=[];try{items=JSON.parse(settings.useful_links||"[]");if(!Array.isArray(items))items=[]}catch(e){items=[]}
+  var box=document.getElementById("footerUsefulLinks");
+  if(!box)return;
+  box.innerHTML=items.filter(function(x){return x&&x.title&&x.url}).map(function(x){
+    var url=String(x.url||"").trim();
+    if(!/^https?:\\/\\//i.test(url))return "";
+    return '<a href="'+url.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener noreferrer" title="'+String(x.description||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;")+'">'+String(x.title).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</a>'+
+      (x.description?'<small style="display:block;color:#9da8b9;margin:0 0 8px;line-height:1.4">'+String(x.description).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</small>':"");
+  }).join("")||'<span style="color:#9da8b9">—</span>';
+}
 function renderExploreLists(){
   var html=(departments||[]).map(function(d){
     return '<a href="'+deptUrl(d)+'">'+(d.icon||"✦")+" "+t(d.name_en,d.name_ne)+"</a>";
   }).join("")||'<p style="color:#667">—</p>';
   document.getElementById("explorePanelList").innerHTML=html;
-  document.getElementById("footerDepts").innerHTML=html;
+  document.getElementById("footerDepts").innerHTML=html;\n  renderUsefulLinks();
   var sel=document.getElementById("c_dept");
   if(sel){
     sel.innerHTML='<option value="">'+t("General","सामान्य")+"</option>"+
@@ -259,7 +270,7 @@ function applyTexts(){
   document.getElementById("latestHead").textContent=t("Latest Articles","नयाँ लेखहरू");
   document.getElementById("popularHead").textContent=t("Popular Articles","लोकप्रिय लेखहरू");
   document.getElementById("exploreTitle").textContent=t("Departments","विभागहरू");
-  document.getElementById("footExplore").textContent=t("Explore","अन्वेषण");
+  document.getElementById("footExplore").textContent=t("Explore","अन्वेषण");\n  document.getElementById("footUseful").textContent=t("Useful Links","उपयोगी लिंकहरू");
   document.getElementById("aboutHeadLabel").textContent=t("About us","हाम्रो बारे");
   document.getElementById("aboutText").textContent=t(
     settings.about_en||"Granshi is a growing digital platform for knowledge, learning, creativity and technology.",
