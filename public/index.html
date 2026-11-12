@@ -254,7 +254,8 @@ function renderExploreLists(){
     return '<a href="'+deptUrl(d)+'">'+(d.icon||"✦")+" "+t(d.name_en,d.name_ne)+"</a>";
   }).join("")||'<p style="color:#667">—</p>';
   document.getElementById("explorePanelList").innerHTML=html;
-  document.getElementById("footerDepts").innerHTML=html;\n  renderUsefulLinks();
+  document.getElementById("footerDepts").innerHTML=html;
+  renderUsefulLinks();
   var sel=document.getElementById("c_dept");
   if(sel){
     sel.innerHTML='<option value="">'+t("General","सामान्य")+"</option>"+
