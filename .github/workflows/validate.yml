@@ -37,11 +37,16 @@ jobs:
           db.executescript(pathlib.Path("database/0001_initial.sql").read_text())
           db.executescript(pathlib.Path("database/0002_inbound_email.sql").read_text())
           db.executescript(pathlib.Path("database/0003_schema_compatibility.sql").read_text())
+          db.executescript(pathlib.Path("database/0004_discovery_search.sql").read_text())
           tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
           assert "messages" in tables and "inbound_email_events" in tables
           cols={r[1] for r in db.execute("PRAGMA table_info(messages)")}
           assert {"reply_text","replied_at"} <= cols
           assert "inbound_email_events" in tables
+          assert "page_search_index" in tables
+          page_cols={r[1] for r in db.execute("PRAGMA table_info(pages)")}
+          assert {"thumbnail_image","thumbnail_title_en","thumbnail_summary_en","thumbnail_focal_x","thumbnail_focal_y"} <= page_cols
+          assert db.execute("SELECT COUNT(*) FROM page_search_index").fetchone()[0] == 0
           db.execute("INSERT INTO messages(name,email,body,status,created_at) VALUES('Test','test@example.com','Hello','new','2026-01-01')")
           print("Fresh database migrations passed.")
           PY
