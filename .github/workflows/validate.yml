@@ -1,0 +1,45 @@
+name: Validate Granshi
+on:
+  push:
+    branches: [main, feature/granshi-admin-improvements]
+  pull_request:
+    branches: [main]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check Worker JavaScript
+        run: node --check src/worker.js
+      - name: Check inline browser scripts
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          for file in [pathlib.Path("public/index.html"), pathlib.Path("public/admin/index.html")]:
+              html=file.read_text()
+              scripts=re.findall(r"<script(?:\\s[^>]*)?>([\\s\\S]*?)</script>", html, re.I)
+              for i, script in enumerate(scripts):
+                  if script.strip():
+                      out=pathlib.Path("/tmp") / f"{file.stem}-{i}.js"
+                      out.write_text(script)
+                      print(f"Checking {out}")
+                      import subprocess
+                      subprocess.run(["node","--check",str(out)],check=True)
+          PY
+      - name: Apply migrations to a fresh SQLite database
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib
+          db=sqlite3.connect(":memory:")
+          db.executescript(pathlib.Path("database/0001_initial.sql").read_text())
+          db.executescript(pathlib.Path("database/0002_inbound_email.sql").read_text())
+          tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          assert "messages" in tables and "inbound_email_events" in tables
+          cols={r[1] for r in db.execute("PRAGMA table_info(messages)")}
+          assert {"reply_text","replied_at"} <= cols
+          db.execute("INSERT INTO messages(name,email,body,status,created_at) VALUES('Test','test@example.com','Hello','new','2026-01-01')")
+          print("Fresh database migrations passed.")
+          PY
