@@ -209,9 +209,27 @@ function pageChrome(title, desc, bodyHtml, settings, lang = "en") {
   return `<!doctype html><html lang="${lang}"><head> <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"> <title>${escapeHtml(title)} · ${escapeHtml(brand)}</title> <meta name="description" content="${escapeHtml(desc || "")}"> <meta name="theme-color" content="${escapeHtml(primary)}"> <style> :root{--navy:${escapeHtml(primary)};--gold:${escapeHtml( accent )};--paper:#f6f7fb;--ink:#172033;--muted:#667085} *{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;color:var(--ink);background:var(--paper)} a{text-decoration:none;color:inherit}.wrap{width:min(960px,92%);margin:auto} header{position:sticky;top:0;z-index:5;background:#101a2cf5;color:#fff;border-bottom:1px solid #ffffff20} .nav{height:64px;display:flex;align-items:center;justify-content:space-between} .brand{font-weight:900;letter-spacing:1px}.btn{display:inline-block;padding:12px 18px;border-radius:10px;font-weight:700;background:linear-gradient(135deg,#f3dfa9,var(--gold));color:#182235} .page-hero{background:var(--navy);color:#fff;padding:48px 0 36px}.page-hero h1{margin:0;font-size:clamp(28px,5vw,42px)}.page-hero p{color:#c7d0dc} article{padding:36px 0 60px}.blk-h{margin:28px 0 12px}.blk-p{line-height:1.75;color:#334} .blk-img img{max-width:100%;border-radius:12px}.blk-quote{border-left:4px solid var(--gold);padding:8px 20px;background:#fff;margin:24px 0} .blk-hr{border:0;border-top:1px solid #e2e6ef;margin:28px 0} .blk-cols{display:grid;grid-template-columns:repeat(var(--cols,2),1fr);gap:20px;margin:20px 0} .blk-col{background:#fff;padding:18px;border-radius:12px;border:1px solid #e8ecf3} .blk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px} .blk-card{background:#fff;border:1px solid #e8ecf3;border-radius:14px;padding:18px} .blk-hero{min-height:280px;background-size:cover;background-position:center;color:#fff;border-radius:16px;position:relative;margin:12px 0 28px} .blk-hero:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#101a2ce0,#101a2c66);border-radius:16px} .blk-hero-inner{position:relative;padding:40px} .blk-video{position:relative;padding-bottom:56.25%;height:0;margin:20px 0} .blk-video iframe,.blk-video video{position:absolute;inset:0;width:100%;height:100%} footer{background:var(--navy);color:#aab;padding:24px 0;text-align:center;font-size:14px} @media(max-width:700px){.blk-cols{grid-template-columns:1fr}} </style></head><body> <header><div class="wrap nav"><a class="brand" href="/">GRANSHI</a><a class="btn" href="/">← Home</a></div></header> ${bodyHtml} <footer><div class="wrap">${escapeHtml( settings.footer_text || "© Granshi" )}</div></footer> </body></html>`;
 }
 
-async function sendEmail(env, { to, subject, html, replyTo }) {
-  if (!env.RESEND_API_KEY || !to) return { sent: false };
+async function sendEmail(env, { to, subject, html, replyTo, attachments = [] }) {
+  if (!env.RESEND_API_KEY || !to) return { sent: false, error: "Email service is not configured." };
   try {
+    const outbound = [];
+    for (const item of attachments.slice(0, 10)) {
+      const key = String(item.key || "");
+      if (!key.startsWith("replies/") || !env.MEDIA) continue;
+      const object = await env.MEDIA.get(key);
+      if (!object) throw new Error("An attachment is missing from storage.");
+      const bytes = new Uint8Array(await object.arrayBuffer());
+      if (bytes.byteLength > 15 * 1024 * 1024) throw new Error("An attachment exceeds 15 MB.");
+      let binary = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      outbound.push({
+        filename: String(item.name || "attachment").replace(/[^a-zA-Z0-9._-]/g, "_"),
+        content: btoa(binary),
+      });
+    }
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -219,16 +237,18 @@ async function sendEmail(env, { to, subject, html, replyTo }) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Granshi <noreply@gopalkoirala.com.np>",
+        from: "Granshi <noreply.info@gopalkoirala.com.np>",
         to: [to],
         subject,
         html,
         reply_to: replyTo,
+        ...(outbound.length ? { attachments: outbound } : {}),
       }),
     });
-    return { sent: res.ok };
-  } catch {
-    return { sent: false };
+    if (!res.ok) return { sent: false, error: (await res.text()).slice(0, 500) };
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, error: String(error).slice(0, 500) };
   }
 }
 
@@ -878,11 +898,13 @@ async function api(req, env) {
         return `<p>Attachment: <a href="${u}">${n}</a></p>`;
       })
       .join("");
-    await sendEmail(env, {
+    const delivery = await sendEmail(env, {
       to: msg.email,
       subject: `Re: ${msg.subject || "Your message to Granshi"}`,
       html: `<p>Hello ${escapeHtml(msg.name)},</p><p>${escapeHtml( reply ).replace(/\n/g, "<br>")}</p>${attHtml}<hr><p>Original: ${escapeHtml( msg.body || "" )}</p>`,
+      attachments,
     });
+    if (!delivery.sent) return json({ error: "Reply could not be sent.", detail: delivery.error || "Email service unavailable." }, 502);
     return json({ ok: true });
   }
   if (p.startsWith("/api/admin/messages/") && method === "POST") {
