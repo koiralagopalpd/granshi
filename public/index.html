@@ -30,7 +30,38 @@ header{position:sticky;top:0;z-index:30;background:#101a2cf5;color:#fff;border-b
 .hero h1{font-size:clamp(34px,6vw,60px);line-height:1.05;max-width:720px;margin:16px 0}
 .hero h1 span{color:var(--gold)}
 .hero p{font-size:17px;line-height:1.7;color:#e2e7ef;max-width:560px}
-.search-box{margin-top:28px;max-width:560px}
+.search-box{display:none}
+.tools #openSearch{font-size:18px;padding:8px 12px;min-width:42px}
+.dept-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-top:24px}
+.dept-card{position:relative;overflow:hidden;min-height:190px;border-radius:18px;padding:22px;color:#fff;background:linear-gradient(145deg,#1c3655,#101a2c);display:flex;flex-direction:column;justify-content:flex-end;box-shadow:0 12px 28px #101a2c15;transition:.2s}
+.dept-card:hover{transform:translateY(-4px);box-shadow:0 18px 36px #101a2c25}
+.dept-card:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 10%,#e5c77e55,transparent 45%)}
+.dept-card>*{position:relative}.dept-card .ico{font-size:28px;color:var(--gold);margin-bottom:12px}.dept-card h3{margin:0 0 7px;font-size:19px}.dept-card p{margin:0;color:#d3dbe6;font-size:13px;line-height:1.5}.dept-card b{margin-top:14px;color:var(--gold);font-size:12px}
+.article{padding:0;overflow:hidden;border-radius:17px;gap:0}
+.article .thumb{height:174px;width:100%;object-fit:cover;background:linear-gradient(135deg,#1a3450,#101a2c);display:grid;place-items:center;color:#e5c77e;font-size:42px}
+.article .card-copy{padding:16px;display:flex;flex-direction:column;gap:8px;min-height:155px}
+.article h3{font-size:17px}.article p{min-height:42px}
+.market-cta{display:inline-flex;margin-top:18px;padding:12px 18px;border-radius:12px;background:linear-gradient(135deg,#f3dfa9,#d8b46a);color:#182235;font-weight:850}
+.search-overlay{display:none;position:fixed;inset:0;z-index:100;background:#f6f7fb;overflow:auto}
+.search-overlay.open{display:block}
+.search-top{position:sticky;top:0;background:#101a2c;color:#fff;padding:14px max(4%,calc((100% - 1000px)/2));display:flex;align-items:center;gap:12px}
+.search-top strong{font-size:17px;flex:1}.search-close{border:1px solid #ffffff44;background:#ffffff12;color:#fff;border-radius:10px;padding:10px 14px}
+.search-main{width:min(850px,92%);margin:8vh auto 40px}
+.search-main h2{font-size:clamp(26px,5vw,42px);margin:0 0 8px;color:#172033}
+.search-main>p{color:#667085;line-height:1.6}
+.ask-row{display:flex;gap:8px;margin:22px 0 12px}
+.ask-row input{flex:1;min-width:0;padding:16px;border:1px solid #d8dee9;border-radius:14px;font:inherit;font-size:16px;box-shadow:0 8px 26px #101a2c0d}
+.ask-row button{border:0;border-radius:12px;padding:0 18px;background:#172640;color:white;font-weight:800}
+.ask-options{display:flex;gap:10px;flex-wrap:wrap}.ask-options button{border:1px solid #dce2ec;background:white;border-radius:10px;padding:10px 14px;font-weight:700;color:#172640}
+.answer-box{background:#fff;border:1px solid #e3e8f0;border-radius:16px;padding:18px;margin-top:18px;line-height:1.7;white-space:pre-wrap}
+.answer-note{font-size:12px;color:#778196;margin-top:10px;line-height:1.5}
+.search-sources{display:grid;gap:10px;margin-top:12px}
+.search-source{display:flex;gap:12px;background:white;border:1px solid #e4e8ef;padding:12px;border-radius:12px}
+.search-source img{width:76px;height:64px;object-fit:cover;border-radius:8px;background:#172640}
+.search-source b{display:block}.search-source small{color:#667085;line-height:1.4}
+.hero .wrap{padding:90px 0 82px}
+.hero .hero-promo{max-width:620px}
+
 .search-row{display:flex;gap:8px;flex-wrap:wrap}
 .search-row input{flex:1;min-width:160px;padding:14px 16px;border-radius:12px;border:0;font:inherit;background:#fff;color:#172033}
 .search-row button{padding:14px 16px;border-radius:12px;border:0;font-weight:800;cursor:pointer;font:inherit}
@@ -93,6 +124,7 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
     <nav class="navlinks" id="nav"></nav>
     <div class="tools">
       <button type="button" id="lang">नेपाली</button>
+      <button type="button" id="openSearch" aria-label="Open Granshi search" title="Search Granshi">⌕</button>
       <button type="button" class="hamb" id="hamb" aria-label="Menu">☰</button>
     </div>
   </div>
@@ -103,15 +135,12 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
     <div class="eyebrow">ONE WORLD · ENDLESS POSSIBILITIES</div>
     <h1 id="heroTitle">Explore Your<br><span>Digital World.</span></h1>
     <p id="heroDesc">Knowledge, learning, creativity and technology — connected in one place.</p>
-    <div class="search-box">
-      <div class="search-row">
-        <input id="siteSearch" type="search" placeholder="Search Granshi pages and departments..." autocomplete="off">
-        <button type="button" class="btn-site" id="btnSite">Search</button>
-        <button type="button" class="btn-ai" id="btnAi">AI Ask</button>
-      </div>
-      <div class="search-results" id="searchResults"></div>
-    </div>
+    <div class="hero-promo"><a class="market-cta" href="#departments" id="heroExplore">Explore Granshi →</a></div>
   </div>
+</section>
+
+<section id="departments" style="padding-bottom:20px">
+  <div class="wrap"><div class="head"><small>EXPLORE BY INTEREST</small><h2 id="deptHead">Explore Departments</h2></div><div class="dept-grid" id="departmentGrid"></div></div>
 </section>
 
 <section id="latest">
@@ -128,6 +157,14 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
   </div>
 </section>
 
+<div class="search-overlay" id="searchOverlay" role="dialog" aria-modal="true" aria-labelledby="searchHeading">
+  <div class="search-top"><strong>GRANSHI · KNOWLEDGE SEARCH</strong><button class="search-close" id="closeSearch">✕ Close</button></div>
+  <div class="search-main"><h2 id="searchHeading">Ask Granshi anything.</h2><p id="searchIntro">Search across published Granshi knowledge, learning and resources. Answers are based only on content available on this website.</p>
+    <form class="ask-row" id="askForm"><input id="askInput" type="search" maxlength="240" placeholder="Example: What is photosynthesis?" autocomplete="off"><button type="submit" id="askSubmit">Ask</button></form>
+    <div class="ask-options"><button type="button" id="googleAi">Continue with Google AI ↗</button><span class="answer-note" id="searchStatus">Website-only search · No external AI model is used here.</span></div>
+    <div id="answerArea" aria-live="polite"></div>
+  </div>
+</div>
 <div class="panel-bg" id="panelBg"></div>
 <div class="explore-panel" id="explorePanel">
   <div style="display:flex;justify-content:space-between;align-items:center">
@@ -223,14 +260,24 @@ function renderNav(){
     });
   });
 }
+function escText(v){return String(v||"").replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function articleCard(a){
-  var title=t(a.title_en,a.title_ne);
-  var desc=t(a.description_en,a.description_ne)||"";
+  var title=lang==="ne"?(a.thumbnail_title_ne||a.title_ne||a.title_en):(a.thumbnail_title_en||a.title_en);
+  var desc=lang==="ne"?(a.thumbnail_summary_ne||a.description_ne||a.description_en):(a.thumbnail_summary_en||a.description_en)||"";
   var dept=t(a.dept_en,a.dept_ne)||"";
-  return '<a class="article" href="/'+a.slug+(lang==="ne"?"?lang=ne":"")+'">'+
-    (dept?'<span class="tag">'+dept+"</span>":"")+
-    "<h3>"+title+"</h3><p>"+desc.slice(0,120)+(desc.length>120?"…":"")+"</p>"+
-    '<span class="more">'+t("Read →","पढ्नुहोस् →")+"</span></a>";
+  var img=a.thumbnail_image?'<img class="thumb" src="'+escText(a.thumbnail_image)+'" alt="'+escText(a.thumbnail_alt||title)+'" loading="lazy" style="object-position:'+(a.thumbnail_focal_x??50)+'% '+(a.thumbnail_focal_y??50)+'%">':'<div class="thumb" aria-hidden="true">✦</div>';
+  return '<a class="article" href="/'+encodeURIComponent(a.slug)+(lang==="ne"?"?lang=ne":"")+'">'+img+'<div class="card-copy">'+
+    (dept?'<span class="tag">'+escText(dept)+"</span>":"")+
+    "<h3>"+escText(title)+"</h3><p>"+escText(desc.slice(0,135))+(desc.length>135?"…":"")+"</p>"+
+    '<span class="more">'+t("Explore article →","लेख पढ्नुहोस् →")+"</span></div></a>";
+}
+function renderDepartments(){
+  var box=document.getElementById("departmentGrid");
+  box.innerHTML=(departments||[]).map(function(d,i){
+    var desc=t(d.description_en,d.description_ne)||"";
+    var colors=["#193b57","#234b48","#3b3155","#47394b","#24465d","#4b4227","#25463c","#4a332c"];
+    return '<a class="dept-card" href="'+deptUrl(d)+'" style="background:linear-gradient(145deg,'+colors[i%colors.length]+',#101a2c)"><span class="ico">'+escText(d.icon||"✦")+'</span><h3>'+escText(t(d.name_en,d.name_ne))+'</h3><p>'+escText(desc)+'</p><b>'+t("Explore department →","विभाग हेर्नुहोस् →")+'</b></a>';
+  }).join("");
 }
 function renderArticles(){
   document.getElementById("latestList").innerHTML=latest.length?latest.map(articleCard).join(""):
@@ -273,6 +320,9 @@ function applyTexts(){
     settings.hero_desc_ne||"ज्ञान, सिकाइ, सिर्जनशीलता र प्रविधि — सबै एउटै ठाउँमा।"
   );
   document.getElementById("latestHead").textContent=t("Latest Articles","नयाँ लेखहरू");
+  document.getElementById("deptHead").textContent=t("Explore Departments","विभागहरू अन्वेषण गर्नुहोस्");
+  document.getElementById("searchHeading").textContent=t("Ask Granshi anything.","Granshi लाई जे पनि सोध्नुहोस्।");
+  document.getElementById("searchIntro").textContent=t("Search across published Granshi knowledge, learning and resources. Answers are based only on content available on this website.","Granshi का प्रकाशित ज्ञान, सिकाइ र सामग्रीमा खोज्नुहोस्। उत्तर वेबसाइटमा उपलब्ध सामग्रीमा आधारित हुन्छन्।");
   document.getElementById("popularHead").textContent=t("Popular Articles","लोकप्रिय लेखहरू");
   document.getElementById("exploreTitle").textContent=t("Departments","विभागहरू");
   document.getElementById("footExplore").textContent=t("Explore","अन्वेषण");
@@ -286,40 +336,33 @@ function applyTexts(){
   if(oc) oc.textContent=t("Contact us","सम्पर्क गर्नुहोस्");
   document.getElementById("footerText").textContent=settings.footer_text||"© Granshi — My Digital World";
   document.getElementById("footerTag").textContent=settings.tagline||"One World. Endless Possibilities.";
-  document.getElementById("siteSearch").placeholder=t("Search Granshi pages and departments...","Granshi का page र विभाग खोज्नुहोस्...");
+  renderDepartments();
   if(settings.brand_name)document.title=settings.brand_name;
   if(settings.primary_color)document.documentElement.style.setProperty("--navy",settings.primary_color);
   if(settings.accent_color)document.documentElement.style.setProperty("--gold",settings.accent_color);
   renderNav();renderArticles();renderExploreLists();
 }
-function doSiteSearch(){
-  var q=(document.getElementById("siteSearch").value||"").trim().toLowerCase();
-  var box=document.getElementById("searchResults");
-  if(!q){box.classList.remove("open");box.innerHTML="";return}
-  var hits=[];
-  (departments||[]).forEach(function(d){
-    var name=(d.name_en||"")+" "+(d.name_ne||"")+" "+(d.description_en||"");
-    if(name.toLowerCase().indexOf(q)>=0)hits.push({type:"Department",title:t(d.name_en,d.name_ne),href:deptUrl(d)});
-  });
-  (allPages||[]).forEach(function(p){
-    var name=(p.title_en||"")+" "+(p.title_ne||"")+" "+(p.description_en||"");
-    if(name.toLowerCase().indexOf(q)>=0)hits.push({type:"Page",title:t(p.title_en,p.title_ne),href:"/"+p.slug+(lang==="ne"?"?lang=ne":"")});
-  });
-  if(!hits.length){
-    box.innerHTML='<div style="padding:12px;color:#667">'+t("No results","नतिजा छैन")+"</div>";
-    box.classList.add("open");return;
-  }
-  box.innerHTML=hits.slice(0,12).map(function(h){
-    return '<a href="'+h.href+'"><span class="tag">'+h.type+"</span><br>"+h.title+"</a>";
-  }).join("");
-  box.classList.add("open");
-}
-function doAiSearch(){
-  var q=(document.getElementById("siteSearch").value||"").trim();
-  if(!q){document.getElementById("siteSearch").focus();return}
-  window.open("https://www.google.com/search?udm=50&q="+encodeURIComponent(q),"_blank","noopener");
-}
-
+function openSearch(){document.getElementById("searchOverlay").classList.add("open");document.body.style.overflow="hidden";setTimeout(()=>document.getElementById("askInput").focus(),80)}
+function closeSearch(){document.getElementById("searchOverlay").classList.remove("open");document.body.style.overflow=""}
+document.getElementById("openSearch").onclick=openSearch;
+document.getElementById("closeSearch").onclick=closeSearch;
+document.getElementById("googleAi").onclick=function(){window.open("https://gemini.google.com/","_blank","noopener,noreferrer")};
+document.getElementById("askForm").onsubmit=async function(e){
+  e.preventDefault();
+  const q=document.getElementById("askInput").value.trim(),area=document.getElementById("answerArea"),btn=document.getElementById("askSubmit");
+  if(q.length<2)return;
+  btn.disabled=true;btn.textContent=t("Searching…","खोज्दै…");
+  area.innerHTML='<div class="answer-box">'+t("Searching published Granshi content…","Granshi का प्रकाशित सामग्री खोजिँदैछ…")+'</div>';
+  try{
+    const response=await fetch("/api/search",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({query:q})});
+    const data=await response.json();if(!response.ok)throw new Error(data.error||"Search failed");
+    if(!data.results||!data.results.length){area.innerHTML='<div class="answer-box">'+escText(data.message||t("No matching published content was found.","मिल्दो प्रकाशित सामग्री भेटिएन।"))+'</div>';return}
+    const answer=data.answer||data.results.map(x=>x.excerpt||x.summary).filter(Boolean).join(" ");
+    area.innerHTML='<div class="answer-box"><b>'+t("What Granshi found","Granshi ले भेटेको जानकारी")+'</b><div style="margin-top:8px">'+escText(answer)+'</div><div class="answer-note">'+t("This is an extractive summary assembled from matching published pages, not an AI-generated answer.","यो मिल्दो प्रकाशित पृष्ठबाट निकालिएको सार हो, AI ले सिर्जना गरेको उत्तर होइन।")+'</div></div><div class="search-sources"><b>'+t("Sources on Granshi","Granshi का स्रोतहरू")+'</b>'+data.results.map(x=>'<a class="search-source" href="'+escText(x.url)+(lang==="ne"?"?lang=ne":"")+'">'+(x.image?'<img src="'+escText(x.image)+'" alt="">':'<img alt="" src="/assets-brand.png">')+'<span><b>'+escText(lang==="ne"?(x.title_ne||x.title):x.title)+'</b><small>'+escText(lang==="ne"?(x.summary_ne||x.summary||""):(x.summary||""))+'</small></span></a>').join("")+'</div><p class="answer-note">'+t("यो उत्तर Granshi मा उपलब्ध सामग्रीका आधारमा तयार गरिएको हो। जानकारी पूर्ण वा १००% सही नहुन सक्छ। थप पुष्टि गर्नुहोस्।","यो उत्तर Granshi मा उपलब्ध सामग्रीका आधारमा तयार गरिएको हो। जानकारी पूर्ण वा १००% सही नहुन सक्छ। थप पुष्टि गर्नुहोस्।")+'</p>';
+  }catch(err){area.innerHTML='<div class="answer-box">'+escText(err.message)+'</div>'}
+  finally{btn.disabled=false;btn.textContent=t("Ask","सोध्नुहोस्")}
+};
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeSearch()});
 document.getElementById("openContact").onclick=function(){
   document.getElementById("contactPanel").classList.add("open");
   document.getElementById("contactPanel").scrollIntoView({behavior:"smooth",block:"nearest"});
@@ -348,10 +391,7 @@ document.getElementById("contactForm").onsubmit=function(e){
 };
 document.getElementById("lang").onclick=function(){lang=lang==="en"?"ne":"en";applyTexts()};
 document.getElementById("hamb").onclick=function(){document.getElementById("nav").classList.toggle("open")};
-document.getElementById("btnSite").onclick=doSiteSearch;
-document.getElementById("btnAi").onclick=doAiSearch;
-document.getElementById("siteSearch").addEventListener("input",doSiteSearch);
-document.getElementById("siteSearch").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();doSiteSearch()}});
+ 
 document.getElementById("closeExplore").onclick=closeExplore;
 document.getElementById("panelBg").onclick=closeExplore;
 document.addEventListener("click",function(e){
