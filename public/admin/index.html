@@ -62,6 +62,7 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
     <button data-tab="messages">Messages</button>
     <button data-tab="comments">Comments</button>
     <button data-tab="menus">Menus</button>
+    <button data-tab="usefulLinks">Useful Links</button>
     <button data-tab="settings">Settings</button>
     <button data-tab="security">Security</button>
     <button id="logout" style="margin-top:16px;color:#f5a8a8">Log out</button>
@@ -102,7 +103,7 @@ function showApp(email){
   $$('.side button[data-tab]').forEach(b=>b.onclick=()=>{$$('.side button[data-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');tab(b.dataset.tab)});
   tab('overview');
 }
-const titles={overview:'Overview',departments:'Departments & content',messages:'Messages',comments:'Comments / Feedback',menus:'Menus',settings:'Settings',security:'Security'};
+const titles={overview:'Overview',departments:'Departments & content',messages:'Messages',comments:'Comments / Feedback',menus:'Menus',usefulLinks:'Useful Links',settings:'Settings',security:'Security'};
 async function tab(name){
   $('#tabTitle').textContent=titles[name]||name;
   const v=$('#view');v.innerHTML='<div class="box"><p class="muted">Loading…</p></div>';
@@ -116,6 +117,7 @@ async function tab(name){
     if(name==='messages') await renderMessages(v);
     if(name==='comments') await renderComments(v);
     if(name==='menus') await renderMenus(v);
+    if(name==='usefulLinks') await renderUsefulLinks(v);
     if(name==='settings') await renderSettings(v);
     if(name==='security'){
       v.innerHTML=`<div class="box"><h3>Change password</h3>
@@ -125,6 +127,46 @@ async function tab(name){
       $('#chp').onclick=async()=>{try{await api('/admin/password',{method:'POST',body:JSON.stringify({currentPassword:$('#oldp').value,newPassword:$('#newp').value})});alert('Changed')}catch(e){alert(e.message)}};
     }
   }catch(e){v.innerHTML=`<div class="box">Error: ${esc(e.message)}</div>`}
+}
+
+
+/* ---- Footer useful links ---- */
+async function renderUsefulLinks(v){
+  const cfg=await api('/admin/overview');
+  let links=[];
+  try{links=JSON.parse(cfg.settings?.useful_links||'[]');if(!Array.isArray(links))links=[]}catch{links=[]}
+  function draw(){
+    v.innerHTML=`<div class="box">
+      <div class="row" style="justify-content:space-between"><h3>Footer · Useful Links</h3><button class="btn gold" id="ulAdd">+ Add link</button></div>
+      <p class="muted">यहाँ थपिएका लिंकहरू वेबसाइटको footer मा देखिन्छन्। Title, छोटो विवरण र पूरा URL राख्नुहोस्।</p>
+      <div id="ulRows">${links.map((x,i)=>`
+        <div class="box" style="background:#f8f9fc">
+          <div class="row" style="justify-content:space-between"><b>Link ${i+1}</b><button class="btn danger" data-uldel="${i}">Remove</button></div>
+          <label>Title / नाम</label><input data-ultitle="${i}" value="${esc(x.title||'')}" placeholder="Example: Nepal Government">
+          <label>Short description / छोटो विवरण</label><input data-uldesc="${i}" value="${esc(x.description||'')}" placeholder="Official information and services">
+          <label>URL (https://...)</label><input data-ulurl="${i}" type="url" value="${esc(x.url||'')}" placeholder="https://example.com">
+          <div class="row"><button class="btn" data-ulup="${i}" ${i===0?'disabled':''}>↑ Move</button><button class="btn" data-uldn="${i}" ${i===links.length-1?'disabled':''}>↓ Move</button></div>
+        </div>`).join('')||'<p class="muted">अहिलेसम्म Useful Links थपिएको छैन।</p>'}</div>
+      <button class="btn gold" id="ulSave">Save Useful Links</button><span id="ulStatus" class="muted" style="margin-left:10px"></span>
+    </div>`;
+    $('[data-ultitle]').forEach(el=>el.oninput=()=>links[+el.dataset.ultitle].title=el.value);
+    $('[data-uldesc]').forEach(el=>el.oninput=()=>links[+el.dataset.uldesc].description=el.value);
+    $('[data-ulurl]').forEach(el=>el.oninput=()=>links[+el.dataset.ulurl].url=el.value);
+    $('[data-uldel]').forEach(el=>el.onclick=()=>{links.splice(+el.dataset.uldel,1);draw()});
+    $('[data-ulup]').forEach(el=>el.onclick=()=>{const i=+el.dataset.ulup;[links[i-1],links[i]]=[links[i],links[i-1]];draw()});
+    $('[data-uldn]').forEach(el=>el.onclick=()=>{const i=+el.dataset.uldn;[links[i+1],links[i]]=[links[i],links[i+1]];draw()});
+    $('#ulAdd').onclick=()=>{links.push({title:'',description:'',url:''});draw()};
+    $('#ulSave').onclick=async()=>{
+      const status=$('#ulStatus');
+      for(const x of links){if(!x.title.trim()||!x.url.trim()){status.textContent='Each link needs a title and URL.';return}
+        try{const u=new URL(x.url);if(!['http:','https:'].includes(u.protocol))throw new Error();}catch{status.textContent='Please enter a valid http/https URL.';return}}
+      $('#ulSave').disabled=true;status.textContent='Saving…';
+      try{await api('/admin/settings',{method:'POST',body:JSON.stringify({useful_links:JSON.stringify(links)})});status.textContent='Saved successfully.'}
+      catch(e){status.textContent=e.message}
+      finally{$('#ulSave').disabled=false}
+    };
+  }
+  draw();
 }
 
 /* ---- Departments hub ---- */
