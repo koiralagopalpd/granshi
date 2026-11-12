@@ -881,11 +881,6 @@ async function api(req, env) {
       attachments.length > 0
         ? reply + "\n\n<!--ATTACH:" + JSON.stringify(attachments) + "-->"
         : reply;
-    await env.DB.prepare(
-      "UPDATE messages SET reply_text=?,replied_at=?,status=? WHERE id=?"
-    )
-      .bind(stored, new Date().toISOString(), "replied", id)
-      .run();
     const attHtml = attachments
       .map((a) => {
         const u = escapeHtml(a.url || "");
@@ -905,6 +900,11 @@ async function api(req, env) {
       attachments,
     });
     if (!delivery.sent) return json({ error: "Reply could not be sent.", detail: delivery.error || "Email service unavailable." }, 502);
+    await env.DB.prepare(
+      "UPDATE messages SET reply_text=?,replied_at=?,status=? WHERE id=?"
+    )
+      .bind(stored, new Date().toISOString(), "replied", id)
+      .run();
     return json({ ok: true });
   }
   if (p.startsWith("/api/admin/messages/") && method === "POST") {
