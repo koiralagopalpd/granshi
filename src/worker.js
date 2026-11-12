@@ -157,7 +157,9 @@ function zipCoverFromHtml(html, slug) {
   return "/_p/" + encodeURIComponent(slug) + "/" + value.split("/").map(encodeURIComponent).join("/");
 }
 function pageExcerpt(text, query) {
-  const clean = String(text || "").replace(/\s+/g," ").trim();
+  let source = String(text || "");
+  try { const parsed=JSON.parse(source); if(Array.isArray(parsed)) source=searchablePageText(parsed); } catch {}
+  const clean = source.replace(/\s+/g," ").trim();
   if (!clean) return "";
   const terms = query.toLowerCase().split(/\s+/).filter(x=>x.length>1);
   let at = -1;
@@ -170,7 +172,7 @@ async function allPublic(env) {
   const settings = await getSettings(env);
   let pages = await safeAll(
     env,
-    `SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.thumbnail_alt,p.thumbnail_focal_x,p.thumbnail_focal_y,p.updated_at,p.department_id,p.is_popular,d.name_en AS dept_en,d.name_ne AS dept_ne,d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT 300`
+    `SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.thumbnail_alt,p.thumbnail_focal_x,p.thumbnail_focal_y,p.updated_at,p.department_id,p.is_popular,p.content,d.name_en AS dept_en,d.name_ne AS dept_ne,d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT 300`
   );
   if (!pages.length) {
     pages = await safeAll(
@@ -178,6 +180,12 @@ async function allPublic(env) {
       `SELECT slug,title_en,title_ne,description_en,description_ne,updated_at FROM pages WHERE published=1 ORDER BY updated_at DESC LIMIT 100`
     );
   }
+  pages = pages.map((pg) => {
+    if (!pg.thumbnail_summary_en && !pg.description_en) pg.thumbnail_summary_en = pageExcerpt(searchablePageText(pg.content), "");
+    if (!pg.thumbnail_summary_ne && !pg.description_ne) pg.thumbnail_summary_ne = pg.thumbnail_summary_en || "";
+    delete pg.content;
+    return pg;
+  });
   let depts = await safeAll(
     env,
     "SELECT id,name_en,name_ne,description_en,description_ne,url,icon,email,image,slug,sort_order FROM departments WHERE visible=1 ORDER BY sort_order"
@@ -376,9 +384,10 @@ async function api(req, env) {
     const limit = Math.max(1,Math.min(60,Number(u.searchParams.get("limit")||24)));
     const offset = Math.max(0,Math.min(100000,Number(u.searchParams.get("offset")||0)));
     const pages = await safeAll(env,
-      "SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.thumbnail_alt,p.thumbnail_focal_x,p.thumbnail_focal_y,p.updated_at,p.department_id,p.is_popular,d.name_en AS dept_en,d.name_ne AS dept_ne,d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT ? OFFSET ?",
+      "SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.thumbnail_alt,p.thumbnail_focal_x,p.thumbnail_focal_y,p.updated_at,p.department_id,p.is_popular,p.content,d.name_en AS dept_en,d.name_ne AS dept_ne,d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT ? OFFSET ?",
       limit,offset);
-    return json({pages,hasMore:pages.length===limit});
+    const enriched=pages.map((pg)=>{if(!pg.thumbnail_summary_en&&!pg.description_en)pg.thumbnail_summary_en=pageExcerpt(searchablePageText(pg.content),"");if(!pg.thumbnail_summary_ne&&!pg.description_ne)pg.thumbnail_summary_ne=pg.thumbnail_summary_en||"";delete pg.content;return pg;});
+    return json({pages:enriched,hasMore:pages.length===limit});
   }
 
   if (p === "/api/search" && method === "POST") {
@@ -1243,7 +1252,7 @@ export default {
         if (dept) {
           const settings = await getSettings(env);
           const pages = await env.DB.prepare(
-            "SELECT slug,title_en,title_ne,description_en,description_ne,thumbnail_image,thumbnail_title_en,thumbnail_title_ne,thumbnail_summary_en,thumbnail_summary_ne,thumbnail_alt,thumbnail_focal_x,thumbnail_focal_y,updated_at FROM pages WHERE department_id=? AND published=1 ORDER BY sort_order,updated_at DESC"
+            "SELECT slug,title_en,title_ne,description_en,description_ne,thumbnail_image,thumbnail_title_en,thumbnail_title_ne,thumbnail_summary_en,thumbnail_summary_ne,thumbnail_alt,thumbnail_focal_x,thumbnail_focal_y,updated_at,content FROM pages WHERE department_id=? AND published=1 ORDER BY sort_order,updated_at DESC"
           )
             .bind(dept.id)
             .all();
@@ -1254,7 +1263,7 @@ export default {
           const list = (pages.results || []).map((pg,i) => {
             const image = pg.thumbnail_image ? `<img src="${escapeHtml(pg.thumbnail_image)}" alt="${escapeHtml(pg.thumbnail_alt||"")}" loading="lazy" style="object-position:${Number(pg.thumbnail_focal_x??50)}% ${Number(pg.thumbnail_focal_y??50)}%">` : `<div class="dept-art" style="background:linear-gradient(135deg,${palette[i%palette.length]},#0c1525)"><span>${escapeHtml(dept.icon||"✦")}</span></div>`;
             const cardTitle = lang==="ne" && pg.thumbnail_title_ne ? pg.thumbnail_title_ne : (pg.thumbnail_title_en || (lang==="ne"&&pg.title_ne?pg.title_ne:pg.title_en));
-            const summary = lang==="ne" ? (pg.thumbnail_summary_ne||pg.description_ne||"") : (pg.thumbnail_summary_en||pg.description_en||"");
+            const summary = lang==="ne" ? (pg.thumbnail_summary_ne||pg.description_ne||pageExcerpt(searchablePageText(pg.content),"")) : (pg.thumbnail_summary_en||pg.description_en||pageExcerpt(searchablePageText(pg.content),""));
             return `<a class="dept-page" href="/${escapeHtml(pg.slug)}${lang==="ne"?"?lang=ne":""}">${image}<div class="dept-card-copy"><span class="dept-card-label">${escapeHtml(dept.name_en)}</span><h3>${escapeHtml(cardTitle)}</h3><p>${escapeHtml(summary.slice(0,150))}</p><b>Explore →</b></div></a>`;
           }).join("");
           const body = `<section class="page-hero"><div class="wrap"><span class="dept-kicker">GRANSHI DEPARTMENT</span><h1>${escapeHtml(title)}</h1><p>${escapeHtml(lang==="ne"&&dept.description_ne?dept.description_ne:dept.description_en||"")}</p><span class="dept-count">${(pages.results||[]).length} published pages</span></div></section><article class="wrap"><div class="dept-list">${list||"<p>No published pages yet.</p>"}</div><style>.dept-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:20px;margin:28px 0 50px}.dept-page{overflow:hidden;background:#fff;border:1px solid #e5e9ef;border-radius:18px;box-shadow:0 8px 28px #14233d0b;transition:.2s}.dept-page:hover{transform:translateY(-4px);box-shadow:0 16px 36px #14233d18}.dept-page>img,.dept-art{display:block;width:100%;height:170px;object-fit:cover}.dept-art{display:grid;place-items:center;color:#f2d99e;font-size:54px}.dept-card-copy{padding:16px}.dept-card-label,.dept-kicker{font-size:10px;letter-spacing:2px;font-weight:800;color:#a47b32}.dept-card-copy h3{margin:8px 0;font-size:18px;line-height:1.3}.dept-card-copy p{margin:0 0 14px;color:#667085;font-size:13px;line-height:1.6;min-height:40px}.dept-card-copy b{font-size:12px;color:#9a742e}.dept-count{display:inline-block;margin-top:8px;font-size:12px;color:#d9dfeb}</style></article>`;
