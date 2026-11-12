@@ -351,6 +351,15 @@ async function api(req, env) {
   if (p === "/api/health") return json({ ok: true, v: 4 });
   if (p === "/api/public" && method === "GET")
     return json(await allPublic(env));
+  if (p === "/api/pages" && method === "GET") {
+    const limit = Math.max(1,Math.min(60,Number(u.searchParams.get("limit")||24)));
+    const offset = Math.max(0,Math.min(100000,Number(u.searchParams.get("offset")||0)));
+    const pages = await safeAll(env,
+      "SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.thumbnail_alt,p.thumbnail_focal_x,p.thumbnail_focal_y,p.updated_at,p.department_id,p.is_popular,d.name_en AS dept_en,d.name_ne AS dept_ne,d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT ? OFFSET ?",
+      limit,offset);
+    return json({pages,hasMore:pages.length===limit});
+  }
+
   if (p === "/api/search" && method === "POST") {
     const x = await body(req);
     const query = String(x.query || "").trim().slice(0,240);
