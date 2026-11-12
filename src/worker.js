@@ -120,11 +120,36 @@ async function safeAll(env, sql, ...binds) {
   }
 }
 
+function searchablePageText(content) {
+  try {
+    const blocks = typeof content === "string" ? JSON.parse(content) : content;
+    if (!Array.isArray(blocks)) return "";
+    return blocks.map((b) => {
+      if (!b || typeof b !== "object") return "";
+      if (["heading","paragraph","quote"].includes(b.type)) return String(b.text || "") + " " + String(b.cite || "");
+      if (b.type === "columns") return (b.columns || []).map(c => c.text || "").join(" ");
+      if (b.type === "cards") return (b.cards || []).map(c => [c.title,c.text].join(" ")).join(" ");
+      if (b.type === "hero") return [b.title,b.subtitle].join(" ");
+      if (b.type === "button") return b.text || "";
+      return "";
+    }).join(" ").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim().slice(0,30000);
+  } catch { return ""; }
+}
+function pageExcerpt(text, query) {
+  const clean = String(text || "").replace(/\\s+/g," ").trim();
+  if (!clean) return "";
+  const terms = query.toLowerCase().split(/\\s+/).filter(x=>x.length>1);
+  let at = -1;
+  for (const term of terms) { at = clean.toLowerCase().indexOf(term); if (at >= 0) break; }
+  const start = Math.max(0, (at < 0 ? 0 : at) - 100);
+  return (start ? "…" : "") + clean.slice(start,start+360) + (start+360<clean.length ? "…" : "");
+}
+
 async function allPublic(env) {
   const settings = await getSettings(env);
   let pages = await safeAll(
     env,
-    `SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.updated_at, p.department_id, p.is_popular, d.name_en AS dept_en, d.name_ne AS dept_ne, d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id = p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT 100`
+    `SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.thumbnail_alt,p.thumbnail_focal_x,p.thumbnail_focal_y,p.updated_at,p.department_id,p.is_popular,d.name_en AS dept_en,d.name_ne AS dept_ne,d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT 300`
   );
   if (!pages.length) {
     pages = await safeAll(
@@ -638,25 +663,27 @@ async function api(req, env) {
       typeof x.content === "string"
         ? x.content
         : JSON.stringify(x.content || []);
+    const updatedAt = new Date().toISOString();
+    let thumbnailImage = String(x.thumbnail_image || "").trim().slice(0,1000);
+    if (!thumbnailImage && sourceType === "blocks") {
+      try { const blocks=JSON.parse(contentStr); const first=blocks.find(b=>b&&((b.type==="image"&&b.url)||(b.type==="hero"&&b.image))); if(first) thumbnailImage=String(first.url||first.image||"").slice(0,1000); } catch {}
+    }
+    if (!thumbnailImage && sourceType === "zip") {
+      const media = await env.DB.prepare("SELECT url FROM media WHERE page_slug=? AND content_type LIKE 'image/%' ORDER BY created_at LIMIT 1").bind(slug).first();
+      if (media) thumbnailImage = media.url;
+    }
+    const searchText = searchablePageText(contentStr);
     await env.DB.prepare(
-      `INSERT INTO pages(slug,title_en,title_ne,description_en,description_ne,content,template,department_id,category_id,is_popular,published,sort_order,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(slug) DO UPDATE SET title_en=excluded.title_en,title_ne=excluded.title_ne,description_en=excluded.description_en,description_ne=excluded.description_ne, content=excluded.content,template=excluded.template,department_id=excluded.department_id,category_id=excluded.category_id, is_popular=excluded.is_popular,published=excluded.published,sort_order=excluded.sort_order,updated_at=excluded.updated_at`
-    )
-      .bind(
-        slug,
-        x.title_en,
-        x.title_ne || "",
-        x.description_en || "",
-        x.description_ne || "",
-        contentStr,
-        sourceType === "zip" ? `zip:${entryFile}` : x.template || "default",
-        x.department_id || null,
-        x.category_id || null,
-        x.is_popular ? 1 : 0,
-        x.published ? 1 : 0,
-        Number(x.sort_order || 0),
-        new Date().toISOString()
-      )
-      .run();
+      `INSERT INTO pages(slug,title_en,title_ne,description_en,description_ne,content,template,department_id,category_id,is_popular,published,sort_order,updated_at,thumbnail_image,thumbnail_title_en,thumbnail_title_ne,thumbnail_summary_en,thumbnail_summary_ne,thumbnail_alt,thumbnail_focal_x,thumbnail_focal_y)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(slug) DO UPDATE SET title_en=excluded.title_en,title_ne=excluded.title_ne,description_en=excluded.description_en,description_ne=excluded.description_ne,content=excluded.content,template=excluded.template,department_id=excluded.department_id,category_id=excluded.category_id,is_popular=excluded.is_popular,published=excluded.published,sort_order=excluded.sort_order,updated_at=excluded.updated_at,thumbnail_image=excluded.thumbnail_image,thumbnail_title_en=excluded.thumbnail_title_en,thumbnail_title_ne=excluded.thumbnail_title_ne,thumbnail_summary_en=excluded.thumbnail_summary_en,thumbnail_summary_ne=excluded.thumbnail_summary_ne,thumbnail_alt=excluded.thumbnail_alt,thumbnail_focal_x=excluded.thumbnail_focal_x,thumbnail_focal_y=excluded.thumbnail_focal_y`
+    ).bind(slug,x.title_en,x.title_ne||"",x.description_en||"",x.description_ne||"",contentStr,sourceType==="zip"?`zip:${entryFile}`:x.template||"default",x.department_id||null,x.category_id||null,x.is_popular?1:0,x.published?1:0,Number(x.sort_order||0),updatedAt,thumbnailImage,String(x.thumbnail_title_en||"").slice(0,180),String(x.thumbnail_title_ne||"").slice(0,180),String(x.thumbnail_summary_en||"").slice(0,400),String(x.thumbnail_summary_ne||"").slice(0,400),String(x.thumbnail_alt||"").slice(0,250),Math.max(0,Math.min(100,Number(x.thumbnail_focal_x??50))),Math.max(0,Math.min(100,Number(x.thumbnail_focal_y??50)))).run();
+    if (x.published) {
+      await env.DB.prepare("INSERT INTO page_search_index(page_slug,title,description,body_text,department_id,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(page_slug) DO UPDATE SET title=excluded.title,description=excluded.description,body_text=excluded.body_text,department_id=excluded.department_id,updated_at=excluded.updated_at")
+        .bind(slug,[x.title_en,x.title_ne].join(" "),[x.description_en,x.description_ne].join(" "),searchText,x.department_id||null,updatedAt).run();
+    } else {
+      await env.DB.prepare("DELETE FROM page_search_index WHERE page_slug=?").bind(slug).run();
+    }
     return json({
       ok: true,
       slug,
@@ -711,7 +738,7 @@ async function api(req, env) {
   }
   if (p.startsWith("/api/admin/pages/") && method === "DELETE") {
     const slug = decodeURIComponent(p.split("/").pop());
-    await env.DB.prepare("DELETE FROM pages WHERE slug=?").bind(slug).run();
+    await env.DB.prepare("DELETE FROM pages WHERE slug=?").bind(slug).run();\n    await env.DB.prepare("DELETE FROM page_search_index WHERE page_slug=?").bind(slug).run();
     // best-effort: list/delete R2 not available without list permission pattern — leave orphans ok
     return json({ ok: true });
   }
@@ -1154,20 +1181,21 @@ export default {
         if (dept) {
           const settings = await getSettings(env);
           const pages = await env.DB.prepare(
-            "SELECT slug,title_en,title_ne,description_en,description_ne,updated_at FROM pages WHERE department_id=? AND published=1 ORDER BY sort_order,updated_at DESC"
+            "SELECT slug,title_en,title_ne,description_en,description_ne,thumbnail_image,thumbnail_title_en,thumbnail_title_ne,thumbnail_summary_en,thumbnail_summary_ne,thumbnail_alt,thumbnail_focal_x,thumbnail_focal_y,updated_at FROM pages WHERE department_id=? AND published=1 ORDER BY sort_order,updated_at DESC"
           )
             .bind(dept.id)
             .all();
           const lang = u.searchParams.get("lang") === "ne" ? "ne" : "en";
           const title =
             lang === "ne" && dept.name_ne ? dept.name_ne : dept.name_en;
-          const list = (pages.results || [])
-            .map(
-              (pg) =>
-                `<a class="dept-page" href="/${escapeHtml(pg.slug)}${ lang === "ne" ? "?lang=ne" : "" }"><h3>${escapeHtml( lang === "ne" && pg.title_ne ? pg.title_ne : pg.title_en )}</h3><p>${escapeHtml( lang === "ne" && pg.description_ne ? pg.description_ne : pg.description_en || "" )}</p></a>`
-            )
-            .join("");
-          const body = `<section class="page-hero"><div class="wrap"><h1>${escapeHtml( title )}</h1><p>${escapeHtml( lang === "ne" && dept.description_ne ? dept.description_ne : dept.description_en || "" )}</p></div></section><article class="wrap"><div class="dept-list">${ list || "<p>No articles yet.</p>" }</div> <style>.dept-page{display:block;background:#fff;border:1px solid #e8ecf3;border-radius:12px;padding:16px;margin:12px 0}.dept-page h3{margin:0 0 6px}.dept-page p{margin:0;color:#667085;font-size:14px}</style></article>`;
+          const palette = ["#14233d","#173c45","#3a2a52","#3d3442","#23415c","#3d3b25","#24433d","#3d2b26"];
+          const list = (pages.results || []).map((pg,i) => {
+            const image = pg.thumbnail_image ? `<img src="${escapeHtml(pg.thumbnail_image)}" alt="${escapeHtml(pg.thumbnail_alt||"")}" loading="lazy" style="object-position:${Number(pg.thumbnail_focal_x??50)}% ${Number(pg.thumbnail_focal_y??50)}%">` : `<div class="dept-art" style="background:linear-gradient(135deg,${palette[i%palette.length]},#0c1525)"><span>${escapeHtml(dept.icon||"✦")}</span></div>`;
+            const cardTitle = lang==="ne" && pg.thumbnail_title_ne ? pg.thumbnail_title_ne : (pg.thumbnail_title_en || (lang==="ne"&&pg.title_ne?pg.title_ne:pg.title_en));
+            const summary = lang==="ne" ? (pg.thumbnail_summary_ne||pg.description_ne||"") : (pg.thumbnail_summary_en||pg.description_en||"");
+            return `<a class="dept-page" href="/${escapeHtml(pg.slug)}${lang==="ne"?"?lang=ne":""}">${image}<div class="dept-card-copy"><span class="dept-card-label">${escapeHtml(dept.name_en)}</span><h3>${escapeHtml(cardTitle)}</h3><p>${escapeHtml(summary.slice(0,150))}</p><b>Explore →</b></div></a>`;
+          }).join("");
+          const body = `<section class="page-hero"><div class="wrap"><span class="dept-kicker">GRANSHI DEPARTMENT</span><h1>${escapeHtml(title)}</h1><p>${escapeHtml(lang==="ne"&&dept.description_ne?dept.description_ne:dept.description_en||"")}</p><span class="dept-count">${(pages.results||[]).length} published pages</span></div></section><article class="wrap"><div class="dept-list">${list||"<p>No published pages yet.</p>"}</div><style>.dept-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:20px;margin:28px 0 50px}.dept-page{overflow:hidden;background:#fff;border:1px solid #e5e9ef;border-radius:18px;box-shadow:0 8px 28px #14233d0b;transition:.2s}.dept-page:hover{transform:translateY(-4px);box-shadow:0 16px 36px #14233d18}.dept-page>img,.dept-art{display:block;width:100%;height:170px;object-fit:cover}.dept-art{display:grid;place-items:center;color:#f2d99e;font-size:54px}.dept-card-copy{padding:16px}.dept-card-label,.dept-kicker{font-size:10px;letter-spacing:2px;font-weight:800;color:#a47b32}.dept-card-copy h3{margin:8px 0;font-size:18px;line-height:1.3}.dept-card-copy p{margin:0 0 14px;color:#667085;font-size:13px;line-height:1.6;min-height:40px}.dept-card-copy b{font-size:12px;color:#9a742e}.dept-count{display:inline-block;margin-top:8px;font-size:12px;color:#d9dfeb}</style></article>`;
           return new Response(
             pageChrome(title, dept.description_en || "", body, settings, lang),
             {
