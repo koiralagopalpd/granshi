@@ -307,7 +307,7 @@ async function handleResendWebhook(req, env) {
     const filename=String(item.filename||obj.filename||"attachment").replace(/[^a-zA-Z0-9._-]/g,"_");
     const key="inbound/"+crypto.randomUUID()+"-"+filename;
     await env.MEDIA.put(key,bytes,{httpMetadata:{contentType:item.content_type||"application/octet-stream"}});
-    attachmentRows.push({key,url:"/media/"+key,name:filename,content_type:item.content_type||"",size:bytes.byteLength});
+    attachmentRows.push({key,url:"/api/admin/messages/attachment?key="+encodeURIComponent(key),name:filename,content_type:item.content_type||"",size:bytes.byteLength});
   }
   const cleanText = textBody || String(htmlBody||"").replace(/<\/(p|div|br|li|h[1-6])>/gi,"\n").replace(/<[^>]*>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").trim() || "(No message body)";
   const inserted=await env.DB.prepare("INSERT INTO messages(name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(?,?,?,?,?,?,?,?)")
@@ -482,6 +482,19 @@ async function api(req, env) {
   const who = await auth(req, env);
   if (!who) return json({ error: "Please log in." }, 401);
   if (p === "/api/auth/me") return json({ email: who });
+
+  if (p === "/api/admin/messages/attachment" && method === "GET") {
+    const key = String(u.searchParams.get("key") || "");
+    if (!key.startsWith("inbound/") || key.includes("..")) return json({ error: "Invalid attachment." }, 400);
+    if (!env.MEDIA) return json({ error: "Storage unavailable." }, 503);
+    const object = await env.MEDIA.get(key);
+    if (!object) return json({ error: "Attachment not found." }, 404);
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set("cache-control", "private, no-store");
+    headers.set("content-disposition", "attachment; filename*=UTF-8''" + encodeURIComponent(key.split("/").pop()));
+    return new Response(object.body, { headers });
+  }
 
   if (p === "/api/admin/overview") {
     const pub = await allPublic(env);
@@ -1067,6 +1080,7 @@ export default {
       if (!env.MEDIA)
         return new Response("Media not configured", { status: 503 });
       const key = u.pathname.slice(7);
+      if (key.startsWith("inbound/")) return new Response("Not found", { status: 404 });
       const obj = await env.MEDIA.get(key);
       if (!obj) return new Response("Not found", { status: 404 });
       const h = new Headers();
