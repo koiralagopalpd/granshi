@@ -340,7 +340,7 @@ function openPageEditor(page,dept,cats){
 
   let blocks=[];
   try{if(page&&!isZipExisting)blocks=typeof page.content==='string'?JSON.parse(page.content):page.content||[]}catch{blocks=[]}
-  let useZip=isZipExisting; // ZIP remains primary; choose block editor when needed
+  let useZip=isZipExisting || !page; // new pages default to ZIP; existing block pages stay in block mode
   let entryFile='index.html';
   if(isZipExisting) entryFile=String(page.template).slice(4)||'index.html';
 
