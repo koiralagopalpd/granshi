@@ -135,6 +135,27 @@ function searchablePageText(content) {
     }).join(" ").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim().slice(0,30000);
   } catch { return ""; }
 }
+function htmlToSearchText(html) {
+  return String(html || "").replace(/<script\\b[\\s\\S]*?<\\/script>/gi," ")
+    .replace(/<style\\b[\\s\\S]*?<\\/style>/gi," ")
+    .replace(/<!--([\\s\\S]*?)-->/g," ")
+    .replace(/<\\/(p|div|li|h[1-6]|section|article|br|tr)>/gi," ")
+    .replace(/<[^>]+>/g," ")
+    .replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&")
+    .replace(/&lt;/gi,"<").replace(/&gt;/gi,">")
+    .replace(/&#39;|&apos;/gi,"'").replace(/&quot;/gi,'"')
+    .replace(/\\s+/g," ").trim().slice(0,30000);
+}
+function zipCoverFromHtml(html, slug) {
+  const source = String(html || "");
+  const og = source.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)/i)
+    || source.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)/i);
+  const img = source.match(/<img[^>]+src=["']([^"']+)/i);
+  const value = (og && og[1]) || (img && img[1]) || "";
+  if (!value || value.startsWith("data:")) return "";
+  if (/^https?:\\/\\//i.test(value) || value.startsWith("/")) return value;
+  return "/_p/" + encodeURIComponent(slug) + "/" + value.split("/").map(encodeURIComponent).join("/");
+}
 function pageExcerpt(text, query) {
   const clean = String(text || "").replace(/\\s+/g," ").trim();
   if (!clean) return "";
@@ -703,7 +724,15 @@ async function api(req, env) {
       const media = await env.DB.prepare("SELECT url FROM media WHERE page_slug=? AND content_type LIKE 'image/%' ORDER BY created_at LIMIT 1").bind(slug).first();
       if (media) thumbnailImage = media.url;
     }
-    const searchText = searchablePageText(contentStr);
+    let searchText = searchablePageText(contentStr);
+    if (sourceType === "zip" && env.MEDIA) {
+      const entryObject = await env.MEDIA.get(`pages/${slug}/${entryFile}`);
+      if (entryObject) {
+        const html = await entryObject.text();
+        searchText = htmlToSearchText(html);
+        if (!thumbnailImage) thumbnailImage = zipCoverFromHtml(html,slug);
+      }
+    }
     await env.DB.prepare(
       `INSERT INTO pages(slug,title_en,title_ne,description_en,description_ne,content,template,department_id,category_id,is_popular,published,sort_order,updated_at,thumbnail_image,thumbnail_title_en,thumbnail_title_ne,thumbnail_summary_en,thumbnail_summary_ne,thumbnail_alt,thumbnail_focal_x,thumbnail_focal_y)
        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
