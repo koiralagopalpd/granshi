@@ -122,7 +122,7 @@ $('#logout').onclick=async()=>{await api('/auth/logout',{method:'POST'});locatio
 $('#exitFocus').onclick=()=>{setRoute({tab:'overview',deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab('overview')};
 function showApp(email){
   $('#login').classList.add('hidden');$('#app').classList.remove('hidden');
-  $('.side button[data-tab]').forEach(b=>b.onclick=()=>{$('.side button[data-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');setRoute({tab:b.dataset.tab,deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab(b.dataset.tab)});
+  $$('.side button[data-tab]').forEach(b=>b.onclick=()=>{$$('.side button[data-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');setRoute({tab:b.dataset.tab,deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab(b.dataset.tab)});
   const saved=getRoute();tab(saved.tab||'overview');
 }
 const titles={overview:'Overview',departments:'Departments & content',messages:'Messages',comments:'Comments / Feedback',menus:'Menus',usefulLinks:'Useful Links',settings:'Settings',security:'Security'};
