@@ -39,6 +39,11 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
 .tabs button{background:#eef1f6;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
 .tabs button.on{background:#172640;color:#fff}
+#app.focus-mode .side{display:none!important}
+#app.focus-mode{display:block!important}
+#app.focus-mode .main{position:fixed;inset:0;z-index:900;overflow:auto;background:#f0f2f7;padding:16px}
+#exitFocus{display:none;margin:0 0 12px}
+#app.focus-mode #exitFocus{display:inline-flex}
 #deptHub.workspace-active,#deptEd.workspace-active,#pageEd.workspace-active{position:fixed!important;inset:0!important;z-index:1000!important;display:block!important;overflow:auto!important;background:#f0f2f7!important;padding:16px!important;margin:0!important;border-radius:0!important}
 #pageEd .editor-mode-tabs{display:flex;gap:10px;margin:12px 0}
 #pageEd .editor-mode-tabs button{flex:1;min-height:46px;font-size:15px}
@@ -75,6 +80,7 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
     <button id="logout" style="margin-top:16px;color:#f5a8a8">Log out</button>
   </aside>
   <main class="main">
+    <button class="btn" id="exitFocus" type="button">← Back to Admin menu</button>
     <h1 id="tabTitle" style="margin:0 0 8px;font-size:20px">Overview</h1>
     <div id="view"></div>
   </main>
@@ -111,6 +117,7 @@ $('#loginBtn').onclick=async()=>{
   }catch(e){$('#loginStatus').textContent=e.message}
 };
 $('#logout').onclick=async()=>{await api('/auth/logout',{method:'POST'});location.reload()};
+$('#exitFocus').onclick=()=>{setRoute({tab:'overview',deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab('overview')};
 function showApp(email){
   $('#login').classList.add('hidden');$('#app').classList.remove('hidden');
   $('.side button[data-tab]').forEach(b=>b.onclick=()=>{$('.side button[data-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');setRoute({tab:b.dataset.tab,deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab(b.dataset.tab)});
@@ -119,6 +126,7 @@ function showApp(email){
 const titles={overview:'Overview',departments:'Departments & content',messages:'Messages',comments:'Comments / Feedback',menus:'Menus',usefulLinks:'Useful Links',settings:'Settings',security:'Security'};
 async function tab(name){
   setRoute({tab:name});
+  $('#app').classList.toggle('focus-mode',name!=='overview');
   $('#tabTitle').textContent=titles[name]||name;
   const v=$('#view');v.innerHTML='<div class="box"><p class="muted">Loading…</p></div>';
   try{
