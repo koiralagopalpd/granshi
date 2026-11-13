@@ -30,3 +30,15 @@ enabled = true
 [observability.logs]
 invocation_logs = true
 head_sampling_rate = 1
+
+# Isolated resources used only by Wrangler preview deployments.
+[previews.vars]
+ENVIRONMENT = "preview"
+
+[[previews.d1_databases]]
+binding = "DB"
+database_id = "f19ddd3e-7e31-4db3-b6db-4ccac43e0f7b"
+
+[[previews.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "granshi-preview-media"
