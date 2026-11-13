@@ -15,7 +15,7 @@ a{text-decoration:none;color:inherit}
 header{position:sticky;top:0;z-index:30;background:#101a2cf5;color:#fff;border-bottom:1px solid #ffffff20;backdrop-filter:blur(8px)}
 .nav{height:72px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:1px}
-.mark{border:2px solid var(--gold);border-radius:13px;width:42px;height:42px;display:grid;place-items:center;color:var(--gold);font-size:22px}
+.mark{border:1px solid #e5c77e;border-radius:14px;width:50px;height:50px;display:grid;place-items:center;background:linear-gradient(145deg,#fff8e6,#d7e8d7);box-shadow:0 4px 14px #0003;flex:0 0 50px}.mark svg{width:44px;height:44px;display:block}.wordmark{display:block;font-size:24px;line-height:1;font-weight:950;letter-spacing:.5px;color:#fff;text-transform:lowercase}.wordmark small{display:block;font-size:9px;color:#c7d0dc;letter-spacing:2px;margin-top:5px;font-weight:700}
 .brand small{display:block;font-size:10px;color:#c7d0dc;letter-spacing:2px}
 .navlinks{display:flex;gap:22px;font-size:14px;align-items:center}
 .navlinks a{cursor:pointer}.navlinks a:hover{color:var(--gold)}
@@ -128,7 +128,7 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 <body>
 <header>
   <div class="wrap nav">
-    <a class="brand" href="/"><span class="mark">G</span><span>GRANSHI<small>MY DIGITAL WORLD</small></span></a>
+    <a class="brand" href="/" aria-label="Granshi home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 64 64" role="img"><path d="M7 8h2v38H7z" fill="#f4e5bd"/><path d="M10 9 31 12 23 23 10 20Z" fill="#d92332" stroke="#fff" stroke-width="1.5"/><path d="M10 20 23 23 31 12 27 29 10 25Z" fill="#d92332" stroke="#fff" stroke-width="1.5"/><path d="M4 49 17 37 28 46 39 34 60 50Z" fill="#456d52"/><path d="M4 51h56v5H4z" fill="#e5c77e"/><text x="34" y="31" font-size="20" text-anchor="middle">🙏</text></svg></span><span class="wordmark">granshi<small>MY DIGITAL WORLD</small></span></a>
     <nav class="navlinks" id="nav"></nav>
     <div class="tools">
       <button type="button" id="lang">नेपाली</button>

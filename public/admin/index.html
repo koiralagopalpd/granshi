@@ -329,11 +329,11 @@ function openPageEditor(page,dept,cats){
       <button class="btn gold" id="saveP">Save page</button>
       <a class="btn" id="prevP" href="#" target="_blank" rel="noopener">Preview</a>
       <button class="btn" id="canP">Cancel</button>
-      <button class="btn" type="button" id="toggleBlocks">Optional: block editor</button>
+      <button class="btn" type="button" id="toggleBlocks">＋ Open Block/Page Builder (alternative to ZIP)</button>
     </div>
 
     <div id="blocksWrap" class="hidden" style="margin-top:14px">
-      <p class="muted">Optional only — if you are not using ZIP.</p>
+      <h4 style="margin:0 0 8px">2) Block/Page Builder</h4><p class="muted">ZIP upload र Block/Page Builder दुवै उपलब्ध छन्। यहाँ Heading, Paragraph, Image, Video, Button, Quote र HTML blocks थपेर page बनाउन सकिन्छ। मोबाइलबाट Gallery/Files वा Media Library प्रयोग गर्नुहोस्।</p>
       <div class="builder">
         <div><div class="canvas" id="canvas"></div></div>
         <div class="palette">
@@ -357,7 +357,7 @@ function openPageEditor(page,dept,cats){
   let entryFile='index.html';
   if(isZipExisting) entryFile=String(page.template).slice(4)||'index.html';
 
-  $('#toggleBlocks').onclick=()=>{useZip=false;$('#blocksWrap').classList.toggle('hidden')};
+  $('#toggleBlocks').onclick=()=>{useZip=false;$('#blocksWrap').classList.remove('hidden');$('#toggleBlocks').textContent='✓ Block/Page Builder selected';$('#blocksWrap').scrollIntoView({behavior:'smooth',block:'start'})};
   $('#canP').onclick=()=>ed.classList.add('hidden');
   $('#prevP').onclick=(e)=>{
     const slug=$('#p_sl').value.trim()||$('#p_te').value.trim();
