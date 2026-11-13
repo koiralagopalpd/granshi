@@ -357,6 +357,15 @@ document.getElementById("askForm").onsubmit=async function(e){
   }catch(err){area.innerHTML='<div class="answer-box">'+escText(err.message)+'</div>'}
   finally{btn.disabled=false;btn.textContent=t("Ask","सोध्नुहोस्")}
 };
+let liveSearchTimer=0;
+document.getElementById("askInput").addEventListener("input",function(){
+  clearTimeout(liveSearchTimer);
+  const value=this.value.trim(),area=document.getElementById("answerArea");
+  if(value.length<2){area.innerHTML="";return;}
+  liveSearchTimer=setTimeout(function(){
+    if(document.getElementById("askInput").value.trim()===value)document.getElementById("askForm").requestSubmit();
+  },350);
+});
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeSearch()});
 document.getElementById("openContact").onclick=function(){
   document.getElementById("contactPanel").classList.add("open");
