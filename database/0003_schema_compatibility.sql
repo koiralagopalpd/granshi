@@ -2,7 +2,7 @@
 -- The columns below are already present in the live D1 database. They are
 -- included in 0001_initial.sql for fresh installations, so this migration
 -- must not ALTER TABLE and duplicate existing columns.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_departments_slug ON departments(slug);
+CREATE INDEX IF NOT EXISTS idx_departments_slug ON departments(slug);
 CREATE INDEX IF NOT EXISTS idx_pages_department ON pages(department_id, published, sort_order);
 CREATE INDEX IF NOT EXISTS idx_categories_department ON categories(department_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_media_department ON media(department_id, created_at);
