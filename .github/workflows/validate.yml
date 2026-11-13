@@ -1,7 +1,7 @@
 name: Validate Granshi
 on:
   push:
-    branches: [main, feature/granshi-admin-improvements]
+    branches: [main, feature/granshi-admin-improvements, feature/granshi-complete-overhaul]
   pull_request:
     branches: [main]
 jobs:

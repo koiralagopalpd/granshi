@@ -439,8 +439,8 @@ function openPageEditor(page,dept,cats){
       let fields='';
       if(b.type==='heading')fields=field('text','Heading text',b.text)+field('level','Level (1–4)',b.level||2);
       else if(b.type==='paragraph'||b.type==='quote')fields=field('text',b.type==='quote'?'Quote':'Paragraph',b.text,true)+(b.type==='quote'?field('cite','Citation',b.cite):'');
-      else if(b.type==='image')fields=field('url','Image URL',b.url)+field('alt','Alt text',b.alt)+field('caption','Caption',b.caption)+'<div class="row"><label class="btn" style="display:inline-block">Choose image<input type="file" accept="image/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
-      else if(b.type==='video')fields=field('url','Video URL or uploaded video URL',b.url)+'<div class="row"><label class="btn" style="display:inline-block">Choose video<input type="file" accept="video/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
+      else if(b.type==='image')fields=field('url','Image URL',b.url)+field('alt','Alt text',b.alt)+field('caption','Caption',b.caption)+'<div class="row"><label class="btn" style="display:inline-block;cursor:pointer">＋ Add Image<input type="file" accept="image/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
+      else if(b.type==='video')fields=field('url','Video URL or uploaded video URL',b.url)+'<div class="row"><label class="btn" style="display:inline-block;cursor:pointer">＋ Add Video<input type="file" accept="video/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
       else if(b.type==='button')fields=field('text','Button label',b.text)+field('url','Button link',b.url);
       else if(b.type==='html')fields=field('html','HTML code',b.html,true);
       else fields='<p class="muted">Divider block</p>';
