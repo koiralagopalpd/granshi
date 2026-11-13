@@ -101,7 +101,7 @@ async function api(path,opts={}){
 const ROUTE_KEY='granshiAdminRoute',DRAFT_KEY='granshiAdminDraft';
 function getRoute(){try{return JSON.parse(sessionStorage.getItem(ROUTE_KEY)||'{}')}catch{return {}}}
 function setRoute(p){try{sessionStorage.setItem(ROUTE_KEY,JSON.stringify({...getRoute(),...p}))}catch(_){}}
-function saveDraft(){const root=$('#pageEd');if(!root||!root.classList.contains('workspace-active'))return;const o={};$('input[id],textarea[id],select[id]',root).forEach(e=>{if(e.type!=='file')o[e.id]={value:e.value,checked:!!e.checked}});try{sessionStorage.setItem(DRAFT_KEY,JSON.stringify(o))}catch(_){}}
+function saveDraft(){const root=$('#pageEd');if(!root||!root.classList.contains('workspace-active'))return;const o={};$$('input[id],textarea[id],select[id]',root).forEach(e=>{if(e.type!=='file')o[e.id]={value:e.value,checked:!!e.checked}});try{sessionStorage.setItem(DRAFT_KEY,JSON.stringify(o))}catch(_){}}
 function restoreDraft(){try{const root=$('#pageEd'),o=JSON.parse(sessionStorage.getItem(DRAFT_KEY)||'{}');Object.entries(o).forEach(([id,x])=>{const e=root?.querySelector('#'+CSS.escape(id));if(e){if(e.type==='checkbox')e.checked=x.checked;else if(e.type!=='file')e.value=x.value}})}catch(_){}}
 document.addEventListener('input',saveDraft,true);document.addEventListener('change',saveDraft,true);window.addEventListener('beforeunload',saveDraft);
 async function boot(){
@@ -280,7 +280,7 @@ async function openDeptHub(id,initialSub='pages',restoreSlug=null,restoreNew=fal
         <div id="subView"></div>
       </div>`;
       $('#closeHub').onclick=()=>{hub.classList.add('hidden');hub.classList.remove('workspace-active');hub.innerHTML='';$('#deptList').classList.remove('hidden');setRoute({deptId:null,deptSub:null,editorSlug:null,editorNew:false})};
-      $('[data-s]').forEach(b=>b.onclick=()=>{sub=b.dataset.s;setRoute({deptSub:sub,editorSlug:null,editorNew:false});draw()});
+      $$('[data-s]').forEach(b=>b.onclick=()=>{sub=b.dataset.s;setRoute({deptSub:sub,editorSlug:null,editorNew:false});draw()});
       const sv=$('#subView');
       if(sub==='pages'){
         renderDeptPages(sv,dept,data.pages||[],data.categories||[]);
@@ -517,7 +517,7 @@ function openPageEditor(page,dept,cats,restoring=false){
     });
   }
   drawBlocks();
-  $('[data-add]',ed).forEach(btn=>btn.onclick=()=>{
+  $$('[data-add]',ed).forEach(btn=>btn.onclick=()=>{
     const t=btn.dataset.add;
     useZip=false;
     const defaults={heading:{type:t,text:'New heading',level:2},paragraph:{type:t,text:'Write your paragraph here.'},image:{type:t,url:'',alt:'',caption:''},video:{type:t,url:''},button:{type:t,text:'Learn more',url:'#'},quote:{type:t,text:'Quote text',cite:''},divider:{type:t},html:{type:t,html:''}};
