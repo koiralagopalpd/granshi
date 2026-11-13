@@ -90,6 +90,19 @@ Checkout / payment is not built yet (you can add eSewa / Khalti / Stripe later).
 
 ---
 
+## Resend inbound email and attachments
+
+After deploying the worker, configure a Resend webhook:
+- Endpoint: `https://gopalkoirala.com.np/api/webhooks/resend`
+- Event: `email.received`
+- Save the webhook signing secret as the Cloudflare Worker secret `RESEND_WEBHOOK_SECRET`.
+- Keep the existing `RESEND_API_KEY` as a Worker secret. Never put either secret in this repository.
+- Apply the new D1 migration: `npx wrangler d1 migrations apply granshi-db --remote`.
+
+The endpoint verifies Svix signatures and timestamp freshness, fetches the full received message from Resend, stores the message in the Admin Inbox, and copies received attachments into the configured R2 bucket. Repeated webhook deliveries are deduplicated by Resend email ID. Test with a real message after deploying; repository checks cannot verify Cloudflare secrets, Resend webhook delivery, DNS routing, or live R2/D1 permissions.
+
+Admin replies use the configured Resend sender and set `info@gopalkoirala.com.np` as Reply-To. Uploaded files are attached to the outgoing email as base64 content. Image attachments are converted/compressed without cropping while preserving aspect ratio; the 100 KB target is best-effort, not guaranteed for every image.
+
 ## Department email
 
 - Edit department → set **Contact email**  

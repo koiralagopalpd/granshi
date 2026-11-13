@@ -62,6 +62,7 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
     <button data-tab="messages">Messages</button>
     <button data-tab="comments">Comments</button>
     <button data-tab="menus">Menus</button>
+    <button data-tab="usefulLinks">Useful Links</button>
     <button data-tab="settings">Settings</button>
     <button data-tab="security">Security</button>
     <button id="logout" style="margin-top:16px;color:#f5a8a8">Log out</button>
@@ -102,7 +103,7 @@ function showApp(email){
   $$('.side button[data-tab]').forEach(b=>b.onclick=()=>{$$('.side button[data-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');tab(b.dataset.tab)});
   tab('overview');
 }
-const titles={overview:'Overview',departments:'Departments & content',messages:'Messages',comments:'Comments / Feedback',menus:'Menus',settings:'Settings',security:'Security'};
+const titles={overview:'Overview',departments:'Departments & content',messages:'Messages',comments:'Comments / Feedback',menus:'Menus',usefulLinks:'Useful Links',settings:'Settings',security:'Security'};
 async function tab(name){
   $('#tabTitle').textContent=titles[name]||name;
   const v=$('#view');v.innerHTML='<div class="box"><p class="muted">Loading…</p></div>';
@@ -116,6 +117,7 @@ async function tab(name){
     if(name==='messages') await renderMessages(v);
     if(name==='comments') await renderComments(v);
     if(name==='menus') await renderMenus(v);
+    if(name==='usefulLinks') await renderUsefulLinks(v);
     if(name==='settings') await renderSettings(v);
     if(name==='security'){
       v.innerHTML=`<div class="box"><h3>Change password</h3>
@@ -125,6 +127,46 @@ async function tab(name){
       $('#chp').onclick=async()=>{try{await api('/admin/password',{method:'POST',body:JSON.stringify({currentPassword:$('#oldp').value,newPassword:$('#newp').value})});alert('Changed')}catch(e){alert(e.message)}};
     }
   }catch(e){v.innerHTML=`<div class="box">Error: ${esc(e.message)}</div>`}
+}
+
+
+/* ---- Footer useful links ---- */
+async function renderUsefulLinks(v){
+  const cfg=await api('/admin/overview');
+  let links=[];
+  try{links=JSON.parse(cfg.settings?.useful_links||'[]');if(!Array.isArray(links))links=[]}catch{links=[]}
+  function draw(){
+    v.innerHTML=`<div class="box">
+      <div class="row" style="justify-content:space-between"><h3>Footer · Useful Links</h3><button class="btn gold" id="ulAdd">+ Add link</button></div>
+      <p class="muted">यहाँ थपिएका लिंकहरू वेबसाइटको footer मा देखिन्छन्। Title, छोटो विवरण र पूरा URL राख्नुहोस्।</p>
+      <div id="ulRows">${links.map((x,i)=>`
+        <div class="box" style="background:#f8f9fc">
+          <div class="row" style="justify-content:space-between"><b>Link ${i+1}</b><button class="btn danger" data-uldel="${i}">Remove</button></div>
+          <label>Title / नाम</label><input data-ultitle="${i}" value="${esc(x.title||'')}" placeholder="Example: Nepal Government">
+          <label>Short description / छोटो विवरण</label><input data-uldesc="${i}" value="${esc(x.description||'')}" placeholder="Official information and services">
+          <label>URL (https://...)</label><input data-ulurl="${i}" type="url" value="${esc(x.url||'')}" placeholder="https://example.com">
+          <div class="row"><button class="btn" data-ulup="${i}" ${i===0?'disabled':''}>↑ Move</button><button class="btn" data-uldn="${i}" ${i===links.length-1?'disabled':''}>↓ Move</button></div>
+        </div>`).join('')||'<p class="muted">अहिलेसम्म Useful Links थपिएको छैन।</p>'}</div>
+      <button class="btn gold" id="ulSave">Save Useful Links</button><span id="ulStatus" class="muted" style="margin-left:10px"></span>
+    </div>`;
+    v.querySelectorAll('[data-ultitle]').forEach(el=>el.oninput=()=>links[+el.dataset.ultitle].title=el.value);
+    v.querySelectorAll('[data-uldesc]').forEach(el=>el.oninput=()=>links[+el.dataset.uldesc].description=el.value);
+    v.querySelectorAll('[data-ulurl]').forEach(el=>el.oninput=()=>links[+el.dataset.ulurl].url=el.value);
+    v.querySelectorAll('[data-uldel]').forEach(el=>el.onclick=()=>{links.splice(+el.dataset.uldel,1);draw()});
+    v.querySelectorAll('[data-ulup]').forEach(el=>el.onclick=()=>{const i=+el.dataset.ulup;[links[i-1],links[i]]=[links[i],links[i-1]];draw()});
+    v.querySelectorAll('[data-uldn]').forEach(el=>el.onclick=()=>{const i=+el.dataset.uldn;[links[i+1],links[i]]=[links[i],links[i+1]];draw()});
+    $('#ulAdd').onclick=()=>{links.push({title:'',description:'',url:''});draw()};
+    $('#ulSave').onclick=async()=>{
+      const status=$('#ulStatus');
+      for(const x of links){if(!x.title.trim()||!x.url.trim()){status.textContent='Each link needs a title and URL.';return}
+        try{const u=new URL(x.url);if(!['http:','https:'].includes(u.protocol))throw new Error();}catch{status.textContent='Please enter a valid http/https URL.';return}}
+      $('#ulSave').disabled=true;status.textContent='Saving…';
+      try{await api('/admin/settings',{method:'POST',body:JSON.stringify({useful_links:JSON.stringify(links)})});status.textContent='Saved successfully.'}
+      catch(e){status.textContent=e.message}
+      finally{$('#ulSave').disabled=false}
+    };
+  }
+  draw();
 }
 
 /* ---- Departments hub ---- */
@@ -258,6 +300,19 @@ function openPageEditor(page,dept,cats){
     </div>
     <label>Description EN</label><textarea id="p_de" rows="2">${esc(page?.description_en||'')}</textarea>
     <label>Description NE</label><textarea id="p_dn" rows="2">${esc(page?.description_ne||'')}</textarea>
+    <div class="box" style="background:#f7f8fb;margin:12px 0">
+      <h4 style="margin:0 0 8px">Thumbnail / Homepage & Department Card</h4>
+      <p class="muted">खाली छोड्दा system ले page भित्रको पहिलो उपयुक्त image छान्छ। चाहनु भए यहाँ आफैँ image र छोटो teaser राख्न सक्नुहुन्छ।</p>
+      <label>Thumbnail image URL (optional override)</label><input id="p_thumb" value="${esc(page?.thumbnail_image||'')}" placeholder="/media/... or /_p/...">
+      <div class="grid2">
+        <div><label>Card title EN</label><input id="p_ttitle_en" value="${esc(page?.thumbnail_title_en||'')}"></div>
+        <div><label>Card title NE</label><input id="p_ttitle_ne" value="${esc(page?.thumbnail_title_ne||'')}"></div>
+        <div><label>Short summary EN</label><textarea id="p_tsum_en" rows="2">${esc(page?.thumbnail_summary_en||'')}</textarea></div>
+        <div><label>Short summary NE</label><textarea id="p_tsum_ne" rows="2">${esc(page?.thumbnail_summary_ne||'')}</textarea></div>
+      </div>
+      <label>Image alt text</label><input id="p_talt" value="${esc(page?.thumbnail_alt||'')}">
+      <div class="grid2"><div><label>Image focus X (0–100)</label><input id="p_fx" type="number" min="0" max="100" value="${Number(page?.thumbnail_focal_x??50)}"></div><div><label>Image focus Y (0–100)</label><input id="p_fy" type="number" min="0" max="100" value="${Number(page?.thumbnail_focal_y??50)}"></div></div>
+    </div>
     <label><input type="checkbox" id="p_pub" ${page?.published?'checked':''}> Published (live)</label>
     <label><input type="checkbox" id="p_pop" ${page?.is_popular?'checked':''}> Popular on homepage</label>
 
@@ -282,21 +337,27 @@ function openPageEditor(page,dept,cats){
       <div class="builder">
         <div><div class="canvas" id="canvas"></div></div>
         <div class="palette">
-          <button data-add="heading">Heading</button>
-          <button data-add="paragraph">Paragraph</button>
-          <button data-add="image">Image</button>
-          <button data-add="html">HTML</button>
+          <p><b>Tap to add blocks</b></p>
+          <button type="button" data-add="heading">＋ Heading</button>
+          <button type="button" data-add="paragraph">＋ Paragraph</button>
+          <button type="button" data-add="image">＋ Image</button>
+          <button type="button" data-add="video">＋ Video</button>
+          <button type="button" data-add="button">＋ Button / Link</button>
+          <button type="button" data-add="quote">＋ Quote</button>
+          <button type="button" data-add="divider">＋ Divider</button>
+          <button type="button" data-add="html">＋ Custom HTML</button>
+          <p class="muted">On mobile use ↑ / ↓ to reorder blocks.</p>
         </div>
       </div>
     </div>`;
 
   let blocks=[];
   try{if(page&&!isZipExisting)blocks=typeof page.content==='string'?JSON.parse(page.content):page.content||[]}catch{blocks=[]}
-  let useZip=isZipExisting||true; // default zip workflow
+  let useZip=isZipExisting || !page; // new pages default to ZIP; existing block pages stay in block mode
   let entryFile='index.html';
   if(isZipExisting) entryFile=String(page.template).slice(4)||'index.html';
 
-  $('#toggleBlocks').onclick=()=>$('#blocksWrap').classList.toggle('hidden');
+  $('#toggleBlocks').onclick=()=>{useZip=false;$('#blocksWrap').classList.toggle('hidden')};
   $('#canP').onclick=()=>ed.classList.add('hidden');
   $('#prevP').onclick=(e)=>{
     const slug=$('#p_sl').value.trim()||$('#p_te').value.trim();
@@ -357,6 +418,9 @@ function openPageEditor(page,dept,cats){
         description_en:$('#p_de').value.trim(),description_ne:$('#p_dn').value.trim(),
         department_id:dept.id,category_id:$('#p_cat').value?Number($('#p_cat').value):null,
         published:false,is_popular:$('#p_pop').checked,
+        thumbnail_image:$('#p_thumb').value.trim(),thumbnail_title_en:$('#p_ttitle_en').value.trim(),thumbnail_title_ne:$('#p_ttitle_ne').value.trim(),
+        thumbnail_summary_en:$('#p_tsum_en').value.trim(),thumbnail_summary_ne:$('#p_tsum_ne').value.trim(),thumbnail_alt:$('#p_talt').value.trim(),
+        thumbnail_focal_x:Number($('#p_fx').value||50),thumbnail_focal_y:Number($('#p_fy').value||50),
         source_type:'zip',entry_file:entryFile,
         content:{files:names,entry:entryFile}
       })});
@@ -370,15 +434,54 @@ function openPageEditor(page,dept,cats){
   const canvas=$('#canvas');
   function drawBlocks(){
     if(!canvas)return;
-    canvas.innerHTML=blocks.map((b,i)=>`<div class="block"><button class="rm" data-rm="${i}">×</button><div class="body"><b>${esc(b.type)}</b>
-      <textarea data-i="${i}" rows="2">${esc(b.text||b.html||b.url||'')}</textarea></div></div>`).join('')||'<p class="muted">No blocks</p>';
-    $$('[data-rm]',canvas).forEach(btn=>btn.onclick=()=>{blocks.splice(+btn.dataset.rm,1);drawBlocks()});
-    $$('[data-i]',canvas).forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.i];if(b.type==='html')b.html=el.value;else if(b.type==='image')b.url=el.value;else b.text=el.value});
+    canvas.innerHTML=blocks.map((b,i)=>{
+      const field=(key,label,val,area=false)=>'<label>'+label+'</label>'+(area?'<textarea data-field="'+key+'" data-i="'+i+'" rows="3">'+esc(val||'')+'</textarea>':'<input data-field="'+key+'" data-i="'+i+'" value="'+esc(val||'')+'">');
+      let fields='';
+      if(b.type==='heading')fields=field('text','Heading text',b.text)+field('level','Level (1–4)',b.level||2);
+      else if(b.type==='paragraph'||b.type==='quote')fields=field('text',b.type==='quote'?'Quote':'Paragraph',b.text,true)+(b.type==='quote'?field('cite','Citation',b.cite):'');
+      else if(b.type==='image')fields=field('url','Image URL',b.url)+field('alt','Alt text',b.alt)+field('caption','Caption',b.caption)+'<div class="row"><label class="btn" style="display:inline-block">Choose image<input type="file" accept="image/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
+      else if(b.type==='video')fields=field('url','Video URL or uploaded video URL',b.url)+'<div class="row"><label class="btn" style="display:inline-block">Choose video<input type="file" accept="video/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
+      else if(b.type==='button')fields=field('text','Button label',b.text)+field('url','Button link',b.url);
+      else if(b.type==='html')fields=field('html','HTML code',b.html,true);
+      else fields='<p class="muted">Divider block</p>';
+      return '<div class="block" style="display:block;margin:10px 0;padding:12px;border:1px solid #dce3ed;border-radius:10px;background:#fff"><div class="row" style="justify-content:space-between"><b>'+esc(b.type.toUpperCase())+'</b><div class="row"><button type="button" class="btn" data-up="'+i+'" '+(i===0?'disabled':'')+'>↑</button><button type="button" class="btn" data-down="'+i+'" '+(i===blocks.length-1?'disabled':'')+'>↓</button><button type="button" class="btn danger" data-rm="'+i+'">Remove</button></div></div><div style="margin-top:8px">'+fields+'</div></div>';
+    }).join('')||'<p class="muted">No blocks yet. Add a block from the buttons.</p>';
+    canvas.querySelectorAll('[data-rm]').forEach(btn=>btn.onclick=()=>{blocks.splice(+btn.dataset.rm,1);drawBlocks()});
+    canvas.querySelectorAll('[data-up]').forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.up;if(i>0){[blocks[i-1],blocks[i]]=[blocks[i],blocks[i-1]];drawBlocks()}});
+    canvas.querySelectorAll('[data-down]').forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.down;if(i<blocks.length-1){[blocks[i+1],blocks[i]]=[blocks[i],blocks[i+1]];drawBlocks()}});
+    canvas.querySelectorAll('[data-field]').forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.i],k=el.dataset.field;b[k]=k==='level'?Number(el.value):el.value});
+    canvas.querySelectorAll('[data-library]').forEach(btn=>btn.onclick=async()=>{
+      const idx=+btn.dataset.library,block=blocks[idx];
+      try{
+        const all=await api('/admin/media?department_id='+encodeURIComponent(dept.id));
+        const allowed=all.filter(m=>block.type==='image'?(m.content_type||'').startsWith('image/'):(m.content_type||'').startsWith('video/'));
+        if(!allowed.length){alert('No matching uploads in Media Library yet. Upload a file first.');return}
+        const card=btn.closest('.block'),select=document.createElement('select');
+        select.style.marginTop='8px';select.innerHTML='<option value="">Choose an uploaded '+block.type+'…</option>'+allowed.map(m=>'<option value="'+esc(m.url)+'">'+esc(m.name)+' · '+Math.ceil((m.size||0)/1024)+' KB</option>').join('');
+        const previous=card.querySelector('[data-library-select]');if(previous)previous.remove();
+        select.setAttribute('data-library-select','');card.appendChild(select);
+        select.onchange=()=>{if(select.value){block.url=select.value;drawBlocks()}};
+      }catch(e){alert(e.message)}
+    });
+    canvas.querySelectorAll('[data-upload]').forEach(el=>el.onchange=async()=>{
+      const file=el.files&&el.files[0];if(!file)return;
+      const idx=+el.dataset.upload,st=$('#zipStatus');if(st)st.textContent='Uploading '+file.name+'…';
+      try{
+        const slug=slugifyClient($('#p_sl').value.trim()||$('#p_te').value.trim());
+        if(!slug)throw new Error('Set page title/slug first.');
+        const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_'),rel='builder/'+Date.now()+'-'+safe;
+        const r=await fetch('/api/admin/pages/asset',{method:'POST',headers:{'content-type':file.type||'application/octet-stream','x-page-slug':slug,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent(rel)},body:file});
+        const d=await r.json();if(!r.ok)throw new Error(d.error||'Upload failed');
+        blocks[idx].url=d.url||('/media/pages/'+slug+'/'+rel);drawBlocks();if(st)st.textContent='Uploaded '+file.name;
+      }catch(err){alert(err.message)}
+    });
   }
   drawBlocks();
   $$('[data-add]',ed).forEach(btn=>btn.onclick=()=>{
     const t=btn.dataset.add;
-    blocks.push(t==='html'?{type:'html',html:''}:t==='image'?{type:'image',url:''}:{type:t,text:''});
+    useZip=false;
+    const defaults={heading:{type:t,text:'New heading',level:2},paragraph:{type:t,text:'Write your paragraph here.'},image:{type:t,url:'',alt:'',caption:''},video:{type:t,url:''},button:{type:t,text:'Learn more',url:'#'},quote:{type:t,text:'Quote text',cite:''},divider:{type:t},html:{type:t,html:''}};
+    blocks.push(defaults[t]||{type:t,text:''});
     drawBlocks();
   });
 
@@ -390,7 +493,10 @@ function openPageEditor(page,dept,cats){
         slug,title_en:$('#p_te').value.trim(),title_ne:$('#p_tn').value.trim(),
         description_en:$('#p_de').value.trim(),description_ne:$('#p_dn').value.trim(),
         department_id:dept.id,category_id:$('#p_cat').value?Number($('#p_cat').value):null,
-        published:$('#p_pub').checked,is_popular:$('#p_pop').checked
+        published:$('#p_pub').checked,is_popular:$('#p_pop').checked,
+        thumbnail_image:$('#p_thumb').value.trim(),thumbnail_title_en:$('#p_ttitle_en').value.trim(),thumbnail_title_ne:$('#p_ttitle_ne').value.trim(),
+        thumbnail_summary_en:$('#p_tsum_en').value.trim(),thumbnail_summary_ne:$('#p_tsum_ne').value.trim(),thumbnail_alt:$('#p_talt').value.trim(),
+        thumbnail_focal_x:Number($('#p_fx').value||50),thumbnail_focal_y:Number($('#p_fy').value||50)
       };
       if(useZip||zipReady||isZipExisting){
         payload.source_type='zip';
@@ -527,10 +633,36 @@ function renderDeptMedia(sv,dept,media){
 
 /* ---- Messages: reply opens only on click, closes after success ---- */
 function parseReplyDisplay(raw){
-  if(!raw)return {text:'',atts:[]};
+  if(!raw)return {text:'',atts:[],inbound:false};
+  try{const j=JSON.parse(raw);if(j&&j.inbound)return {text:'',atts:j.attachments||[],inbound:true}}catch{}
   const m=String(raw).match(/\n\n<!--ATTACH:([\s\S]*?)-->$/);
-  if(!m)return {text:raw,atts:[]};
-  try{return {text:raw.slice(0,m.index),atts:JSON.parse(m[1])}}catch{return {text:raw,atts:[]}}
+  if(!m)return {text:raw,atts:[],inbound:false};
+  try{return {text:raw.slice(0,m.index),atts:JSON.parse(m[1]),inbound:false}}catch{return {text:raw,atts:[],inbound:false}}
+}
+async function compressMailImage(file){
+  if(!file.type||!file.type.startsWith('image/')||file.type==='image/gif'||file.type==='image/svg+xml')return file;
+  try{
+    const bmp=await createImageBitmap(file);
+    let scale=Math.min(1,1800/Math.max(bmp.width,bmp.height));
+    let canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+    let blob=null;
+    for(let pass=0;pass<8;pass++){
+      canvas.width=Math.max(1,Math.round(bmp.width*scale));
+      canvas.height=Math.max(1,Math.round(bmp.height*scale));
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(bmp,0,0,canvas.width,canvas.height);
+      for(const q of [.78,.65,.52,.4,.3]){
+        blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',q));
+        if(blob&&blob.size<=100*1024)break;
+      }
+      if(blob&&blob.size<=100*1024)break;
+      scale*=.78;
+    }
+    bmp.close();
+    if(!blob)return file;
+    const base=file.name.replace(/\.[^.]+$/,'')||'image';
+    return new File([blob],base+'.jpg',{type:'image/jpeg',lastModified:Date.now()});
+  }catch{return file}
 }
 async function renderMessages(v){
   const list=await api('/admin/messages');
@@ -550,6 +682,7 @@ async function renderMessages(v){
         </div>
       </div>
       <div style="margin-top:8px"><b>${esc(m.subject||'(no subject)')}</b><div style="white-space:pre-wrap;margin-top:4px">${esc(m.body)}</div></div>
+      ${pr.inbound&&pr.atts.length?'<div class="notice" style="margin-top:8px"><b>Received attachments:</b>'+pr.atts.map(a=>'<div style="margin-top:5px"><a href="'+esc(a.url)+'" target="_blank" rel="noopener">'+esc(a.name||'file')+'</a> · '+Math.ceil((a.size||0)/1024)+' KB</div>').join('')+'</div>':''}
       ${pr.text?`<div class="notice" style="margin-top:8px"><b>Your reply:</b><div style="white-space:pre-wrap">${esc(pr.text)}</div>
         ${pr.atts.map(a=>`<div style="margin-top:6px"><a href="${esc(a.url)}" target="_blank">${esc(a.name||'file')}</a></div>`).join('')}
       </div>`:''}
@@ -577,21 +710,26 @@ async function renderMessages(v){
     const id=b.dataset.send;const text=$('#rt-'+id).value.trim();
     const msg=$('#rm-'+id);
     if(!text){msg.textContent='Write a reply';return}
-    msg.textContent='Sending…';
+    const sendButton=b;
+    sendButton.disabled=true;
+    msg.textContent='Uploading attachments…';
     try{
       const files=$('#ra-'+id).files||[];
       const attachments=[];
-      for(const f of files){
+      for(const original of files){
+        const f=await compressMailImage(original);
         const r=await fetch('/api/admin/messages/attach',{method:'POST',headers:{
           'content-type':f.type||'application/octet-stream','x-file-name':encodeURIComponent(f.name)
         },body:f});
         const d=await r.json();if(!r.ok)throw new Error(d.error||'Attach failed');
-        attachments.push({url:d.url,name:d.name,content_type:d.content_type,size:d.size});
+        attachments.push({key:d.key,url:d.url,name:d.name,content_type:d.content_type,size:d.size});
+        msg.textContent='Uploaded '+attachments.length+' / '+files.length+' · Sending email…';
       }
       await api('/admin/messages/'+id+'/reply',{method:'POST',body:JSON.stringify({reply_text:text,attachments})});
       msg.textContent='Sent';
       setTimeout(()=>tab('messages'),500);
     }catch(e){msg.textContent=e.message}
+    finally{sendButton.disabled=false}
   });
   $$('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/messages/'+b.dataset.del,{method:'DELETE'});tab('messages')});
 }
@@ -672,7 +810,7 @@ async function renderSettings(v){
     <label>About NE</label><textarea id="s_an">${esc(s.about_ne||'')}</textarea>
     <label>Footer</label><input id="s_f" value="${esc(s.footer_text||'')}">
     <label style="display:block;margin-top:12px"><input type="checkbox" id="s_comments" ${s.comments_enabled==='0'?'':'checked'}> Enable page comments / feedback</label>
-    <button class="btn gold" id="ss" style="margin-top:10px">Save</button></div>`;
+<div class="box"><h3>Public information &amp; policies</h3><p class="muted">यी सामग्री वेबसाइटको Footer मा देखिने सार्वजनिक पेजमा प्रकाशित हुन्छन्।</p><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>About Granshi / ग्रान्शीको बारेमा</b></summary><label>English</label><textarea id="legal_about_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_about_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Contact / सम्पर्क</b></summary><label>English</label><textarea id="legal_contact_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_contact_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Privacy Policy / गोपनीयता नीति</b></summary><label>English</label><textarea id="legal_privacy_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_privacy_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Terms & Conditions / प्रयोगका सर्तहरू</b></summary><label>English</label><textarea id="legal_terms_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_terms_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Disclaimer / अस्वीकरण</b></summary><label>English</label><textarea id="legal_disclaimer_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_disclaimer_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Cookie Policy / कुकी नीति</b></summary><label>English</label><textarea id="legal_cookies_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_cookies_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Copyright Policy / प्रतिलिपि अधिकार नीति</b></summary><label>English</label><textarea id="legal_copyright_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_copyright_ne" rows="5"></textarea></details><button class="btn gold" id="saveLegal">Save public pages</button><span class="muted" id="legalStatus"></span></div><div class="box"><h3>Email branding</h3><p>Outgoing emails use a short Granshi footer with the About Granshi link.</p></div><div class="box"><h3>Advertising readiness</h3><p>Ads remain off until AdSense approval and applicable consent configuration are complete.</p><label>AdSense Publisher ID</label><input id="adsPublisher" placeholder="ca-pub-..."><button class="btn" id="saveAds">Save Publisher ID</button><span id="adsStatus" class="muted"></span></div><div class="box"><h3>Launch checklist</h3><ul><li>Check contact inbox regularly.</li><li>Keep policy text consistent with actual services.</li><li>Before ads, complete publisher approval and Google-certified consent setup for applicable EEA/UK/Swiss visitors.</li></ul></div>    <button class="btn gold" id="ss" style="margin-top:10px">Save</button></div>`;
   $('#ss').onclick=async()=>{
     await api('/admin/settings',{method:'POST',body:JSON.stringify({
       brand_name:$('#s_b').value,tagline:$('#s_t').value,contact_email:$('#s_m').value,hero_image:$('#s_h').value,
@@ -682,6 +820,10 @@ async function renderSettings(v){
     })});
     alert('Saved');
   };
+  const policyDefaults={"about":{"en":"About Granshi\n\nGranshi is an independently operated personal website created to share knowledge, practical skills, learning resources, useful information, creative ideas and entertainment. It is a place to learn from one another, exchange experiences and explore topics from everyday knowledge to more advanced subjects.\n\nGranshi is not a government website, public authority, school, university or formal professional institution, and it is not affiliated with any of them. The website is maintained as a personal project.\n\nOur aim is to publish original, useful and clearly presented material. We do not claim that every page is perfect or that every view represents a universally accepted opinion. We welcome thoughtful feedback, corrections and suggestions. When an error is brought to our attention, we will review it and make a reasonable correction or update.\n\nWe do not knowingly publish material intended to insult, threaten, harass, mislead or deliberately harm a person, group or organisation. If any content unintentionally resembles or affects someone, we sincerely apologise. Please contact us with the page link and details so we can review the concern and take appropriate action.\n\nThank you for visiting, learning with us and helping Granshi improve.","ne":"ग्रान्शीको बारेमा\n\nGranshi व्यक्तिगत प्रयासमा सञ्चालन गरिएको स्वतन्त्र वेबसाइट हो। यसको उद्देश्य ज्ञान, सीप, सिकाइका सामग्री, उपयोगी जानकारी, सिर्जनात्मक विचार र मनोरञ्जनात्मक सामग्री साझा गर्नु हो। दैनिक जीवनका सामान्य ज्ञानदेखि उन्नत विषयसम्म एकअर्काबाट सिक्ने, अनुभव साटासाट गर्ने र नयाँ कुरा खोज्ने साझा स्थानका रूपमा Granshi विकास गर्ने हाम्रो चाहना हो।\n\nGranshi कुनै सरकारी वेबसाइट, सार्वजनिक निकाय, विद्यालय, विश्वविद्यालय वा औपचारिक व्यावसायिक संस्थाको वेबसाइट होइन र त्यस्ता निकायसँग यसको सम्बन्ध वा आबद्धता छैन। यो व्यक्तिगत परियोजनाका रूपमा सञ्चालन हुन्छ।\n\nहाम्रो उद्देश्य मौलिक, उपयोगी र बुझ्न सजिलो सामग्री प्रस्तुत गर्नु हो। यहाँका सबै सामग्री पूर्ण छन् वा सबै विचार सबैले स्वीकार गर्नैपर्छ भन्ने हाम्रो दाबी छैन। तपाईंका सुझाव, प्रश्न, आलोचना र सुधारका कुरा स्वागतयोग्य छन्। कुनै त्रुटि औँल्याइएमा हामी समीक्षा गरी आवश्यक सुधार वा अद्यावधिक गर्नेछौँ।\n\nकुनै व्यक्ति, समूह वा संस्थालाई अपमान, धम्की, दुर्व्यवहार, भ्रम वा जानाजानी हानि पुर्‍याउने उद्देश्यले सामग्री प्रकाशित गर्ने हाम्रो मनसाय छैन। कुनै सामग्री संयोगवश कसैसँग मेल खान गएमा वा कसैलाई असर परेको महसुस भएमा हामी हृदयदेखि क्षमाप्रार्थी छौँ। कृपया सम्बन्धित पेजको लिंक र विवरणसहित जानकारी दिनुहोस्, हामी उचित समीक्षा र आवश्यक कदम चाल्नेछौँ।\n\nGranshi मा आउनुभएको, सिक्नुभएको र यसलाई अझ राम्रो बनाउन सहयोग गर्नुभएकोमा धन्यवाद।"},"contact":{"en":"We welcome questions, suggestions, corrections, collaboration ideas and reports about content.\n\nEmail: info@gopalkoirala.com.np\n\nYou can also use the contact form available on the website. When reporting a problem, please include the page link and explain what should be reviewed. We will make a reasonable effort to read and respond to genuine messages.\n\nPlease do not send passwords, financial details or other sensitive personal information.","ne":"तपाईंका प्रश्न, सुझाव, सुधारका प्रस्ताव, सहकार्यका विचार तथा सामग्रीसम्बन्धी गुनासो हामीलाई स्वागत छ।\n\nइमेल: info@gopalkoirala.com.np\n\nवेबसाइटमा उपलब्ध Contact Form बाट पनि सन्देश पठाउन सक्नुहुन्छ। कुनै सामग्री सच्याउन वा समीक्षा गराउन चाहनुहुन्छ भने सम्बन्धित पेजको लिंक र स्पष्ट विवरण दिनुहोस्। हामी वास्तविक र उपयोगी सन्देश पढ्ने तथा सम्भव भएसम्म जवाफ दिने प्रयास गर्नेछौँ।\n\nकृपया पासवर्ड, बैंक विवरण वा अन्य संवेदनशील व्यक्तिगत जानकारी सामान्य फारम वा इमेलमार्फत नपठाउनुहोस्।"},"privacy":{"en":"Granshi is a personally operated website. We aim to collect only information that is reasonably needed to operate the website and respond to visitors.\n\nIf you contact us, submit a form or post feedback, we may receive details such as your name, email address and message. These details are used to respond, review suggestions, moderate feedback and maintain the website. Basic technical information may also be processed by our hosting and security providers to deliver and protect the service.\n\nWe do not sell visitors' personal information. We do not ask visitors to send sensitive personal information through ordinary forms or email.\n\nSome services used to host, protect, deliver email or operate website features may process technical information on our behalf. If analytics or advertising services are added in the future, their relevant cookies or similar technologies and data practices will be explained here and through any required consent choices before those optional technologies are enabled.\n\nYou may contact us at info@gopalkoirala.com.np with a privacy question or a request concerning information you have submitted. We may need to retain limited records where reasonably necessary for security, administration or legitimate operational purposes.\n\nThis page should be updated whenever the website's actual features, providers or data practices materially change.","ne":"Granshi व्यक्तिगत रूपमा सञ्चालन हुने वेबसाइट हो। वेबसाइट चलाउन र आगन्तुकका सन्देशको जवाफ दिन आवश्यक पर्ने सीमित जानकारी मात्र प्रयोग गर्ने हाम्रो प्रयास हुन्छ।\n\nतपाईंले Contact Form, इमेल वा टिप्पणीमार्फत सम्पर्क गर्दा नाम, इमेल ठेगाना र सन्देशजस्ता विवरण हामीकहाँ आउन सक्छन्। ती विवरण जवाफ दिन, सुझाव समीक्षा गर्न, टिप्पणी व्यवस्थापन गर्न र वेबसाइट सञ्चालन गर्न प्रयोग गरिन्छन्। वेबसाइट उपलब्ध गराउन र सुरक्षित राख्न होस्टिङ तथा सुरक्षा सेवा प्रदायकले सामान्य प्राविधिक जानकारी पनि प्रशोधन गर्न सक्छन्।\n\nहामी आगन्तुकका व्यक्तिगत विवरण बिक्री गर्दैनौँ। सामान्य फारम वा इमेलमार्फत संवेदनशील व्यक्तिगत जानकारी माग्ने हाम्रो उद्देश्य छैन।\n\nवेबसाइट होस्ट गर्ने, सुरक्षा दिने, इमेल पठाउने वा अन्य सुविधा सञ्चालन गर्ने सेवा प्रदायकले सेवा दिन आवश्यक प्राविधिक जानकारी प्रशोधन गर्न सक्छन्। भविष्यमा Analytics वा विज्ञापन सेवा थपिएमा तिनका सम्बन्धित Cookies वा यस्तै प्रविधि तथा डेटा प्रयोगबारे यहाँ र आवश्यक सहमति सूचनामा स्पष्ट जानकारी दिइनेछ। आवश्यक पर्ने अवस्थामा आगन्तुकको छनोट नलिई वैकल्पिक प्रविधि सक्रिय गरिने छैन।\n\nतपाईंले पठाउनुभएको जानकारीबारे प्रश्न वा अनुरोध भए info@gopalkoirala.com.np मा सम्पर्क गर्न सक्नुहुन्छ। सुरक्षा, प्रशासन वा वेबसाइट सञ्चालनका उचित कारणले केही सीमित अभिलेख राख्नुपर्ने हुन सक्छ।\n\nवेबसाइटका सुविधा, सेवा प्रदायक वा जानकारी प्रशोधन गर्ने तरिकामा महत्त्वपूर्ण परिवर्तन भएमा यो पृष्ठ पनि अद्यावधिक गरिनेछ।"},"terms":{"en":"By using Granshi, you agree to use the website respectfully and lawfully.\n\nGranshi provides general knowledge, learning material, creative content, tools and entertainment. Please do not misuse the website, attempt to disrupt or damage its services, bypass security, impersonate another person, submit unlawful or abusive material, or knowingly infringe another person's rights.\n\nYou remain responsible for material you submit, including comments and messages. Do not share private, confidential or sensitive information in public comments or ordinary contact forms.\n\nWe make reasonable efforts to present useful and accurate information, but content may contain mistakes, become outdated or be incomplete. We may correct, update, move or remove content and may change website features when needed.\n\nSome pages may refer to external websites or services. Those are operated by third parties, and Granshi does not control their content or practices.\n\nGranshi is an independently operated personal website, not a government service or formal educational institution. Please read the Disclaimer for more information about the nature of the content.","ne":"Granshi प्रयोग गर्दा वेबसाइटलाई सम्मानजनक र कानुनसम्मत तरिकाले प्रयोग गर्न सहमत भएको मानिन्छ।\n\nGranshi मा सामान्य ज्ञान, सिकाइ सामग्री, सिर्जनात्मक सामग्री, उपयोगी उपकरण र मनोरञ्जन उपलब्ध गराइन्छ। कृपया वेबसाइटको दुरुपयोग नगर्नुहोस्, सेवा अवरुद्ध वा क्षति पुर्‍याउने प्रयास नगर्नुहोस्, सुरक्षा छल्ने काम नगर्नुहोस्, अरूको पहिचान नक्कल नगर्नुहोस्, गैरकानुनी वा अपमानजनक सामग्री नपठाउनुहोस् र अरूको अधिकार उल्लङ्घन नगर्नुहोस्।\n\nतपाईंले पठाउने टिप्पणी, सन्देश वा अन्य सामग्रीको जिम्मेवारी तपाईं स्वयंको हुनेछ। सार्वजनिक टिप्पणी वा सामान्य सम्पर्क फारममा निजी, गोप्य वा संवेदनशील जानकारी नराख्नुहोस्।\n\nहामी उपयोगी र सही जानकारी दिने प्रयास गर्छौँ, तर सामग्रीमा त्रुटि हुन, पुरानो हुन वा अपूर्ण रहन सक्छ। आवश्यकताअनुसार सामग्री सच्याउन, अद्यावधिक गर्न, सार्न वा हटाउन तथा वेबसाइटका सुविधा परिवर्तन गर्न सकिन्छ।\n\nकेही पेजमा बाह्य वेबसाइट वा सेवाका लिंक हुन सक्छन्। ती सम्बन्धित तेस्रो पक्षले सञ्चालन गर्ने भएकाले तिनको सामग्री वा कार्यशैलीमाथि Granshi को नियन्त्रण हुँदैन।\n\nGranshi स्वतन्त्र व्यक्तिगत वेबसाइट हो, सरकारी सेवा वा औपचारिक शैक्षिक संस्था होइन। सामग्रीको प्रकृतिबारे थप जानकारीका लागि Disclaimer पृष्ठ पनि पढ्नुहोस्।"},"disclaimer":{"en":"Content on Granshi is shared in good faith for general information, learning, creativity and entertainment. It is not a substitute for advice from a qualified professional. In particular, articles and examples should not be treated as medical, legal, financial or other professional advice.\n\nWe try to check information and keep it useful, but we cannot promise that every item is complete, current, suitable for every situation or free from error. Please verify important matters with reliable and appropriate sources before acting on them.\n\nTools, calculators, games, demonstrations and examples are provided for general use and enjoyment. Results may be approximate and should not be relied on for important decisions.\n\nWe do not knowingly intend to publish content that harms or targets anyone. If something unintentionally causes concern or appears inaccurate, please contact us. We are willing to review it, apologise where appropriate and make corrections.","ne":"Granshi मा प्रकाशित सामग्री सद्भावपूर्वक सामान्य जानकारी, सिकाइ, सिर्जनात्मकता र मनोरञ्जनका लागि साझा गरिन्छ। यो योग्य विशेषज्ञबाट लिनुपर्ने सल्लाहको विकल्प होइन। विशेषगरी लेख तथा उदाहरणलाई स्वास्थ्य, कानुनी, आर्थिक वा अन्य व्यावसायिक सल्लाहका रूपमा लिनु हुँदैन।\n\nहामी जानकारी जाँच्ने र उपयोगी बनाउने प्रयास गर्छौँ, तर सबै सामग्री पूर्ण, अद्यावधिक, हरेक परिस्थितिमा उपयुक्त वा त्रुटिरहित हुने प्रत्याभूति दिन सक्दैनौँ। कुनै महत्त्वपूर्ण निर्णय गर्नुअघि सम्बन्धित विश्वसनीय र आधिकारिक स्रोतबाट पुष्टि गर्नुहोस्।\n\nTools, Calculator, Games, प्रदर्शन तथा उदाहरणहरू सामान्य प्रयोग र मनोरञ्जनका लागि हुन्। तिनबाट प्राप्त नतिजा अनुमानित हुन सक्छन् र महत्त्वपूर्ण निर्णयको एकमात्र आधार बनाउनु हुँदैन।\n\nकसैलाई लक्षित गरी वा जानाजानी हानि पुर्‍याउने उद्देश्यले सामग्री प्रकाशित गरिँदैन। कुनै सामग्रीले अनपेक्षित रूपमा समस्या पारेको वा गलत जानकारी दिएको लागेमा हामीलाई जानकारी दिनुहोस्। हामी समीक्षा गर्ने, आवश्यक परे क्षमा माग्ने र सुधार गर्नेछौँ।"},"cookies":{"en":"A cookie is a small file or similar piece of storage that a website may use to remember settings or support features.\n\nGranshi may use essential browser storage or similar technologies where needed for basic website functions, security or preferences. If optional analytics or advertising services are introduced, they may use cookies or similar identifiers to measure visits or provide advertisements.\n\nWhere visitor consent is required, optional analytics and advertising technologies should remain disabled until the visitor has been given a clear choice. Visitors can also manage or clear cookies through their browser settings.\n\nThe actual cookies and providers may change as website features change. This page will be updated to describe the technologies actually in use. Until optional services are configured, do not assume that analytics or advertising cookies are active.","ne":"Cookie भनेको वेबसाइटले सेटिङ सम्झन वा केही सुविधा सञ्चालन गर्न प्रयोग गर्न सक्ने सानो फाइल वा यस्तै प्रकारको भण्डारण हो।\n\nGranshi ले वेबसाइटका आधारभूत सुविधा, सुरक्षा वा प्रयोगकर्ताका प्राथमिकता कायम राख्न आवश्यक Browser Storage वा यस्तै प्रविधि प्रयोग गर्न सक्छ। भविष्यमा वैकल्पिक Analytics वा विज्ञापन सेवा थपिएमा आगन्तुकको भ्रमण मापन गर्न वा विज्ञापन देखाउन Cookies वा यस्तै पहिचान प्रविधि प्रयोग हुन सक्छन्।\n\nजहाँ आगन्तुकको सहमति आवश्यक हुन्छ, त्यहाँ स्पष्ट छनोटको अवसर नदिएसम्म वैकल्पिक Analytics र विज्ञापन प्रविधि बन्द रहनुपर्छ। आगन्तुकले Browser Settings बाट पनि Cookies व्यवस्थापन वा हटाउन सक्छन्।\n\nवेबसाइटका सुविधा परिवर्तनसँगै प्रयोग हुने Cookies र सेवा प्रदायक पनि परिवर्तन हुन सक्छन्। वास्तवमा प्रयोगमा रहेका प्रविधिबारे यो पृष्ठ अद्यावधिक गरिनेछ। वैकल्पिक सेवा जडान नभएसम्म Analytics वा विज्ञापनका Cookies सक्रिय छन् भनेर नबुझ्नुहोस्।"},"copyright":{"en":"We respect the work and rights of authors, photographers, artists, educators and other creators. We aim to publish original material or use material that we have permission or an appropriate right to use.\n\nVisitors must not copy, republish, sell or otherwise reuse protected material from Granshi or from other creators without permission or a lawful basis. Where practical, sources and creator credits should be acknowledged.\n\nIf you believe that material published on Granshi uses your work or affects your rights improperly, please email info@gopalkoirala.com.np. Include the page address, identify the material concerned, explain your connection to the original work and provide enough information for us to review the request.\n\nWe will consider genuine reports and, where appropriate, correct, credit, restrict or remove the material. We also welcome corrections to inaccurate attributions.","ne":"हामी लेखक, फोटोग्राफर, कलाकार, शिक्षक तथा अन्य सिर्जनाकर्ताको सिर्जना र अधिकारको सम्मान गर्छौँ। मौलिक सामग्री प्रकाशित गर्ने वा अनुमति अथवा उचित अधिकार भएको सामग्री मात्र प्रयोग गर्ने हाम्रो प्रयास हुन्छ।\n\nअनुमति वा कानुनी आधारबिना Granshi वा अन्य सिर्जनाकर्ताको संरक्षित सामग्री प्रतिलिपि गर्ने, पुनःप्रकाशन गर्ने, बिक्री गर्ने वा अन्य तरिकाले पुनःप्रयोग नगर्नुहोस्। सम्भव भएसम्म स्रोत र सिर्जनाकर्ताको नाम उल्लेख गर्नुपर्छ।\n\nGranshi मा प्रकाशित कुनै सामग्रीले तपाईंको सिर्जना वा अधिकार अनुचित रूपमा प्रयोग गरेको लागेमा info@gopalkoirala.com.np मा इमेल पठाउनुहोस्। सम्बन्धित पेजको लिंक, कुन सामग्रीबारे उजुरी हो, मौलिक सिर्जनासँग तपाईंको सम्बन्ध र समीक्षा गर्न आवश्यक विवरण उपलब्ध गराउनुहोस्।\n\nहामी वास्तविक उजुरी समीक्षा गर्नेछौँ र उपयुक्त भए सामग्री सच्याउने, श्रेय थप्ने, पहुँच सीमित गर्ने वा हटाउने कदम चाल्नेछौँ। गलत श्रेय वा स्रोत उल्लेखबारे सुधारका सुझाव पनि स्वागत छ।"}};
+  for(const slug of ["about","contact","privacy","terms","disclaimer","cookies","copyright"]){document.getElementById('legal_'+slug+'_en').value=s['legal_'+slug+'_en']||policyDefaults[slug].en;document.getElementById('legal_'+slug+'_ne').value=s['legal_'+slug+'_ne']||policyDefaults[slug].ne;}
+  document.getElementById('saveLegal').onclick=async()=>{const payload={};for(const slug of ["about","contact","privacy","terms","disclaimer","cookies","copyright"]){payload['legal_'+slug+'_en']=document.getElementById('legal_'+slug+'_en').value;payload['legal_'+slug+'_ne']=document.getElementById('legal_'+slug+'_ne').value;}try{await api('/admin/settings',{method:'POST',body:JSON.stringify(payload)});document.getElementById('legalStatus').textContent=' Saved.';}catch(e){document.getElementById('legalStatus').textContent=' '+e.message;}};
+  document.getElementById('saveAds').onclick=async()=>{const id=document.getElementById('adsPublisher').value.trim();if(id&&!/^ca-pub-\d+$/.test(id)){document.getElementById('adsStatus').textContent=' Invalid publisher ID.';return;}try{await api('/admin/settings',{method:'POST',body:JSON.stringify({adsense_publisher_id:id,ads_enabled:'0'})});document.getElementById('adsStatus').textContent=' Saved. Ads remain off.';}catch(e){document.getElementById('adsStatus').textContent=' '+e.message;}};
 }
 boot();
 </script>

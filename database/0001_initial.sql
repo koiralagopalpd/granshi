@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS pages (
   template TEXT NOT NULL DEFAULT 'default',
   published INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
+  department_id INTEGER,
+  category_id INTEGER,
+  is_popular INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL
 );
 
@@ -36,7 +39,8 @@ CREATE TABLE IF NOT EXISTS departments (
   email TEXT DEFAULT '',
   image TEXT DEFAULT '',
   visible INTEGER NOT NULL DEFAULT 1,
-  sort_order INTEGER NOT NULL DEFAULT 0
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  slug TEXT
 );
 
 CREATE TABLE IF NOT EXISTS menus (
@@ -55,7 +59,9 @@ CREATE TABLE IF NOT EXISTS media (
   url TEXT NOT NULL,
   content_type TEXT,
   size INTEGER,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  department_id INTEGER,
+  page_slug TEXT
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -66,7 +72,9 @@ CREATE TABLE IF NOT EXISTS messages (
   subject TEXT,
   body TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'new',
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  reply_text TEXT,
+  replied_at TEXT
 );
 
 -- Marketplace-ready (empty until you enable)
@@ -80,7 +88,8 @@ CREATE TABLE IF NOT EXISTS categories (
   image TEXT DEFAULT '',
   parent_id INTEGER DEFAULT NULL,
   visible INTEGER NOT NULL DEFAULT 1,
-  sort_order INTEGER NOT NULL DEFAULT 0
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  department_id INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS products (
@@ -145,18 +154,26 @@ INSERT OR IGNORE INTO settings(key, value) VALUES
   ('marketplace_enabled', '0'),
   ('currency', 'NPR');
 
-INSERT OR IGNORE INTO departments(name_en, name_ne, description_en, description_ne, url, icon, email, visible, sort_order) VALUES
-  ('Knowledge', 'ज्ञान', 'Discover facts, science, history and useful information.', 'तथ्य, विज्ञान, इतिहास र उपयोगी जानकारी।', '#', '✦', '', 1, 1),
-  ('Learning', 'सिकाइ', 'Languages, skills, lessons and tutorials.', 'भाषा, सीप, पाठ र ट्युटोरियल।', '#', '◎', '', 1, 2),
-  ('Smart Tools', 'स्मार्ट टुल्स', 'Useful digital tools and productivity helpers.', 'उपयोगी डिजिटल टुल्स र काम सजिलो बनाउने साधन।', '#', '⌘', '', 1, 3),
-  ('Games', 'खेल', 'Games and interactive experiences.', 'खेल तथा अन्तरक्रियात्मक अनुभव।', '#', '♟', '', 1, 4),
-  ('Creative Studio', 'क्रिएटिभ स्टुडियो', 'Photography, video, design and creative work.', 'फोटोग्राफी, भिडियो, डिजाइन र सिर्जनात्मक काम।', '#', '✧', '', 1, 5),
-  ('World', 'विश्व', 'Countries, cultures, places and stories.', 'देश, संस्कृति, स्थान र कथाहरू।', '#', '◎', '', 1, 6),
-  ('Community', 'समुदाय', 'Connect and share ideas.', 'जोडिनुहोस् र विचार साझा गर्नुहोस्।', '#', '♧', '', 1, 7),
-  ('Advanced Services', 'विशेष सेवाहरू', 'Future digital services and projects.', 'भविष्यका डिजिटल सेवा र परियोजनाहरू।', '#', '◇', '', 1, 8);
+INSERT INTO departments(name_en, name_ne, description_en, description_ne, url, icon, email, visible, sort_order)
+SELECT seed.name_en,seed.name_ne,seed.description_en,seed.description_ne,seed.url,seed.icon,seed.email,seed.visible,seed.sort_order
+FROM (
+  SELECT 'Knowledge' AS name_en, 'ज्ञान' AS name_ne, 'Discover facts, science, history and useful information.' AS description_en, 'तथ्य, विज्ञान, इतिहास र उपयोगी जानकारी।' AS description_ne, '#' AS url, '✦' AS icon, '' AS email, 1 AS visible, 1 AS sort_order
+  UNION ALL SELECT 'Learning','सिकाइ','Languages, skills, lessons and tutorials.','भाषा, सीप, पाठ र ट्युटोरियल।','#','◎','',1,2
+  UNION ALL SELECT 'Smart Tools','स्मार्ट टुल्स','Useful digital tools and productivity helpers.','उपयोगी डिजिटल टुल्स र काम सजिलो बनाउने साधन।','#','⌘','',1,3
+  UNION ALL SELECT 'Games','खेल','Games and interactive experiences.','खेल तथा अन्तरक्रियात्मक अनुभव।','#','♟','',1,4
+  UNION ALL SELECT 'Creative Studio','क्रिएटिभ स्टुडियो','Photography, video, design and creative work.','फोटोग्राफी, भिडियो, डिजाइन र सिर्जनात्मक काम।','#','✧','',1,5
+  UNION ALL SELECT 'World','विश्व','Countries, cultures, places and stories.','देश, संस्कृति, स्थान र कथाहरू।','#','◎','',1,6
+  UNION ALL SELECT 'Community','समुदाय','Connect and share ideas.','जोडिनुहोस् र विचार साझा गर्नुहोस्।','#','♧','',1,7
+  UNION ALL SELECT 'Advanced Services','विशेष सेवाहरू','Future digital services and projects.','भविष्यका डिजिटल सेवा र परियोजनाहरू।','#','◇','',1,8
+) AS seed
+WHERE NOT EXISTS (SELECT 1 FROM departments d WHERE d.name_en=seed.name_en);
 
-INSERT OR IGNORE INTO menus(label_en, label_ne, url, visible, sort_order) VALUES
-  ('Home', 'गृहपृष्ठ', '/', 1, 1),
-  ('Explore', 'अन्वेषण', '#departments', 1, 2),
-  ('About', 'हाम्रोबारे', '#about', 1, 3),
-  ('Contact', 'सम्पर्क', '#contact', 1, 4);
+INSERT INTO menus(label_en, label_ne, url, visible, sort_order)
+SELECT seed.label_en,seed.label_ne,seed.url,seed.visible,seed.sort_order
+FROM (
+  SELECT 'Home' AS label_en, 'गृहपृष्ठ' AS label_ne, '/' AS url, 1 AS visible, 1 AS sort_order
+  UNION ALL SELECT 'Explore','अन्वेषण','#departments',1,2
+  UNION ALL SELECT 'About','हाम्रोबारे','#about',1,3
+  UNION ALL SELECT 'Contact','सम्पर्क','#contact',1,4
+) AS seed
+WHERE NOT EXISTS (SELECT 1 FROM menus m WHERE m.label_en=seed.label_en);

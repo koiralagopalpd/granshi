@@ -24,6 +24,7 @@ ENVIRONMENT = "production"
 # SESSION_SECRET
 # SETUP_TOKEN
 # RESEND_API_KEY  (optional – real email)
+# RESEND_WEBHOOK_SECRET  (required to verify Resend email.received webhooks)
 [observability]
 enabled = true
 [observability.logs]
