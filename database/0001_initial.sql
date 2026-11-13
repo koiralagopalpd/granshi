@@ -139,16 +139,16 @@ CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
 
 -- Defaults
 INSERT OR IGNORE INTO settings(key, value) VALUES
-  ('brand_name', 'Granshi — My Digital World'),
-  ('tagline', 'One World. Endless Possibilities.'),
-  ('hero_title_en', 'Explore Your Digital World.'),
+  ('brand_name', 'Granshi — Our Digital World'),
+  ('tagline', 'Learn Together · Explore Freely · Grow Together.'),
+  ('hero_title_en', 'Explore Our Digital World.'),
   ('hero_title_ne', 'आफ्नो डिजिटल संसार अन्वेषण गर्नुहोस्।'),
   ('hero_desc_en', 'Knowledge, learning, creativity and technology — connected in one place. Welcome to Granshi.'),
   ('hero_desc_ne', 'ज्ञान, सिकाइ, सिर्जनशीलता र प्रविधि — सबै एउटै ठाउँमा। Granshi मा स्वागत छ।'),
   ('hero_image', '/assets-brand.png'),
   ('contact_email', 'hello@gopalkoirala.com.np'),
   ('language_default', 'en'),
-  ('footer_text', '© Granshi — My Digital World. One World. Endless Possibilities.'),
+  ('footer_text', '© Granshi — Our Digital World. Learn Together · Explore Freely · Grow Together.'),
   ('primary_color', '#101a2c'),
   ('accent_color', '#e5c77e'),
   ('marketplace_enabled', '0'),
