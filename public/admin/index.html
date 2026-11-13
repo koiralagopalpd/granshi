@@ -13,12 +13,14 @@
 input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;border-radius:9px;margin:5px 0 12px;font:inherit}
 .btn{background:#172640;color:#fff;border:0;border-radius:9px;padding:10px 14px;font-weight:750;cursor:pointer;font-size:13px}
 .gold{background:#d8b46a;color:#182338}.danger{background:#a83333}.muted{color:#68758a;font-size:13px}
-.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
-.side{background:#101a2c;color:#fff;padding:16px 10px;position:sticky;top:0;height:100vh;overflow:auto}
-.side h2{padding:4px 10px 12px;font-size:16px;margin:0}
-.side button{display:block;width:100%;text-align:left;background:none;color:#dce3ed;border:0;padding:10px;border-radius:8px;cursor:pointer;font:inherit}
-.side button.active,.side button:hover{background:#ffffff18;color:#f1d99e}
-.main{padding:20px;min-width:0}
+.shell{display:block;min-height:100vh;width:100%}
+.side{position:sticky;top:0;z-index:50;min-height:58px;height:auto;display:flex;align-items:center;gap:5px;overflow-x:auto;overflow-y:hidden;padding:7px clamp(10px,2vw,24px);background:linear-gradient(110deg,#101a2c,#1b2c46 65%,#243b58);border-bottom:1px solid #d8b46a55;box-shadow:0 8px 24px #101a2c20;scrollbar-width:thin}
+.side h2{flex:0 0 auto;padding:0 14px 0 2px;margin:0 8px 0 0;font-size:14px;letter-spacing:2px;color:#f2d99e;white-space:nowrap}
+.side button{flex:0 0 auto;width:auto;white-space:nowrap;text-align:center;background:#ffffff0b;color:#dce3ed;border:1px solid #ffffff12;padding:8px 12px;border-radius:9px;cursor:pointer;font:600 12px system-ui}
+.side button.active,.side button:hover{background:linear-gradient(135deg,#f3dfa9,#d8b46a);border-color:transparent;color:#182338}
+.main{padding:16px clamp(12px,2.4vw,30px);min-width:0;width:100%;max-width:none}
+#tabTitle{font-size:17px!important;color:#25344d!important;margin:0 0 8px!important}
+
 .box{background:#fff;border:1px solid #e4e8ef;border-radius:14px;padding:16px 18px;margin-top:12px}
 .item{padding:12px;border:1px solid #e5e9ef;border-radius:10px;margin:8px 0;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;background:#fafbfd}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -39,21 +41,30 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
 .tabs button{background:#eef1f6;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
 .tabs button.on{background:#172640;color:#fff}
-#app.focus-mode .side{display:none!important}
+#app.focus-mode .side{display:flex!important}
 #app.focus-mode{display:block!important;min-height:100vh;width:100%}
 #app.focus-mode .main{display:block!important;position:relative!important;inset:auto!important;z-index:auto!important;overflow:visible!important;min-height:100vh;width:100%;background:#f0f2f7;padding:16px}
 #app.focus-mode #view{display:block!important;visibility:visible!important;min-height:200px}
 #app.focus-mode #view>.box,#app.focus-mode #view .box{display:block!important;visibility:visible!important}
 #exitFocus{display:none;margin:0 0 12px}
 #app.focus-mode #exitFocus{display:inline-flex}
-#deptHub.workspace-active,#deptEd.workspace-active,#pageEd.workspace-active{position:fixed!important;inset:0!important;z-index:1000!important;display:block!important;overflow:auto!important;background:#f0f2f7!important;padding:16px!important;margin:0!important;border-radius:0!important}
+#deptHub.workspace-active,#deptEd.workspace-active,#pageEd.workspace-active{position:fixed!important;inset:66px 0 0!important;z-index:40!important;display:block!important;overflow:auto!important;background:#f0f2f7!important;padding:16px!important;margin:0!important;border-radius:0!important}
 #pageEd .editor-mode-tabs{display:flex;gap:10px;margin:12px 0}
 #pageEd .editor-mode-tabs button{flex:1;min-height:46px;font-size:15px}
 #pageEd .editor-mode-tabs button.on{outline:3px solid #d8b46a;outline-offset:1px}
 #pageEd .editor-panel{background:#fff;border:1px solid #e4e8ef;border-radius:14px;padding:14px;margin:10px 0}
 #pageEd .editor-panel[hidden]{display:none!important}
 #pageEd .editor-top{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:-14px;background:#f0f2f7;padding:8px 0;z-index:5}
-@media(max-width:900px){.shell{grid-template-columns:1fr}.side{height:auto;position:relative;display:flex;overflow:auto;gap:4px}.side h2{display:none}.side button{width:auto;white-space:nowrap}.builder{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
+@media(max-width:900px){.side{min-height:54px;gap:4px;padding:6px 8px}.side h2{display:block;font-size:12px;padding-right:6px;margin-right:2px}.side button{padding:8px 9px;font-size:11px}.main{padding:12px}.builder{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
+@media(max-width:430px){.side h2{font-size:10px;letter-spacing:1px}.side button{padding:7px 8px;font-size:10px}.main{padding:10px}}
+.admin-dept-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}
+.admin-dept-card{overflow:hidden;border:1px solid #e1e6ef;border-radius:14px;background:#fff;box-shadow:0 8px 24px #1726400b;transition:transform .2s,box-shadow .2s}
+.admin-dept-card:hover{transform:translateY(-3px);box-shadow:0 14px 30px #1726401b}
+.admin-dept-art{height:100px;display:flex;align-items:flex-end;padding:12px;background-image:radial-gradient(circle at 80% 15%,hsl(var(--dept-hue) 75% 72% / .55),transparent 35%),linear-gradient(135deg,hsl(var(--dept-hue) 45% 30%),#101a2c);background-size:cover;background-position:center;color:#fff;font-weight:800;letter-spacing:.4px}
+.admin-dept-copy{padding:10px 12px}
+.admin-dept-card .row{gap:4px}
+.admin-dept-card .btn{padding:6px 8px;font-size:11px}
+@media(max-width:900px){.admin-dept-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.admin-dept-art{height:82px}.admin-dept-copy{padding:8px}.admin-dept-card .item{margin:0}}
 </style>
 </head>
 <body>
@@ -211,9 +222,10 @@ async function renderDepartments(v){
       <button class="btn gold" id="newDept" style="padding:6px 10px;font-size:12px">+ New</button>
     </div>
     <p class="muted" style="margin:8px 0">Open → Pages / Media। Edit → नाम/slug।</p>
-    <div id="deptList">${list.map(d=>`
-      <div class="item" style="align-items:center;padding:10px 12px">
-        <div style="flex:1;min-width:0"><b style="font-size:14px">${esc(d.icon||'')} ${esc(d.name_en)}</b>
+    <div id="deptList" class="admin-dept-grid">${list.map((d,i)=>`
+      <div class="admin-dept-card" style="--dept-hue:${[205,165,265,25,215,45,145,12][i%8]}">
+        <div class="admin-dept-art" ${d.image?'style="background-image:linear-gradient(180deg,#101a2c10,#101a2ce8),url(\''+esc(d.image)+'\')"':''} aria-hidden="true"><span>${esc(d.name_en||'Department')}</span></div>
+        <div class="admin-dept-copy"><b style="font-size:14px">${esc(d.name_en)}</b>
           <div class="muted" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.name_ne||'')} · /dept/${esc(d.slug||d.id)}</div>
         </div>
         <div class="row" style="flex-shrink:0;gap:4px">
@@ -247,6 +259,7 @@ function editDept(d){
       <div><label>Contact email</label><input id="d_email" value="${esc(d?.email||'')}"></div>
       <div><label>Sort</label><input id="d_sort" type="number" value="${d?.sort_order??0}"></div>
     </div>
+    <label>Department background image URL (optional)</label><input id="d_image" type="url" value="${esc(d?.image||'')}" placeholder="https://… or uploaded media URL">
     <label>Description EN</label><textarea id="d_den">${esc(d?.description_en||'')}</textarea>
     <label>Description NE</label><textarea id="d_dne">${esc(d?.description_ne||'')}</textarea>
     <label><input type="checkbox" id="d_vis" ${d?.visible!==0?'checked':''}> Visible</label>
@@ -255,7 +268,7 @@ function editDept(d){
   $('#saveD').onclick=async()=>{
     await api('/admin/departments',{method:'POST',body:JSON.stringify({
       id:d?.id,name_en:$('#d_en').value.trim(),name_ne:$('#d_ne').value.trim(),slug:$('#d_slug').value.trim(),
-      icon:$('#d_icon').value.trim(),email:$('#d_email').value.trim(),sort_order:Number($('#d_sort').value||0),
+      icon:$('#d_icon').value.trim(),image:$('#d_image').value.trim(),email:$('#d_email').value.trim(),sort_order:Number($('#d_sort').value||0),
       description_en:$('#d_den').value.trim(),description_ne:$('#d_dne').value.trim(),visible:$('#d_vis').checked
     })});
     tab('departments');
