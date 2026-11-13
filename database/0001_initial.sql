@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS pages (
   template TEXT NOT NULL DEFAULT 'default',
   published INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
+  department_id INTEGER,
+  category_id INTEGER,
+  is_popular INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL
 );
 
@@ -36,7 +39,8 @@ CREATE TABLE IF NOT EXISTS departments (
   email TEXT DEFAULT '',
   image TEXT DEFAULT '',
   visible INTEGER NOT NULL DEFAULT 1,
-  sort_order INTEGER NOT NULL DEFAULT 0
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  slug TEXT
 );
 
 CREATE TABLE IF NOT EXISTS menus (
@@ -55,7 +59,9 @@ CREATE TABLE IF NOT EXISTS media (
   url TEXT NOT NULL,
   content_type TEXT,
   size INTEGER,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  department_id INTEGER,
+  page_slug TEXT
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -66,7 +72,9 @@ CREATE TABLE IF NOT EXISTS messages (
   subject TEXT,
   body TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'new',
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  reply_text TEXT,
+  replied_at TEXT
 );
 
 -- Marketplace-ready (empty until you enable)
@@ -80,7 +88,8 @@ CREATE TABLE IF NOT EXISTS categories (
   image TEXT DEFAULT '',
   parent_id INTEGER DEFAULT NULL,
   visible INTEGER NOT NULL DEFAULT 1,
-  sort_order INTEGER NOT NULL DEFAULT 0
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  department_id INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS products (
