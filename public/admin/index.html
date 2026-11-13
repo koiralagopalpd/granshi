@@ -94,8 +94,14 @@ const $$=(s,el=document)=>[...el.querySelectorAll(s)];
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function api(path,opts={}){
   const r=await fetch('/api'+path,{...opts,headers:{'content-type':'application/json',...(opts.headers||{})}});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.error||d.detail||'Request failed');
+  const d=await r.json().catch(()=>null);
+  if(!r.ok){
+    const message=d?.error||d?.detail||'Request failed';
+    const err=new Error('HTTP '+r.status+' · '+path+' · '+message);
+    err.status=r.status;
+    throw err;
+  }
+  if(!d || typeof d!=='object')throw new Error('Invalid JSON response from '+path);
   return d;
 }
 const ROUTE_KEY='granshiAdminRoute',DRAFT_KEY='granshiAdminDraft';
@@ -264,6 +270,14 @@ async function openDeptHub(id,initialSub='pages',restoreSlug=null,restoreNew=fal
   hub.innerHTML='<p class="muted">Loading…</p>';
   try{
     const data=await api('/admin/departments/'+id+'/bundle');
+    if(!data.department || !Array.isArray(data.pages) || !Array.isArray(data.categories) || !Array.isArray(data.media)){
+      const missing=[];
+      if(!data.department)missing.push('department');
+      if(!Array.isArray(data.pages))missing.push('pages[]');
+      if(!Array.isArray(data.categories))missing.push('categories[]');
+      if(!Array.isArray(data.media))missing.push('media[]');
+      throw new Error('Department GET response is incomplete. Missing/invalid: '+missing.join(', '));
+    }
     const dept=data.department;
     let sub=initialSub||'pages';
     function draw(){
@@ -291,9 +305,10 @@ async function openDeptHub(id,initialSub='pages',restoreSlug=null,restoreNew=fal
     }
     draw();
   }catch(e){
-    hub.innerHTML=`<div class="notice">Open failed: ${esc(e.message)}</div>
-      <p class="muted">D1 मा column नभए ALTER चलाउनुहोस् (तलको SQL)।</p>
-      <button class="btn" id="closeHub">← Back</button>`;
+    hub.innerHTML=`<div class="notice"><b>Department load failed</b><br>${esc(e.message)}</div>
+      <p class="muted">GET request वा response जाँच असफल भयो। Retry गरेर फेरि अनुरोध गर्न सक्नुहुन्छ।</p>
+      <div class="row"><button class="btn gold" id="retryHub">Retry GET</button><button class="btn" id="closeHub">← Back</button></div>`;
+    $('#retryHub').onclick=()=>openDeptHub(id,initialSub,restoreSlug,restoreNew);
     $('#closeHub').onclick=()=>{hub.classList.add('hidden');hub.classList.remove('workspace-active');$('#deptList').classList.remove('hidden')};
   }
 }
