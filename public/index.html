@@ -18,7 +18,7 @@ header{position:sticky;top:0;z-index:30;background:#0874d1 url("/granshi-brand.w
 .mark{border:2px solid var(--gold);border-radius:13px;width:42px;height:42px;display:grid;place-items:center;color:var(--gold);font-size:22px}
 .brand small{display:block;font-size:10px;color:#e4f3ff;letter-spacing:2px}
 .navlinks{display:flex;gap:22px;font-size:14px;align-items:center}
-.navlinks a{cursor:pointer}.navlinks a:hover{color:var(--gold)}
+.navlinks a{cursor:pointer;color:#fff;text-shadow:0 1px 5px #001b48;text-decoration:none}.navlinks a:hover{color:#ffe2a0}.tools button,.hamb{border:1px solid #ffffff80;color:#fff;background:#052e68a8;text-shadow:0 1px 3px #001b48;box-shadow:0 2px 8px #001b4830}.tools button:hover,.hamb:hover{background:#06458dcc;color:#fff}
 .tools{display:flex;gap:8px}
 .tools button,.hamb{border:1px solid #ffffff55;color:#fff;background:#ffffff10;padding:10px 13px;border-radius:10px;cursor:pointer}
 .hamb{display:none}
@@ -108,10 +108,26 @@ footer{position:relative;isolation:isolate;overflow:hidden;background:#062b70 ur
 .footer-grid a:hover{color:#ffd58a}
 .foot-bottom{margin-top:24px;padding-top:16px;border-top:1px solid #ffffff45;font-size:13px;color:#f3f7ff}.footer-policies{margin-top:14px;border-top:1px solid #ffffff45;padding-top:12px}.footer-policies summary{cursor:pointer;list-style:none;color:#ffe0a3;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}.footer-policies summary::-webkit-details-marker{display:none}.footer-policies summary:after{content:"+";font-size:17px;line-height:1}.footer-policies[open] summary:after{content:"−"}.footer-policies summary:focus-visible,.footer-policy-links a:focus-visible{outline:2px solid #ffe0a3;outline-offset:4px}.footer-policy-links{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:12px}.footer-policy-links a{color:#e4efff}.footer-policy-links a:hover{color:#ffd58a}
 @media(max-width:760px){
-.navlinks{display:none;flex-direction:column;position:absolute;top:72px;left:0;right:0;background:transparent;padding:16px;gap:14px;border-bottom:0}
+header{background-position:center 24%;background-size:auto 190px}
+.nav{height:66px;gap:8px}
+.brand-logo{height:48px;max-width:116px}
+.tools{gap:5px}.tools button,.hamb{padding:9px 10px;font-size:12px;background:#052e68c9;color:#fff;border-color:#ffffffa0}
+.navlinks{display:none;flex-direction:column;align-items:stretch;position:absolute;top:66px;left:0;right:0;gap:0;padding:8px 4%;background:#063b7eeF url("/granshi-brand.webp") center 24%/cover no-repeat;border-bottom:1px solid #ffffff70;box-shadow:0 12px 22px #001b4860}
 .navlinks.open{display:flex}
-.hamb{display:block}
-.footer-grid{grid-template-columns:1fr}
+.navlinks a{display:block;padding:12px 10px;color:#fff;font-size:15px;text-shadow:0 1px 5px #001b48;border-bottom:1px solid #ffffff35}
+.footer-grid{grid-template-columns:1fr;gap:20px}
+footer{background-position:center 22%;background-size:auto 280px;padding:28px 0 22px;font-size:14px}
+footer:before{background:linear-gradient(180deg,#05275fe8 0%,#062b70f0 48%,#041b45fa 100%)}
+.footer-grid h4{font-size:15px;margin-bottom:9px;color:#fff;text-shadow:0 1px 5px #001b48}
+.footer-grid a{padding:5px 0;margin:2px 0;color:#f1f6ff;line-height:1.45}
+.footer-about{max-width:none;line-height:1.65;color:#f1f6ff}
+.foot-bottom{margin-top:18px;padding-top:13px;font-size:12px;line-height:1.6;color:#fff}
+.footer-policies{margin-top:12px;padding-top:11px}
+.footer-policies summary{font-size:13px;color:#ffe3a5;padding:7px 0}
+.footer-policy-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;font-size:12px}
+.footer-policy-links a{display:block;padding:8px 0;color:#f1f6ff;line-height:1.4}
+.contact-panel{padding:12px;background:#031d49e8;border-color:#ffffff70}
+.contact-panel label{color:#fff}
 .hero{min-height:480px}
 }
 
