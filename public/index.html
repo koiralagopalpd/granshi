@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101a2c">
-<title>Granshi — My Digital World</title>
-<meta name="description" content="One World. Endless Possibilities.">
+<title>Granshi — Our Digital World</title>
+<meta name="description" content="Learn Together · Explore Freely · Grow Together.">
 <style>
 :root{--navy:#101a2c;--gold:#e5c77e;--paper:#f6f7fb;--ink:#172033;--muted:#667085}
 *{box-sizing:border-box}
@@ -133,7 +133,7 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 <body>
 <header>
   <div class="wrap nav">
-    <a class="brand" href="/"><span class="mark">G</span><span>GRANSHI<small>MY DIGITAL WORLD</small></span></a>
+    <a class="brand" href="/"><span class="mark">G</span><span>GRANSHI<small>OUR DIGITAL WORLD</small></span></a>
     <nav class="navlinks" id="nav"></nav>
     <div class="tools">
       <button type="button" id="lang">नेपाली</button>
@@ -145,8 +145,8 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 
 <section class="hero">
   <div class="wrap">
-    <div class="eyebrow">ONE WORLD · ENDLESS POSSIBILITIES</div>
-    <h1 id="heroTitle">Explore Your<br><span>Digital World.</span></h1>
+    <div class="eyebrow">LEARN TOGETHER · EXPLORE FREELY · GROW TOGETHER</div>
+    <h1 id="heroTitle">Explore Our<br><span>Digital World.</span></h1>
     <p id="heroDesc">Knowledge, learning, creativity and technology — connected in one place.</p>
   </div>
 </section>
@@ -214,7 +214,7 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
         <div id="footerUsefulLinks"></div>
       </div>
     </div>
-    <div class="foot-bottom" id="footerText">© Granshi — My Digital World</div><details class="footer-policies"><summary>About &amp; Policies <span lang="ne">/ बारेमा तथा नीतिहरू</span></summary><nav class="footer-policy-links" aria-label="About and website policies"><a href="/legal/about">About Granshi</a><a href="/legal/contact">Contact</a><a href="/legal/privacy">Privacy Policy</a><a href="/legal/terms">Terms &amp; Conditions</a><a href="/legal/disclaimer">Disclaimer</a><a href="/legal/cookies">Cookie Policy</a><a href="/legal/copyright">Copyright Policy</a></nav></details>
+    <div class="foot-bottom" id="footerText">© Granshi — Our Digital World</div><details class="footer-policies"><summary>About &amp; Policies <span lang="ne">/ बारेमा तथा नीतिहरू</span></summary><nav class="footer-policy-links" aria-label="About and website policies"><a href="/legal/about">About Granshi</a><a href="/legal/contact">Contact</a><a href="/legal/privacy">Privacy Policy</a><a href="/legal/terms">Terms &amp; Conditions</a><a href="/legal/disclaimer">Disclaimer</a><a href="/legal/cookies">Cookie Policy</a><a href="/legal/copyright">Copyright Policy</a></nav></details>
   </div>
 </footer>
 
@@ -313,7 +313,7 @@ function renderExploreLists(){
 }
 function applyTexts(){
   document.getElementById("lang").textContent=lang==="en"?"नेपाली":"English";
-  var ht=settings.hero_title_en||"Explore Your Digital World.";
+  var ht=settings.hero_title_en||"Explore Our Digital World.";
   document.getElementById("heroTitle").innerHTML=lang==="en"
     ?ht.replace(/Digital World\.?/,"<span>Digital World.</span>")
     :(settings.hero_title_ne||ht);
@@ -335,8 +335,8 @@ function applyTexts(){
   );
   var oc=document.getElementById("openContact");
   if(oc) oc.textContent=t("Contact us","सम्पर्क गर्नुहोस्");
-  document.getElementById("footerText").textContent=settings.footer_text||"© Granshi — My Digital World";
-  document.getElementById("footerTag").textContent=settings.tagline||"One World. Endless Possibilities.";
+  document.getElementById("footerText").textContent=settings.footer_text||"© Granshi — Our Digital World";
+  document.getElementById("footerTag").textContent=settings.tagline||"Learn Together · Explore Freely · Grow Together.";
   renderDepartments();
   if(settings.brand_name)document.title=settings.brand_name;
   if(settings.primary_color)document.documentElement.style.setProperty("--navy",settings.primary_color);
