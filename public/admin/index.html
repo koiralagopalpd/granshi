@@ -39,6 +39,13 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
 .tabs button{background:#eef1f6;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
 .tabs button.on{background:#172640;color:#fff}
+#deptHub.workspace-active,#deptEd.workspace-active,#pageEd.workspace-active{position:fixed!important;inset:0!important;z-index:1000!important;display:block!important;overflow:auto!important;background:#f0f2f7!important;padding:16px!important;margin:0!important;border-radius:0!important}
+#pageEd .editor-mode-tabs{display:flex;gap:10px;margin:12px 0}
+#pageEd .editor-mode-tabs button{flex:1;min-height:46px;font-size:15px}
+#pageEd .editor-mode-tabs button.on{outline:3px solid #d8b46a;outline-offset:1px}
+#pageEd .editor-panel{background:#fff;border:1px solid #e4e8ef;border-radius:14px;padding:14px;margin:10px 0}
+#pageEd .editor-panel[hidden]{display:none!important}
+#pageEd .editor-top{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:-14px;background:#f0f2f7;padding:8px 0;z-index:5}
 @media(max-width:900px){.shell{grid-template-columns:1fr}.side{height:auto;position:relative;display:flex;overflow:auto;gap:4px}.side h2{display:none}.side button{width:auto;white-space:nowrap}.builder{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
 </style>
 </head>
@@ -204,7 +211,7 @@ async function renderDepartments(v){
   $$('[data-open]').forEach(b=>b.onclick=()=>openDeptHub(+b.dataset.open));
 }
 function editDept(d){
-  const ed=$('#deptEd');ed.classList.remove('hidden');
+  const ed=$('#deptEd');ed.classList.remove('hidden');ed.classList.add('workspace-active');
   ed.innerHTML=`<h3 style="margin-top:0">${d?'Edit':'New'} department</h3>
     <div class="grid2">
       <div><label>Name EN *</label><input id="d_en" value="${esc(d?.name_en||'')}"></div>
@@ -218,7 +225,7 @@ function editDept(d){
     <label>Description NE</label><textarea id="d_dne">${esc(d?.description_ne||'')}</textarea>
     <label><input type="checkbox" id="d_vis" ${d?.visible!==0?'checked':''}> Visible</label>
     <div class="row" style="margin-top:10px"><button class="btn gold" id="saveD">Save</button><button class="btn" id="canD">Cancel</button></div>`;
-  $('#canD').onclick=()=>{ed.classList.add('hidden');$('#deptList').classList.remove('hidden')};
+  $('#canD').onclick=()=>{ed.classList.add('hidden');ed.classList.remove('workspace-active');$('#deptList').classList.remove('hidden')};
   $('#saveD').onclick=async()=>{
     await api('/admin/departments',{method:'POST',body:JSON.stringify({
       id:d?.id,name_en:$('#d_en').value.trim(),name_ne:$('#d_ne').value.trim(),slug:$('#d_slug').value.trim(),
@@ -231,8 +238,8 @@ function editDept(d){
 async function openDeptHub(id){
   const listEl=$('#deptList');const ed=$('#deptEd');const hub=$('#deptHub');
   if(listEl)listEl.classList.add('hidden');
-  if(ed)ed.classList.add('hidden');
-  hub.classList.remove('hidden');
+  if(ed){ed.classList.add('hidden');ed.classList.remove('workspace-active')}
+  hub.classList.remove('hidden');hub.classList.add('workspace-active');
   hub.innerHTML='<p class="muted">Loading…</p>';
   try{
     const data=await api('/admin/departments/'+id+'/bundle');
@@ -251,7 +258,7 @@ async function openDeptHub(id){
         </div>
         <div id="subView"></div>
       </div>`;
-      $('#closeHub').onclick=()=>{hub.classList.add('hidden');hub.innerHTML='';$('#deptList').classList.remove('hidden')};
+      $('#closeHub').onclick=()=>{hub.classList.add('hidden');hub.classList.remove('workspace-active');hub.innerHTML='';$('#deptList').classList.remove('hidden')};
       $$('[data-s]').forEach(b=>b.onclick=()=>{sub=b.dataset.s;draw()});
       const sv=$('#subView');
       if(sub==='pages') renderDeptPages(sv,dept,data.pages||[],data.categories||[]);
@@ -263,7 +270,7 @@ async function openDeptHub(id){
     hub.innerHTML=`<div class="notice">Open failed: ${esc(e.message)}</div>
       <p class="muted">D1 मा column नभए ALTER चलाउनुहोस् (तलको SQL)।</p>
       <button class="btn" id="closeHub">← Back</button>`;
-    $('#closeHub').onclick=()=>{hub.classList.add('hidden');$('#deptList').classList.remove('hidden')};
+    $('#closeHub').onclick=()=>{hub.classList.add('hidden');hub.classList.remove('workspace-active');$('#deptList').classList.remove('hidden')};
   }
 }
 function renderDeptPages(sv,dept,pages,cats){
@@ -286,11 +293,11 @@ function renderDeptPages(sv,dept,pages,cats){
   $$('[data-dp]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete page?'))return;await api('/admin/pages/'+encodeURIComponent(b.dataset.dp),{method:'DELETE'});openDeptHub(dept.id)});
 }
 function openPageEditor(page,dept,cats){
-  const ed=$('#pageEd');ed.classList.remove('hidden');
+  const ed=$('#pageEd');ed.classList.remove('hidden');ed.classList.add('workspace-active');
   const isZipExisting=page && String(page.template||'').startsWith('zip:');
   let fileList=[];
   let zipReady=false;
-  ed.innerHTML=`<h4>${page?'Edit':'New'} page</h4>
+  ed.innerHTML=`<div class="editor-top"><h3 style="margin:0">${page?'Edit page':'New page'}</h3><button class="btn" id="editorBack" type="button">← Back to Pages</button></div>
     <div class="notice"><b>Primary:</b> Upload a ZIP of your finished page (must include <code>index.html</code>). Test offline first, then upload → Preview → Publish.</div>
     <div class="grid2">
       <div><label>Title EN *</label><input id="p_te" value="${esc(page?.title_en||'')}"></div>
@@ -316,23 +323,24 @@ function openPageEditor(page,dept,cats){
     <label><input type="checkbox" id="p_pub" ${page?.published?'checked':''}> Published (live)</label>
     <label><input type="checkbox" id="p_pop" ${page?.is_popular?'checked':''}> Popular on homepage</label>
 
-    <div class="box" style="margin-top:12px;background:#f7f8fb">
-      <h4 style="margin-top:0">1) ZIP package upload (main)</h4>
-      <p class="muted">ZIP भित्र: index.html + css/js/images। Nested folder OK। Mobile बाट पनि ZIP छान्न मिल्छ।</p>
+    <div class="editor-mode-tabs">
+      <button type="button" id="modeZip" class="btn">ZIP Upload</button>
+      <button type="button" id="modeBlocks" class="btn">Block PageMaker</button>
+    </div>
+    <div id="zipPanel" class="editor-panel">
+      <h4 style="margin-top:0">ZIP package upload</h4>
+      <p class="muted">ZIP भित्र index.html + CSS/JS/images राख्नुहोस्। Mobile बाट पनि छान्न मिल्छ।</p>
       <input type="file" id="zipFile" accept=".zip,application/zip">
       <div id="zipStatus" class="muted" style="margin-top:8px">${isZipExisting?'Existing ZIP page — upload new ZIP to replace files.':'No ZIP selected yet.'}</div>
       <ul id="zipList" class="muted" style="font-size:12px;max-height:120px;overflow:auto"></ul>
       <button class="btn gold" type="button" id="uploadZip" style="margin-top:8px">Upload ZIP to server</button>
     </div>
-
     <div class="row" style="margin-top:14px">
       <button class="btn gold" id="saveP">Save page</button>
       <a class="btn" id="prevP" href="#" target="_blank" rel="noopener">Preview</a>
       <button class="btn" id="canP">Cancel</button>
-      <button class="btn" type="button" id="toggleBlocks">Optional: block editor</button>
     </div>
-
-    <div id="blocksWrap" class="hidden" style="margin-top:14px">
+    <div id="blocksWrap" class="editor-panel" hidden>
       <p class="muted">Optional only — if you are not using ZIP.</p>
       <div class="builder">
         <div><div class="canvas" id="canvas"></div></div>
@@ -353,12 +361,18 @@ function openPageEditor(page,dept,cats){
 
   let blocks=[];
   try{if(page&&!isZipExisting)blocks=typeof page.content==='string'?JSON.parse(page.content):page.content||[]}catch{blocks=[]}
-  let useZip=isZipExisting || !page; // new pages default to ZIP; existing block pages stay in block mode
+  let useZip=isZipExisting || !page;
   let entryFile='index.html';
   if(isZipExisting) entryFile=String(page.template).slice(4)||'index.html';
-
-  $('#toggleBlocks').onclick=()=>{useZip=false;$('#blocksWrap').classList.toggle('hidden')};
-  $('#canP').onclick=()=>ed.classList.add('hidden');
+  function selectEditorMode(mode){
+    useZip=mode==='zip';$('#zipPanel').hidden=!useZip;$('#blocksWrap').hidden=useZip;
+    $('#modeZip').classList.toggle('on',useZip);$('#modeBlocks').classList.toggle('on',!useZip);
+  }
+  $('#modeZip').onclick=()=>selectEditorMode('zip');
+  $('#modeBlocks').onclick=()=>selectEditorMode('blocks');
+  selectEditorMode(isZipExisting||!page?'zip':'blocks');
+  $('#editorBack').onclick=()=>{ed.classList.add('hidden');ed.classList.remove('workspace-active')};
+  $('#canP').onclick=()=>{ed.classList.add('hidden');ed.classList.remove('workspace-active')};
   $('#prevP').onclick=(e)=>{
     const slug=$('#p_sl').value.trim()||$('#p_te').value.trim();
     if(!slug){e.preventDefault();alert('Save slug first');return}
@@ -477,7 +491,7 @@ function openPageEditor(page,dept,cats){
     });
   }
   drawBlocks();
-  $$('[data-add]',ed).forEach(btn=>btn.onclick=()=>{
+  $('[data-add]',ed).forEach(btn=>btn.onclick=()=>{
     const t=btn.dataset.add;
     useZip=false;
     const defaults={heading:{type:t,text:'New heading',level:2},paragraph:{type:t,text:'Write your paragraph here.'},image:{type:t,url:'',alt:'',caption:''},video:{type:t,url:''},button:{type:t,text:'Learn more',url:'#'},quote:{type:t,text:'Quote text',cite:''},divider:{type:t},html:{type:t,html:''}};
