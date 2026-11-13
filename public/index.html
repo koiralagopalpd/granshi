@@ -12,11 +12,11 @@
 body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper)}
 a{text-decoration:none;color:inherit}
 .wrap{width:min(1100px,92%);margin:auto}
-header{position:sticky;top:0;z-index:30;background:linear-gradient(108deg,#142f43 0%,#294d60 48%,#3c5e6c 100%);color:#fff;border-bottom:1px solid #d8c99a88;box-shadow:0 5px 20px #10263728;backdrop-filter:blur(10px)}
+header{position:sticky;top:0;z-index:30;background:linear-gradient(112deg,#062b70 0%,#0756b5 46%,#063b8e 100%);color:#fff;border-bottom:3px solid #f28a16;box-shadow:0 5px 22px #062b7040;backdrop-filter:blur(10px)}
 .nav{height:72px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:1px}.brand-logo{display:block;height:56px;width:auto;max-width:132px;object-fit:contain}
 .mark{border:2px solid var(--gold);border-radius:13px;width:42px;height:42px;display:grid;place-items:center;color:var(--gold);font-size:22px}
-.brand small{display:block;font-size:10px;color:#c7d0dc;letter-spacing:2px}
+.brand small{display:block;font-size:10px;color:#fff0d8;letter-spacing:2px}
 .navlinks{display:flex;gap:22px;font-size:14px;align-items:center}
 .navlinks a{cursor:pointer}.navlinks a:hover{color:var(--gold)}
 .tools{display:flex;gap:8px}
@@ -108,7 +108,7 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 .footer-grid a:hover{color:var(--gold)}
 .foot-bottom{margin-top:24px;padding-top:16px;border-top:1px solid #ffffff18;font-size:13px}.footer-policies{margin-top:14px;border-top:1px solid #ffffff18;padding-top:12px}.footer-policies summary{cursor:pointer;list-style:none;color:#e5c77e;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}.footer-policies summary::-webkit-details-marker{display:none}.footer-policies summary:after{content:"+";font-size:17px;line-height:1}.footer-policies[open] summary:after{content:"−"}.footer-policies summary:focus-visible,.footer-policy-links a:focus-visible{outline:2px solid #e5c77e;outline-offset:4px}.footer-policy-links{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:12px}.footer-policy-links a{color:#c5ccd7}.footer-policy-links a:hover{color:var(--gold)}
 @media(max-width:760px){
-.navlinks{display:none;flex-direction:column;position:absolute;top:72px;left:0;right:0;background:linear-gradient(108deg,#142f43 0%,#294d60 48%,#3c5e6c 100%);padding:16px;gap:14px;border-bottom:1px solid #d8c99a88}
+.navlinks{display:none;flex-direction:column;position:absolute;top:72px;left:0;right:0;background:linear-gradient(112deg,#062b70 0%,#0756b5 46%,#063b8e 100%);padding:16px;gap:14px;border-bottom:3px solid #f28a16}
 .navlinks.open{display:flex}
 .hamb{display:block}
 .footer-grid{grid-template-columns:1fr}
@@ -254,18 +254,37 @@ function articleCard(a){
     "<h3>"+escText(title)+"</h3><p>"+escText(desc.slice(0,135))+(desc.length>135?"…":"")+"</p>"+
     '<span class="more">'+t("Explore article →","लेख पढ्नुहोस् →")+"</span></div></a>";
 }
-function departmentPhoto(slug){
-  var photos={
-    knowledge:"https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=900&q=82",
-    learning:"https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=900&q=82",
-    "smart-tools":"https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=82",
-    games:"https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=900&q=82",
-    "creative-studio":"https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=900&q=82",
-    world:"https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?auto=format&fit=crop&w=900&q=82",
-    community:"https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=900&q=82",
-    "advanced-services":"https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=900&q=82"
-  };
-  return photos[slug]||photos.knowledge;
+function departmentPhoto(slug,index){
+  var photos=[
+    "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1460661419201-fd4ce6678234?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1519682337058-a94d519337bc?auto=format&fit=crop&w=900&q=82",
+    "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=82"
+  ];
+  var key=String(slug||"").toLowerCase();
+  var rules=[
+    [/knowledge|general|quiz|fact|trivia/,"https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=900&q=82"],
+    [/learn|education|study|school|course/,"https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=900&q=82"],
+    [/tech|digital|ai|tool|software|computer/,"https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=82"],
+    [/game|play|puzzle/,"https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=900&q=82"],
+    [/creative|art|design|media|studio/,"https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=900&q=82"],
+    [/world|geograph|travel|nature|environment/,"https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?auto=format&fit=crop&w=900&q=82"],
+    [/community|people|society|culture/,"https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=900&q=82"],
+    [/health|medical|fitness|wellness/,"https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=900&q=82"],
+    [/business|finance|money|econom/,"https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=82"],
+    [/science|research|space|physics/,"https://images.unsplash.com/photo-1519682337058-a94d519337bc?auto=format&fit=crop&w=900&q=82"],
+    [/history|heritage|civilization/,"https://images.unsplash.com/photo-1460661419201-fd4ce6678234?auto=format&fit=crop&w=900&q=82"]
+  ];
+  for(var i=0;i<rules.length;i++){if(rules[i][0].test(key))return rules[i][1];}
+  return photos[(Number(index)||0)%photos.length];
 }
 function renderDepartments(){
   var box=document.getElementById("departmentGrid");
@@ -273,7 +292,7 @@ function renderDepartments(){
     var desc=t(d.description_en,d.description_ne)||"";
     var hues=[205,165,265,25,215,45,145,12];
     var slug=String(d.slug||d.id||"").toLowerCase().replace(/[^a-z0-9-]/g,"");
-    var photo=d.image||departmentPhoto(slug);
+    var photo=d.image||departmentPhoto(slug,i);
     var bg='background-image:url(\''+escText(photo)+'\')';
     var visual="";
     return '<a class="dept-card" href="'+deptUrl(d)+'" style="--dept-hue:'+hues[i%hues.length]+';'+bg+'">'+visual+'<h3>'+escText(t(d.name_en,d.name_ne))+'</h3><p>'+escText(desc)+'</p><b>'+t("Explore →","हेर्नुहोस् →")+'</b></a>';
