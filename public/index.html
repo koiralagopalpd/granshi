@@ -14,7 +14,7 @@ a{text-decoration:none;color:inherit}
 .wrap{width:min(1100px,92%);margin:auto}
 header{position:sticky;top:0;z-index:30;background:#101a2cf5;color:#fff;border-bottom:1px solid #ffffff20;backdrop-filter:blur(8px)}
 .nav{height:72px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:1px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:1px}.brand-logo{display:block;height:56px;width:auto;max-width:132px;object-fit:contain}
 .mark{border:2px solid var(--gold);border-radius:13px;width:42px;height:42px;display:grid;place-items:center;color:var(--gold);font-size:22px}
 .brand small{display:block;font-size:10px;color:#c7d0dc;letter-spacing:2px}
 .navlinks{display:flex;gap:22px;font-size:14px;align-items:center}
@@ -23,7 +23,7 @@ header{position:sticky;top:0;z-index:30;background:#101a2cf5;color:#fff;border-b
 .tools button,.hamb{border:1px solid #ffffff55;color:#fff;background:#ffffff10;padding:10px 13px;border-radius:10px;cursor:pointer}
 .hamb{display:none}
 .hero{min-height:560px;color:#fff;position:relative;display:flex;align-items:center;overflow:hidden;background:#101a2c}
-.hero:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#101a2ce8 0%,#101a2cae 45%,#101a2c40 100%),url('/granshi-brand.webp') center 42%/cover no-repeat;transform:scale(1.06)}
+.hero:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#101a2ce8 0%,#101a2cae 45%,#101a2c40 100%),url('/assets-brand.png') center 42%/cover no-repeat;transform:scale(1.06)}
 .hero:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,#101a2c70,transparent 50%)}
 .hero .wrap{position:relative;z-index:1;padding:72px 0 56px}
 .eyebrow{color:var(--gold);font-weight:850;letter-spacing:3px;font-size:12px}
@@ -133,7 +133,7 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 <body>
 <header>
   <div class="wrap nav">
-    <a class="brand" href="/"><span class="mark">G</span><span>GRANSHI<small>OUR DIGITAL WORLD</small></span></a>
+    <a class="brand" href="/" aria-label="Granshi — Our Digital World"><img class="brand-logo" src="/granshi-brand.webp" alt="Granshi logo"></a>
     <nav class="navlinks" id="nav"></nav>
     <div class="tools">
       <button type="button" id="lang">नेपाली</button>
