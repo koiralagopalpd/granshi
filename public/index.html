@@ -275,7 +275,7 @@ function renderDepartments(){
     var desc=t(d.description_en,d.description_ne)||"";
     var hues=[205,165,265,25,215,45,145,12];
     var slug=String(d.slug||d.id||"").toLowerCase().replace(/[^a-z0-9-]/g,"");
-    var bg=d.image?'background-image:linear-gradient(180deg,#101a2c08,#101a2cf2),url(\\''+escText(d.image)+'\\')':'';
+    var bg=d.image?'background-image:linear-gradient(180deg,#101a2c08,#101a2cf2),url(\''+escText(d.image)+'\')':'';
     var visual=d.image?'':'<div class="dept-art" aria-hidden="true">'+departmentArtwork(slug)+'</div>';
     return '<a class="dept-card" href="'+deptUrl(d)+'" style="--dept-hue:'+hues[i%hues.length]+';'+bg+'">'+visual+'<h3>'+escText(t(d.name_en,d.name_ne))+'</h3><p>'+escText(desc)+'</p><b>'+t("Explore →","हेर्नुहोस् →")+'</b></a>';
   }).join("");
