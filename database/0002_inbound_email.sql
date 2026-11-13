@@ -1,7 +1,5 @@
--- Add reply tracking and idempotent inbound email storage.
--- Existing messages and all existing records remain unchanged.
-ALTER TABLE messages ADD COLUMN reply_text TEXT;
-ALTER TABLE messages ADD COLUMN replied_at TEXT;
+-- Add idempotent inbound email storage.
+-- reply_text and replied_at are part of the baseline schema; live D1 already has them.
 
 CREATE TABLE IF NOT EXISTS inbound_email_events (
   id TEXT PRIMARY KEY,
