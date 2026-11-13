@@ -40,8 +40,10 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 .tabs button{background:#eef1f6;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
 .tabs button.on{background:#172640;color:#fff}
 #app.focus-mode .side{display:none!important}
-#app.focus-mode{display:block!important}
-#app.focus-mode .main{position:fixed;inset:0;z-index:900;overflow:auto;background:#f0f2f7;padding:16px}
+#app.focus-mode{display:block!important;min-height:100vh;width:100%}
+#app.focus-mode .main{display:block!important;position:relative!important;inset:auto!important;z-index:auto!important;overflow:visible!important;min-height:100vh;width:100%;background:#f0f2f7;padding:16px}
+#app.focus-mode #view{display:block!important;visibility:visible!important;min-height:200px}
+#app.focus-mode #view>.box,#app.focus-mode #view .box{display:block!important;visibility:visible!important}
 #exitFocus{display:none;margin:0 0 12px}
 #app.focus-mode #exitFocus{display:inline-flex}
 #deptHub.workspace-active,#deptEd.workspace-active,#pageEd.workspace-active{position:fixed!important;inset:0!important;z-index:1000!important;display:block!important;overflow:auto!important;background:#f0f2f7!important;padding:16px!important;margin:0!important;border-radius:0!important}
