@@ -50,3 +50,26 @@ jobs:
           db.execute("INSERT INTO messages(name,email,body,status,created_at) VALUES('Test','test@example.com','Hello','new','2026-01-01')")
           print("Fresh database migrations passed.")
           PY
+
+      - name: Check migrations against an already initialized D1 database
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib
+          root=pathlib.Path("database")
+          db=sqlite3.connect(":memory:")
+          # Simulate a live database whose migration ledger is missing:
+          # initialize once, keep existing data, then replay the full migration chain.
+          db.executescript((root/"0001_initial.sql").read_text())
+          db.execute("INSERT INTO pages(slug,title_en,content,updated_at,published) VALUES('existing-page','Existing page','[]','2026-11-13',1)")
+          db.execute("INSERT INTO messages(name,email,body,status,created_at,reply_text,replied_at) VALUES('Existing','existing@example.com','Existing message','new','2026-11-13',NULL,NULL)")
+          before=(db.execute("SELECT COUNT(*) FROM departments").fetchone()[0],db.execute("SELECT COUNT(*) FROM menus").fetchone()[0])
+          for name in ["0001_initial.sql","0002_inbound_email.sql","0003_schema_compatibility.sql","0004_discovery_search.sql"]:
+              db.executescript((root/name).read_text())
+          after=(db.execute("SELECT COUNT(*) FROM departments").fetchone()[0],db.execute("SELECT COUNT(*) FROM menus").fetchone()[0])
+          assert before == after == (8,4), (before,after)
+          assert db.execute("SELECT title_en FROM pages WHERE slug='existing-page'").fetchone()[0] == "Existing page"
+          assert db.execute("SELECT body FROM messages WHERE email='existing@example.com'").fetchone()[0] == "Existing message"
+          assert db.execute("SELECT COUNT(*) FROM page_search_index WHERE page_slug='existing-page'").fetchone()[0] == 1
+          assert db.execute("SELECT COUNT(*) FROM inbound_email_events").fetchone()[0] == 0
+          print("Existing database replay test passed without duplicate departments, menus or data loss.")
+          PY
