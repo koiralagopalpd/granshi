@@ -97,11 +97,6 @@ section{padding:56px 0}
 .article .more{color:#8a6b2a;font-weight:700;font-size:13px}
 .panel-bg{display:none;position:fixed;inset:0;background:#0006;z-index:40}
 .panel-bg.open{display:block}
-.explore-panel{display:none;position:fixed;z-index:41;left:50%;top:12%;transform:translateX(-50%);width:min(480px,92%);max-height:70vh;overflow:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 20px 60px #0005}
-.explore-panel.open{display:block}
-.explore-panel h3{margin:0 0 12px}
-.explore-panel a{display:block;padding:12px;border:1px solid #e8ecf3;border-radius:10px;margin:8px 0}
-.explore-panel a:hover{border-color:var(--gold)}
 footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 .footer-grid{display:grid;grid-template-columns:2fr 1fr;gap:28px}
 .footer-grid h4{color:#fff;margin:0 0 12px;font-size:14px}
@@ -180,15 +175,6 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
     <div id="answerArea" aria-live="polite"></div>
   </div>
 </div>
-<div class="panel-bg" id="panelBg"></div>
-<div class="explore-panel" id="explorePanel">
-  <div style="display:flex;justify-content:space-between;align-items:center">
-    <h3 id="exploreTitle">Departments</h3>
-    <button type="button" id="closeExplore" style="border:0;background:#eee;padding:8px 12px;border-radius:8px;cursor:pointer">X</button>
-  </div>
-  <div id="explorePanelList"></div>
-</div>
-
 <footer>
   <div class="wrap">
     <div class="footer-grid">
@@ -236,38 +222,18 @@ function deptUrl(d){
   if(d.url&&d.url!=="#"&&d.url.indexOf("#")!==0)return d.url;
   return "/dept/"+d.id;
 }
-function openExplore(){
-  document.getElementById("panelBg").classList.add("open");
-  document.getElementById("explorePanel").classList.add("open");
-  closeMobileNav();
-}
-function closeExplore(){
-  document.getElementById("panelBg").classList.remove("open");
-  document.getElementById("explorePanel").classList.remove("open");
-}
 function renderNav(){
-  var items=menus.length?menus:[
-    {label_en:"Home",label_ne:"गृहपृष्ठ",url:"/"},
-    {label_en:"Explore",label_ne:"अन्वेषण",url:"#explore"},
-    {label_en:"About",label_ne:"हाम्रोबारे",url:"#about"}
-  ];
+  var items=menus.length?menus:[{label_en:"Home",label_ne:"गृहपृष्ठ",url:"/"},{label_en:"Explore",label_ne:"अन्वेषण",url:"#departments"},{label_en:"About",label_ne:"हाम्रोबारे",url:"/legal/about"}];
   document.getElementById("nav").innerHTML=items.map(function(m){
     var label=t(m.label_en,m.label_ne);
     var u=(m.url||"").toLowerCase();
-    if(u==="#explore"||u==="/explore"||label.toLowerCase().indexOf("explore")>=0||label.indexOf("अन्वेषण")>=0)
-      return '<a href="#explore" data-explore="1">'+label+"</a>";
-    if(u==="#about"||label.toLowerCase().indexOf("about")>=0||label.indexOf("हाम्रो")>=0)
-      return '<a href="#footerExploreBlock" data-about="1">'+label+"</a>";
+    if(u==="#explore"||u==="#departments"||u==="/explore"||label.toLowerCase().indexOf("explore")>=0||label.indexOf("अन्वेषण")>=0) return '<a href="#departments" data-section="departments">'+label+"</a>";
+    if(u==="#about"||label.toLowerCase().indexOf("about")>=0||label.indexOf("हाम्रो")>=0) return '<a href="/legal/about">'+label+"</a>";
     return '<a href="'+(m.url||"/")+'">'+label+"</a>";
   }).join("");
   document.querySelectorAll("#nav a").forEach(function(a){
     a.addEventListener("click",function(e){
-      if(a.getAttribute("data-explore")){e.preventDefault();openExplore()}
-      else if(a.getAttribute("data-about")){
-        e.preventDefault();
-        document.querySelector("footer").scrollIntoView({behavior:"smooth"});
-        closeMobileNav();
-      }else closeMobileNav();
+      if(a.getAttribute("data-section")){e.preventDefault();document.getElementById("departments").scrollIntoView({behavior:"smooth",block:"start"});}closeMobileNav();
     });
   });
 }
@@ -332,10 +298,6 @@ function renderUsefulLinks(){
   }).join("")||'<span style="color:#9da8b9">—</span>';
 }
 function renderExploreLists(){
-  var html=(departments||[]).map(function(d){
-    return '<a href="'+deptUrl(d)+'">'+(d.icon||"✦")+" "+t(d.name_en,d.name_ne)+"</a>";
-  }).join("")||'<p style="color:#667">—</p>';
-  document.getElementById("explorePanelList").innerHTML=html;
   renderUsefulLinks();
   var sel=document.getElementById("c_dept");
   if(sel){
@@ -355,11 +317,10 @@ function applyTexts(){
   );
   document.getElementById("latestHead").textContent=t("Latest Articles","नयाँ लेखहरू");
   document.getElementById("allPagesHead").textContent=t("All Published Pages","सबै प्रकाशित सामग्री");
-  document.getElementById("deptHead").textContent=t("Explore Departments","विभागहरू अन्वेषण गर्नुहोस्");
+  document.getElementById("deptHead").textContent=t("Departments","विभागहरू");
   document.getElementById("searchHeading").textContent=t("Ask Granshi anything.","Granshi लाई जे पनि सोध्नुहोस्।");
   document.getElementById("searchIntro").textContent=t("Search across published Granshi knowledge, learning and resources. Answers are based only on content available on this website.","Granshi का प्रकाशित ज्ञान, सिकाइ र सामग्रीमा खोज्नुहोस्। उत्तर वेबसाइटमा उपलब्ध सामग्रीमा आधारित हुन्छन्।");
   document.getElementById("popularHead").textContent=t("Popular Articles","लोकप्रिय लेखहरू");
-  document.getElementById("exploreTitle").textContent=t("Departments","विभागहरू");
   document.getElementById("footUseful").textContent=t("Useful Links","उपयोगी लिंकहरू");
   document.getElementById("aboutHeadLabel").textContent=t("About us","हाम्रो बारे");
   document.getElementById("aboutText").textContent=t(
@@ -427,8 +388,6 @@ document.getElementById("lang").onclick=function(){lang=lang==="en"?"ne":"en";ap
 document.getElementById("hamb").onclick=function(){document.getElementById("nav").classList.toggle("open")};
  
 document.getElementById("loadMorePages").onclick=loadMorePages;
-document.getElementById("closeExplore").onclick=closeExplore;
-document.getElementById("panelBg").onclick=closeExplore;
 
 fetch("/api/public").then(function(r){return r.ok?r.json():null}).then(function(d){
   if(!d)return;
