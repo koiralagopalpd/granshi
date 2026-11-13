@@ -103,7 +103,7 @@ section{padding:56px 0}
 .explore-panel a{display:block;padding:12px;border:1px solid #e8ecf3;border-radius:10px;margin:8px 0}
 .explore-panel a:hover{border-color:var(--gold)}
 footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
-.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:28px}
+.footer-grid{display:grid;grid-template-columns:2fr 1fr;gap:28px}
 .footer-grid h4{color:#fff;margin:0 0 12px;font-size:14px}
 .footer-grid a{display:block;margin:6px 0;color:#aab}
 .footer-grid a:hover{color:var(--gold)}
@@ -148,12 +148,11 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
     <div class="eyebrow">ONE WORLD · ENDLESS POSSIBILITIES</div>
     <h1 id="heroTitle">Explore Your<br><span>Digital World.</span></h1>
     <p id="heroDesc">Knowledge, learning, creativity and technology — connected in one place.</p>
-    <div class="hero-promo"><a class="market-cta" href="#departments" id="heroExplore">Explore Granshi →</a><div class="marketplace-teaser"><span class="spark">✧</span><span><b>Marketplace Spotlight</b><small>Featured promotions and partner spaces · Coming soon</small></span></div></div>
   </div>
 </section>
 
 <section id="departments" style="padding-bottom:20px">
-  <div class="wrap"><div class="head"><small>EXPLORE BY INTEREST</small><h2 id="deptHead">Explore Departments</h2></div><div class="dept-grid" id="departmentGrid"></div></div>
+  <div class="wrap"><div class="head"><h2 id="deptHead">Departments</h2></div><div class="dept-grid" id="departmentGrid"></div></div>
 </section>
 
 <section id="allpages" style="padding-top:12px">
@@ -219,10 +218,6 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
           </form>
         </div>
       </div>
-      <div id="footerExploreBlock">
-        <h4 id="footExplore">Explore</h4>
-        <div id="footerDepts"></div>
-      </div>
       <div id="footerUsefulBlock">
         <h4 id="footUseful">Useful Links</h4>
         <div id="footerUsefulLinks"></div>
@@ -270,7 +265,7 @@ function renderNav(){
       if(a.getAttribute("data-explore")){e.preventDefault();openExplore()}
       else if(a.getAttribute("data-about")){
         e.preventDefault();
-        document.getElementById("footerExploreBlock").scrollIntoView({behavior:"smooth"});
+        document.querySelector("footer").scrollIntoView({behavior:"smooth"});
         closeMobileNav();
       }else closeMobileNav();
     });
@@ -341,7 +336,6 @@ function renderExploreLists(){
     return '<a href="'+deptUrl(d)+'">'+(d.icon||"✦")+" "+t(d.name_en,d.name_ne)+"</a>";
   }).join("")||'<p style="color:#667">—</p>';
   document.getElementById("explorePanelList").innerHTML=html;
-  document.getElementById("footerDepts").innerHTML=html;
   renderUsefulLinks();
   var sel=document.getElementById("c_dept");
   if(sel){
@@ -366,7 +360,6 @@ function applyTexts(){
   document.getElementById("searchIntro").textContent=t("Search across published Granshi knowledge, learning and resources. Answers are based only on content available on this website.","Granshi का प्रकाशित ज्ञान, सिकाइ र सामग्रीमा खोज्नुहोस्। उत्तर वेबसाइटमा उपलब्ध सामग्रीमा आधारित हुन्छन्।");
   document.getElementById("popularHead").textContent=t("Popular Articles","लोकप्रिय लेखहरू");
   document.getElementById("exploreTitle").textContent=t("Departments","विभागहरू");
-  document.getElementById("footExplore").textContent=t("Explore","अन्वेषण");
   document.getElementById("footUseful").textContent=t("Useful Links","उपयोगी लिंकहरू");
   document.getElementById("aboutHeadLabel").textContent=t("About us","हाम्रो बारे");
   document.getElementById("aboutText").textContent=t(
