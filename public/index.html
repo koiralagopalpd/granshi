@@ -101,12 +101,12 @@ section{padding:56px 0}
 .article .more{color:#8a6b2a;font-weight:700;font-size:13px}
 .panel-bg{display:none;position:fixed;inset:0;background:#0006;z-index:40}
 .panel-bg.open{display:block}
-footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
+footer{position:relative;isolation:isolate;overflow:hidden;background:#062b70 url("/granshi-brand.webp") center 24%/cover no-repeat;color:#f3f7ff;padding:36px 0 28px;font-size:14px}footer:before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,#062b70b8 0%,#062b70d9 48%,#041b45ed 100%)}
 .footer-grid{display:grid;grid-template-columns:2fr 1fr;gap:28px}
 .footer-grid h4{color:#fff;margin:0 0 12px;font-size:14px}
-.footer-grid a{display:block;margin:6px 0;color:#aab}
-.footer-grid a:hover{color:var(--gold)}
-.foot-bottom{margin-top:24px;padding-top:16px;border-top:1px solid #ffffff18;font-size:13px}.footer-policies{margin-top:14px;border-top:1px solid #ffffff18;padding-top:12px}.footer-policies summary{cursor:pointer;list-style:none;color:#e5c77e;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}.footer-policies summary::-webkit-details-marker{display:none}.footer-policies summary:after{content:"+";font-size:17px;line-height:1}.footer-policies[open] summary:after{content:"−"}.footer-policies summary:focus-visible,.footer-policy-links a:focus-visible{outline:2px solid #e5c77e;outline-offset:4px}.footer-policy-links{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:12px}.footer-policy-links a{color:#c5ccd7}.footer-policy-links a:hover{color:var(--gold)}
+.footer-grid a{display:block;margin:6px 0;color:#e4efff}
+.footer-grid a:hover{color:#ffd58a}
+.foot-bottom{margin-top:24px;padding-top:16px;border-top:1px solid #ffffff45;font-size:13px;color:#f3f7ff}.footer-policies{margin-top:14px;border-top:1px solid #ffffff45;padding-top:12px}.footer-policies summary{cursor:pointer;list-style:none;color:#ffe0a3;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}.footer-policies summary::-webkit-details-marker{display:none}.footer-policies summary:after{content:"+";font-size:17px;line-height:1}.footer-policies[open] summary:after{content:"−"}.footer-policies summary:focus-visible,.footer-policy-links a:focus-visible{outline:2px solid #ffe0a3;outline-offset:4px}.footer-policy-links{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:12px}.footer-policy-links a{color:#e4efff}.footer-policy-links a:hover{color:#ffd58a}
 @media(max-width:760px){
 .navlinks{display:none;flex-direction:column;position:absolute;top:72px;left:0;right:0;background:transparent;padding:16px;gap:14px;border-bottom:0}
 .navlinks.open{display:flex}
@@ -117,9 +117,9 @@ footer{background:var(--navy);color:#aab;padding:36px 0 28px;font-size:14px}
 
 .footer-about{margin:0;line-height:1.7;max-width:420px}
 .contact-btn{margin-top:14px;padding:10px 14px;border-radius:10px;border:0;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#f3dfa9,#d8b46a);color:#182235;font:inherit}
-.contact-panel{display:none;margin-top:14px;padding:14px;background:#ffffff12;border:1px solid #ffffff25;border-radius:12px}
+.contact-panel{display:none;margin-top:14px;padding:14px;background:#061f4caa;border:1px solid #ffffff55;border-radius:12px}
 .contact-panel.open{display:block}
-.contact-panel label{display:block;font-size:12px;font-weight:700;margin:8px 0 4px;color:#dde}
+.contact-panel label{display:block;font-size:12px;font-weight:700;margin:8px 0 4px;color:#f3f7ff}
 .contact-panel input,.contact-panel select,.contact-panel textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #ffffff30;background:#fff;color:#172033;font:inherit;box-sizing:border-box}
 .contact-panel textarea{min-height:90px;resize:vertical}
 .contact-panel .row-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
