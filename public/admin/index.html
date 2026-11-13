@@ -306,8 +306,9 @@ function renderDeptPages(sv,dept,pages,cats){
   $$('[data-ep]').forEach(b=>b.onclick=()=>openPageEditor(pages.find(x=>x.slug===b.dataset.ep),dept,cats));
   $$('[data-dp]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete page?'))return;await api('/admin/pages/'+encodeURIComponent(b.dataset.dp),{method:'DELETE'});openDeptHub(dept.id)});
 }
-function openPageEditor(page,dept,cats){
+function openPageEditor(page,dept,cats,restoring=false){
   const ed=$('#pageEd');ed.classList.remove('hidden');ed.classList.add('workspace-active');
+  setRoute({tab:'departments',deptId:Number(dept.id),deptSub:'pages',editorSlug:page?.slug||null,editorNew:!page});
   const isZipExisting=page && String(page.template||'').startsWith('zip:');
   let fileList=[];
   let zipReady=false;
@@ -385,8 +386,9 @@ function openPageEditor(page,dept,cats){
   $('#modeZip').onclick=()=>selectEditorMode('zip');
   $('#modeBlocks').onclick=()=>selectEditorMode('blocks');
   selectEditorMode(isZipExisting||!page?'zip':'blocks');
-  $('#editorBack').onclick=()=>{ed.classList.add('hidden');ed.classList.remove('workspace-active')};
-  $('#canP').onclick=()=>{ed.classList.add('hidden');ed.classList.remove('workspace-active')};
+  $('#editorBack').onclick=()=>{ed.classList.add('hidden');ed.classList.remove('workspace-active');setRoute({editorSlug:null,editorNew:false})};
+  $('#canP').onclick=()=>{ed.classList.add('hidden');ed.classList.remove('workspace-active');setRoute({editorSlug:null,editorNew:false})};
+  if(restoring)setTimeout(restoreDraft,60);
   $('#prevP').onclick=(e)=>{
     const slug=$('#p_sl').value.trim()||$('#p_te').value.trim();
     if(!slug){e.preventDefault();alert('Save slug first');return}
@@ -536,7 +538,7 @@ function openPageEditor(page,dept,cats){
       }
       const r=await api('/admin/pages',{method:'POST',body:JSON.stringify(payload)});
       alert('Saved /'+r.slug+(payload.published?' (Published)':' (Draft — use Preview)'));
-      openDeptHub(dept.id);
+      setRoute({editorSlug:null,editorNew:false,deptSub:'pages'});openDeptHub(dept.id,'pages');
     }catch(e){alert(e.message)}
   };
 }
