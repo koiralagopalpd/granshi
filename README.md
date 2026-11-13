@@ -2,7 +2,7 @@
 
 **Cloudflare Workers + D1 + R2**  
 Domain target: `gopalkoirala.com.np`  
-Brand: Granshi — My Digital World
+Brand: Granshi — Our Digital World
 
 Completely free-tier friendly. No paid services required (optional Resend for real email).
 
