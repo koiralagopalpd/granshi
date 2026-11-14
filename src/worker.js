@@ -421,6 +421,126 @@ async function handleResendWebhook(req, env) {
   return json({received:true});
 }
 
+
+const DIAG_PUBLIC_ORIGIN = "https://gopalkoirala.com.np";
+const DIAG_BATCH_SIZE = 5;
+async function buildDiagnosisChecks(env) {
+  const checks = [];
+  const add = (id,label,kind,target,solution,cause,affected,can_fix="developer") =>
+    checks.push({id,label,kind,target:target||"",status:"pending",ok:null,detail:"Waiting",solution,cause,affected,can_fix,resolved:false});
+  add("d1_connection","D1 database connection","d1","","Verify the Worker D1 binding named DB and database availability.","D1 binding, database availability or query failure.","Cloudflare Worker → D1 binding DB");
+  for (const table of ["pages","departments","messages","admin_message_reads","inbound_email_events","pending_work_items","diagnostics_state"]) {
+    add("table_"+table,"D1 table: "+table,"table",table,"Apply the required D1 migration and confirm the table exists.","The table may be missing or the migration may not have been applied.","D1 database schema: "+table,"developer");
+  }
+  add("r2_connection","R2 bucket connection","r2","","Check Worker R2 binding MEDIA and bucket granshi-media.","Missing binding, bucket permission or R2 service error.","Worker R2 binding MEDIA → granshi-media","developer");
+  for (const path of ["/","/sitemap.xml","/robots.txt","/api/health"]) {
+    add("url_"+path.replace(/[^a-z0-9]/gi,"_"),"Public route: "+path,"url",path,"Check Cloudflare route, asset deployment and the relevant public file or API route.","The route may be unavailable, misrouted or returning an HTTP error.","Public URL "+path,"developer");
+  }
+  let pages=[];
+  try { pages=(await env.DB.prepare("SELECT slug,title_en,title_ne,description_en,description_ne,thumbnail_summary_en,thumbnail_image FROM pages WHERE published=1 ORDER BY updated_at DESC LIMIT 80").all()).results||[]; }
+  catch(e) { add("pages_query","Published pages query","d1_query","","Repair the pages table or database permissions, then rerun diagnosis.",String(e).slice(0,220),"D1 pages table","developer"); }
+  for (const pg of pages) {
+    const slug=String(pg.slug||"");
+    if (!slug) continue;
+    add("page_"+slug,"Published page: /"+slug,"url","/"+encodeURIComponent(slug),"Check the page publication state, slug and Worker page rendering.","The page may be unpublished, missing or failing during render.","D1 pages.slug="+slug+" and public route","admin");
+    if (pg.thumbnail_image && /^\//.test(pg.thumbnail_image))
+      add("thumb_"+slug,"Thumbnail: /"+slug,"url",pg.thumbnail_image,"Check the image URL and confirm the referenced object exists in R2.","The thumbnail path may be invalid or the R2 object may be missing.","Page "+slug+" → thumbnail_image","admin");
+  }
+  const missingTitle=pages.filter(p=>!String(p.title_en||p.title_ne||"").trim()).length;
+  const missingDesc=pages.filter(p=>!String(p.description_en||p.description_ne||p.thumbnail_summary_en||"").trim()).length;
+  add("seo_metadata","Published page SEO metadata","seo","", "Edit missing title and description fields in Departments → Pages.","Published pages are missing one or more search metadata fields.","D1 pages.title_en/title_ne and description_en/description_ne","admin");
+  checks.find(x=>x.id==="seo_metadata").seo={total:pages.length,missingTitle,missingDesc};
+  return checks;
+}
+async function runDiagnosisCheck(env, check) {
+  try {
+    if (check.kind==="d1") {
+      const row=await env.DB.prepare("SELECT 1 AS ok").first();
+      return {ok:!!row?.ok,detail:"D1 SELECT 1 "+(row?.ok?"succeeded":"returned no result")};
+    }
+    if (check.kind==="table") {
+      const row=await env.DB.prepare("SELECT COUNT(*) AS n FROM "+check.target).first();
+      return {ok:true,detail:"Table accessible · "+Number(row?.n||0)+" rows"};
+    }
+    if (check.kind==="d1_query") {
+      const row=await env.DB.prepare("SELECT COUNT(*) AS n FROM pages").first();
+      return {ok:true,detail:"Published pages query succeeded · "+Number(row?.n||0)+" rows"};
+    }
+    if (check.kind==="r2") {
+      if(!env.MEDIA) throw new Error("MEDIA binding missing");
+      const r=await env.MEDIA.list({limit:1});
+      return {ok:true,detail:"R2 bucket listing succeeded · "+(r.objects||[]).length+" sample object(s) returned"};
+    }
+    if (check.kind==="url") {
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort("Check timed out after 5 seconds"),5000);
+      try {
+        const response=await fetch(DIAG_PUBLIC_ORIGIN+check.target,{method:check.target==="/api/health"?"GET":"HEAD",cache:"no-store",signal:controller.signal});
+        return {ok:response.ok,detail:"HTTP "+response.status+(response.ok?" · reachable":" · route returned an error")};
+      } finally { clearTimeout(timer); }
+    }
+    if (check.kind==="seo") {
+      const s=check.seo||{};
+      const ok=!s.missingTitle&&!s.missingDesc;
+      return {ok,detail:s.total+" published pages · "+s.missingTitle+" missing titles · "+s.missingDesc+" missing descriptions"};
+    }
+    return {ok:false,detail:"Unsupported diagnostic check type"};
+  } catch(e) {
+    const timed=String(e).toLowerCase().includes("abort")||String(e).toLowerCase().includes("timeout");
+    return {ok:false,detail:(timed?"TIMEOUT · ":"")+String(e).slice(0,260),timeout:timed};
+  }
+}
+async function createDiagnosisRun(env, triggerType="manual") {
+  const checks=await buildDiagnosisChecks(env);
+  const now=new Date().toISOString();
+  const old=await env.DB.prepare("SELECT latest_report_json FROM diagnostics_state WHERE id=1").first();
+  await env.DB.prepare("INSERT INTO diagnostics_state(id,status,trigger_type,run_id,started_at,updated_at,completed_at,current_index,checks_json,latest_report_json) VALUES(1,'running',?,?,?, ?,NULL,0,?,?) ON CONFLICT(id) DO UPDATE SET status='running',trigger_type=excluded.trigger_type,run_id=excluded.run_id,started_at=excluded.started_at,updated_at=excluded.updated_at,completed_at=NULL,current_index=0,checks_json=excluded.checks_json")
+    .bind(triggerType,crypto.randomUUID(),now,now,JSON.stringify(checks),old?.latest_report_json||null).run();
+}
+async function advanceDiagnosis(env) {
+  const state=await env.DB.prepare("SELECT * FROM diagnostics_state WHERE id=1").first();
+  if(!state || state.status!=="running") return state;
+  const checks=JSON.parse(state.checks_json||"[]");
+  let index=Number(state.current_index||0);
+  const end=Math.min(checks.length,index+DIAG_BATCH_SIZE);
+  for(;index<end;index++) {
+    const result=await runDiagnosisCheck(env,checks[index]);
+    checks[index]={...checks[index],...result,status:result.ok?"pass":"issue",checked_at:new Date().toISOString()};
+  }
+  const now=new Date().toISOString();
+  if(index>=checks.length) {
+    const evaluable=checks.filter(x=>x.status==="pass"||x.status==="issue");
+    const issues=evaluable.filter(x=>!x.ok);
+    const documented=issues.filter(x=>String(x.solution||"").trim()).length;
+    const report={run_id:state.run_id,trigger_type:state.trigger_type,started_at:state.started_at,completed_at:now,checks,total_checks:checks.length,evaluable_checks:evaluable.length,passed:evaluable.length-issues.length,issues:issues.length,health_percent:evaluable.length?Math.round((evaluable.length-issues.length)/evaluable.length*100):0,solution_percent:issues.length?Math.round(documented/issues.length*100):100,verified_resolutions:issues.filter(x=>x.resolved===true).length,limitations:["Browser console errors, private account billing metrics and Cloudflare runtime logs are not available to this scheduled Worker scan.","R2 inventory size is checked separately in the Storage card; it is not the Cloudflare monthly GB-month billing meter."]};
+    await env.DB.prepare("UPDATE diagnostics_state SET status='complete',updated_at=?,completed_at=?,current_index=?,checks_json=?,latest_report_json=? WHERE id=1")
+      .bind(now,now,index,JSON.stringify(checks),JSON.stringify(report)).run();
+  } else {
+    await env.DB.prepare("UPDATE diagnostics_state SET updated_at=?,current_index=?,checks_json=? WHERE id=1")
+      .bind(now,index,JSON.stringify(checks)).run();
+  }
+  return await env.DB.prepare("SELECT * FROM diagnostics_state WHERE id=1").first();
+}
+async function runScheduledDiagnosis(env, scheduledTime) {
+  const date=new Date(scheduledTime);
+  const hour=date.getUTCHours();
+  if(hour<0||hour>4) return;
+  let state=await env.DB.prepare("SELECT * FROM diagnostics_state WHERE id=1").first();
+  if(state?.status==="running") { await advanceDiagnosis(env); return; }
+  if(hour!==1) return;
+  const today=date.toISOString().slice(0,10);
+  if(state?.completed_at && state.completed_at.slice(0,10)===today) return;
+  await createDiagnosisRun(env,"nightly");
+  await advanceDiagnosis(env);
+}
+async function diagnosisStateResponse(env) {
+  const state=await env.DB.prepare("SELECT status,trigger_type,run_id,started_at,updated_at,completed_at,current_index,checks_json,latest_report_json FROM diagnostics_state WHERE id=1").first();
+  if(!state) return {status:"not_scanned",active:false,latest_report:null,checks:[],progress:0};
+  const checks=JSON.parse(state.checks_json||"[]");
+  const latest=state.latest_report_json?JSON.parse(state.latest_report_json):null;
+  return {status:state.status,active:state.status==="running",trigger_type:state.trigger_type,run_id:state.run_id,started_at:state.started_at,updated_at:state.updated_at,completed_at:state.completed_at,current_index:Number(state.current_index||0),total_checks:checks.length,checks,progress:checks.length?Math.round(Number(state.current_index||0)/checks.length*100):0,latest_report:latest};
+}
+
 async function api(req, env) {
   const u = new URL(req.url);
   const p = u.pathname;
@@ -622,6 +742,41 @@ async function api(req, env) {
     headers.set("cache-control", "private, no-store");
     headers.set("content-disposition", "attachment; filename*=UTF-8''" + encodeURIComponent(key.split("/").pop()));
     return new Response(object.body, { headers });
+  }
+
+
+  if (p === "/api/admin/diagnostics/status" && method === "GET") return json(await diagnosisStateResponse(env));
+  if (p === "/api/admin/diagnostics/start" && method === "POST") {
+    const current=await env.DB.prepare("SELECT status FROM diagnostics_state WHERE id=1").first();
+    if(current?.status!=="running") await createDiagnosisRun(env,"manual");
+    const state=await advanceDiagnosis(env);
+    return json({ok:true,...await diagnosisStateResponse(env)});
+  }
+  if (p === "/api/admin/diagnostics/continue" && method === "POST") {
+    const state=await advanceDiagnosis(env);
+    return json({ok:true,...await diagnosisStateResponse(env)});
+  }
+  if (p === "/api/admin/pending-work" && method === "GET") {
+    const items=(await env.DB.prepare("SELECT * FROM pending_work_items ORDER BY status ASC,sort_order ASC,id ASC").all()).results||[];
+    return json({items,total:items.length,success:items.filter(x=>x.status==="success").length,remaining:items.filter(x=>x.status!=="success").length});
+  }
+  if (p === "/api/admin/pending-work" && method === "POST") {
+    const x=await body(req),title=String(x.title||"").trim().slice(0,240);
+    if(!title) return json({error:"Task title is required."},400);
+    await env.DB.prepare("INSERT INTO pending_work_items(title,created_at,sort_order) VALUES(?,?,?)").bind(title,new Date().toISOString(),Date.now()).run();
+    return json({ok:true});
+  }
+  if (p.match(/^\/api\/admin\/pending-work\/\d+\/complete$/) && method === "POST") {
+    const id=Number(p.split("/")[4]);
+    const r=await env.DB.prepare("UPDATE pending_work_items SET status='success',completed_at=? WHERE id=?").bind(new Date().toISOString(),id).run();
+    if(!r.meta?.changes) return json({error:"Task not found."},404);
+    return json({ok:true});
+  }
+  if (p.match(/^\/api\/admin\/pending-work\/\d+$/) && method === "DELETE") {
+    const id=Number(p.split("/").pop());
+    const r=await env.DB.prepare("DELETE FROM pending_work_items WHERE id=? AND status='success'").bind(id).run();
+    if(!r.meta?.changes) return json({error:"Only completed tasks can be deleted."},400);
+    return json({ok:true});
   }
 
   if (p === "/api/admin/overview") {
@@ -1329,6 +1484,9 @@ function commentsWidgetHtml(slug) {
 }
 
 export default {
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(runScheduledDiagnosis(env,controller.scheduledTime).catch(e=>console.error("Nightly diagnosis failed",e)));
+  },
   async fetch(req, env) {
     const u = new URL(req.url);
     if (u.pathname.startsWith("/api/")) {
