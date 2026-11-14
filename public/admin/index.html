@@ -777,11 +777,11 @@ async function renderMessages(v){
     finally{const b=$('#sync-resend-inbox');if(b)b.disabled=false;}
   };
   $$('[data-reply]').forEach(b=>b.onclick=()=>{
-    $$$('.reply-box').forEach(x=>x.classList.remove('open'));
+    $('.reply-box').forEach(x=>x.classList.remove('open'));
     $('#rb-'+b.dataset.reply).classList.add('open');
   });
-  $$$('[data-cancel]').forEach(b=>b.onclick=()=>$('#rb-'+b.dataset.cancel).classList.remove('open'));
-  $$$('[data-send]').forEach(b=>b.onclick=async()=>{
+  $('[data-cancel]').forEach(b=>b.onclick=()=>$('#rb-'+b.dataset.cancel).classList.remove('open'));
+  $('[data-send]').forEach(b=>b.onclick=async()=>{
     const id=b.dataset.send;const text=$('#rt-'+id).value.trim();
     const msg=$('#rm-'+id);
     if(!text){msg.textContent='Write a reply';return}
@@ -806,7 +806,7 @@ async function renderMessages(v){
     }catch(e){msg.textContent=e.message}
     finally{sendButton.disabled=false}
   });
-  $$$('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/messages/'+b.dataset.del,{method:'DELETE'});tab('messages')});
+  $('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/messages/'+b.dataset.del,{method:'DELETE'});tab('messages')});
 }
 
 async function renderComments(v){
