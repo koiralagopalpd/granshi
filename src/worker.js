@@ -54,9 +54,8 @@ function cookie(req, name) {
   return m ? decodeURIComponent(m[1]) : "";
 }
 async function sessionToken(env, email) {
-  const payload = b64(
-    enc.encode(JSON.stringify({ email, exp: Date.now() + 7 * 86400000 }))
-  );
+  const admin = await env.DB.prepare("SELECT session_version FROM admins WHERE email=?").bind(email).first();
+  const payload = b64(enc.encode(JSON.stringify({ email, version: Number(admin?.session_version || 0), exp: Date.now() + 7 * 86400000 })));
   return payload + "." + (await hmac(env.SESSION_SECRET, payload));
 }
 async function auth(req, env) {
@@ -65,13 +64,10 @@ async function auth(req, env) {
     if (!p || !s || (await hmac(env.SESSION_SECRET, p)) !== s) return null;
     const v = JSON.parse(new TextDecoder().decode(unb64(p)));
     if (v.exp < Date.now()) return null;
-    const a = await env.DB.prepare("SELECT email FROM admins WHERE email=?")
-      .bind(v.email)
-      .first();
-    return a ? a.email : null;
-  } catch {
-    return null;
-  }
+    const a = await env.DB.prepare("SELECT email,session_version,locked_at FROM admins WHERE email=?").bind(v.email).first();
+    if (!a || a.locked_at || Number(v.version) !== Number(a.session_version || 0)) return null;
+    return a.email;
+  } catch { return null; }
 }
 const sessionCookie = (token) =>
   `granshi_session=${encodeURIComponent( token )}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`;
@@ -733,21 +729,38 @@ async function api(req, env) {
       ),
     });
   }
+  if (p === "/api/admin/recover-lock" && method === "POST") {
+    const x = await body(req);
+    if (!env.SETUP_TOKEN || x.setupToken !== env.SETUP_TOKEN) return json({ error: "Invalid recovery token." }, 403);
+    const email = String(x.email || "").trim().toLowerCase();
+    const a = await env.DB.prepare("SELECT email,locked_at,recovery_authorized FROM admins WHERE email=?").bind(email).first();
+    if (!a || !a.locked_at || Number(a.recovery_authorized) !== 1) return json({ error: "Run the one-time D1 recovery authorization SQL first." }, 409);
+    await env.DB.prepare("UPDATE admins SET failed_login_attempts=0,locked_at=NULL,recovery_authorized=0,session_version=session_version+1 WHERE email=?").bind(email).run();
+    return json({ ok: true, message: "Admin unlocked. All previous sessions have been revoked." });
+  }
   if (p === "/api/auth/login" && method === "POST") {
     const x = await body(req);
-    const a = await env.DB.prepare(
-      "SELECT email,salt,password_hash FROM admins WHERE email=?"
-    )
-      .bind(String(x.email || "").toLowerCase())
-      .first();
-    if (
-      !a ||
-      !(await verifyPassword(String(x.password || ""), a.salt, a.password_hash))
-    )
+    const email = String(x.email || "").trim().toLowerCase();
+    const a = await env.DB.prepare("SELECT email,salt,password_hash,failed_login_attempts,locked_at FROM admins WHERE email=?").bind(email).first();
+    if (!a) return json({ error: "Incorrect email or password." }, 401);
+    if (a.locked_at || Number(a.failed_login_attempts || 0) >= 5)
+      return json({ error: "Admin account is locked. Use the secure recovery procedure." }, 423);
+    const valid = await verifyPassword(String(x.password || ""), a.salt, a.password_hash);
+    if (!valid) {
+      const result = await env.DB.prepare("UPDATE admins SET failed_login_attempts=failed_login_attempts+1, locked_at=CASE WHEN failed_login_attempts+1>=5 THEN CURRENT_TIMESTAMP ELSE locked_at END WHERE email=? RETURNING failed_login_attempts,locked_at").bind(email).first();
+      const attempts = Number(result?.failed_login_attempts || 1);
+      if (attempts === 4) {
+        const ip = String(req.headers.get("CF-Connecting-IP") || "Unavailable").slice(0,100);
+        const ua = String(req.headers.get("User-Agent") || "Unavailable").slice(0,500);
+        const stamp = new Date().toISOString();
+        await sendEmail(env, { to: "koiralagopalpd@gmail.com", subject: "Granshi Admin security alert: failed login", html: "<p>Four failed Admin login attempts detected.</p><p>Time (UTC): "+escapeHtml(stamp)+"</p><p>IP: "+escapeHtml(ip)+"</p><p>Browser/device: "+escapeHtml(ua)+"</p><p>Failed attempts: 4 of 5. Account is not yet locked.</p><p>No password or session token is included.</p>" });
+      }
+      if (attempts >= 5) return json({ error: "Admin account locked after five failed attempts." }, 423);
+      if (attempts === 3) return json({ error: "Incorrect password. Final warning: one more failed attempt will lock the Admin account." }, 401);
       return json({ error: "Incorrect email or password." }, 401);
-    return json({ ok: true }, 200, {
-      "set-cookie": sessionCookie(await sessionToken(env, a.email)),
-    });
+    }
+    await env.DB.prepare("UPDATE admins SET failed_login_attempts=0 WHERE email=?").bind(email).run();
+    return json({ ok: true }, 200, { "set-cookie": sessionCookie(await sessionToken(env, a.email)) });
   }
   if (p === "/api/auth/logout" && method === "POST")
     return json({ ok: true }, 200, { "set-cookie": clearCookie });
@@ -1464,11 +1477,9 @@ async function api(req, env) {
       return json({ error: "Current password incorrect." }, 401);
     const h = await passwordHash(x.newPassword);
     await env.DB.prepare(
-      "UPDATE admins SET salt=?,password_hash=? WHERE email=?"
-    )
-      .bind(h.salt, h.hash, who)
-      .run();
-    return json({ ok: true });
+      "UPDATE admins SET salt=?,password_hash=?,session_version=session_version+1,failed_login_attempts=0 WHERE email=?"
+    ).bind(h.salt, h.hash, who).run();
+    return json({ ok: true }, 200, { "set-cookie": clearCookie });
   }
 
   // Admin: comments moderation
