@@ -712,30 +712,37 @@ function parseReplyDisplay(raw){
   try{return {text:raw.slice(0,m.index),atts:JSON.parse(m[1]),inbound:false}}catch{return {text:raw,atts:[],inbound:false}}
 }
 async function compressMailImage(file){
-  if(!file.type||!file.type.startsWith('image/')||file.type==='image/gif'||file.type==='image/svg+xml')return file;
+  const MAX=2*1024*1024,TARGET=Math.min(file.size*.5,MAX);
+  if(!file.type||!file.type.startsWith('image/')||file.type==='image/gif'||file.type==='image/svg+xml'){
+    return {file,compressed:false,note:file.size>MAX?'यो फाइल 2 MB भन्दा ठूलो छ। PDF/Document लाई आफैँ crop नगरी यहाँ compress गर्न मिल्दैन; 2 MB भन्दा सानो फाइल छान्नुहोस्।':'यो प्रकारको फाइल परिवर्तन नगरी राखिएको छ।'};
+  }
   try{
     const bmp=await createImageBitmap(file);
-    let scale=Math.min(1,1800/Math.max(bmp.width,bmp.height));
-    let canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
-    let blob=null;
-    for(let pass=0;pass<8;pass++){
+    let scale=1,best=null;
+    const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+    for(let pass=0;pass<10;pass++){
       canvas.width=Math.max(1,Math.round(bmp.width*scale));
       canvas.height=Math.max(1,Math.round(bmp.height*scale));
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.drawImage(bmp,0,0,canvas.width,canvas.height);
-      for(const q of [.78,.65,.52,.4,.3]){
-        blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',q));
-        if(blob&&blob.size<=100*1024)break;
+      for(const quality of [.86,.78,.70,.62,.54,.46,.38,.30]){
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',quality));
+        if(blob&&(!best||blob.size<best.size))best=blob;
+        if(blob&&blob.size<=TARGET)break;
       }
-      if(blob&&blob.size<=100*1024)break;
-      scale*=.78;
+      if(best&&best.size<=TARGET)break;
+      if(best&&best.size<=MAX&&pass>=2)break;
+      scale*=.88;
     }
     bmp.close();
-    if(!blob)return file;
+    if(!best)return {file,compressed:false,note:'यो फोटो compress गर्न सकिएन।'};
+    if(best.size>=file.size)return {file,compressed:false,note:'यो फोटोको आकार घटाउन सकिएन; मूल फाइल प्रयोग गरिएको छ।'};
     const base=file.name.replace(/\.[^.]+$/,'')||'image';
-    return new File([blob],base+'.jpg',{type:'image/jpeg',lastModified:Date.now()});
-  }catch{return file}
+    const output=new File([best],base+'.webp',{type:'image/webp',lastModified:Date.now()});
+    return {file:output,compressed:true,note:'फोटो crop नगरी पूरा आकार/अनुपात कायम राखेर compress गरियो।'};
+  }catch{return {file,compressed:false,note:'यो फोटो browser बाट compress हुन सकेन।'}}
 }
+
 async function renderMessages(v){
   let section='messages',folder='inbox';
   const date=s=>{try{return new Date(s).toLocaleString()}catch{return s||''}};
@@ -743,7 +750,7 @@ async function renderMessages(v){
     const prior=$('#mailComposer');if(prior)prior.remove();
     const modal=document.createElement('div');modal.id='mailComposer';modal.className='mail-compose-overlay';
     const from=mode==='contact'?'Granshi <noreply@gopalkoirala.com.np>':'Granshi <info@gopalkoirala.com.np>';
-    modal.innerHTML='<section class="mail-compose"><header><b>'+(mode==='contact'?'Reply to message':mode==='reply'?'Reply email':'New email')+'</b><button class="btn" id="mailClose">✕</button></header><div class="mail-compose-fields"><label>From</label><input disabled value="'+from+'"><label>To</label><input id="mailTo" type="email" value="'+esc(to||'')+'" '+(mode==='contact'?'readonly':'')+'><label>Subject</label><input id="mailSubject" value="'+esc(subject||'')+'"><label>Message</label><textarea id="mailBody" rows="12" placeholder="Write your email…"></textarea><div class="mail-attachments"><label for="mailFiles">📎 Attach files</label><input id="mailFiles" type="file" multiple><small>Maximum 10 files · 15 MB per file · 20 MB total</small><div id="mailAttachmentList"></div></div>'+(mode==='contact'?'<p class="notice">यो जवाफ noreply@ बाट पठाइन्छ। थप सहयोगका लागि info@ मा नयाँ इमेल गर्न अनुरोध स्वतः जोडिन्छ।</p>':'')+'</div><footer><span id="mailSendStatus" class="muted"></span><button class="btn gold" id="mailSend">Send email</button></footer></section>';
+    modal.innerHTML='<section class="mail-compose"><header><b>'+(mode==='contact'?'Reply to message':mode==='reply'?'Reply email':'New email')+'</b><button class="btn" id="mailClose">✕</button></header><div class="mail-compose-fields"><label>From</label><input disabled value="'+from+'"><label>To</label><input id="mailTo" type="email" value="'+esc(to||'')+'" '+(mode==='contact'?'readonly':'')+'><label>Subject</label><input id="mailSubject" value="'+esc(subject||'')+'"><label>Message</label><textarea id="mailBody" rows="12" placeholder="Write your email…"></textarea><div class="mail-attachments"><label for="mailFiles">📎 Attach files</label><input id="mailFiles" type="file" multiple><small>Maximum 10 files · 2 MB per file after compression · 20 MB total</small><div id="mailAttachmentList"></div></div>'+(mode==='contact'?'<p class="notice">यो जवाफ noreply@ बाट पठाइन्छ। थप सहयोगका लागि info@ मा नयाँ इमेल गर्न अनुरोध स्वतः जोडिन्छ।</p>':'')+'</div><footer><span id="mailSendStatus" class="muted"></span><button class="btn gold" id="mailSend">Send email</button></footer></section>';
     document.body.appendChild(modal);
     const files=[];
     const list=$('#mailAttachmentList',modal),status=$('#mailSendStatus',modal);
@@ -753,16 +760,25 @@ async function renderMessages(v){
     }
     $('#mailFiles',modal).onchange=async ev=>{
       const selected=[...ev.target.files];ev.target.value='';
-      for(const file of selected){
-        if(files.length>=10){status.textContent='Maximum 10 attachments allowed.';break}
-        if(file.size>15*1024*1024){status.textContent=file.name+': 15 MB भन्दा ठूलो फाइल स्वीकार हुँदैन।';continue}
-        if(files.reduce((n,x)=>n+x.size,0)+file.size>20*1024*1024){status.textContent='सबै attachment को कुल आकार 20 MB भन्दा बढी हुन मिल्दैन।';break}
-        status.textContent='Uploading '+file.name+'…';
+      for(const original of selected){
+        if(files.length>=10){status.textContent='एक इमेलमा बढीमा १० वटा फाइल मात्र जोड्न मिल्छ।';break}
+        status.textContent=original.name+' compress/जाँच हुँदैछ…';
         try{
+          const result=await compressMailImage(original),file=result.file;
+          if(file.size>2*1024*1024){
+            status.textContent=original.name+': compress गरेपछि पनि 2 MB भन्दा ठूलो छ। '+(result.note||'कृपया सानो फाइल छान्नुहोस्।');
+            continue;
+          }
+          if(files.reduce((n,x)=>n+x.size,0)+file.size>20*1024*1024){
+            status.textContent='सबै attachment को कुल आकार 20 MB भन्दा बढी हुन मिल्दैन।';break;
+          }
+          if(result.compressed)status.textContent=original.name+' crop नगरी compress भयो ('+(original.size/1024/1024).toFixed(2)+' MB → '+(file.size/1024/1024).toFixed(2)+' MB)। Upload हुँदैछ…';
+          else status.textContent=result.note+' Upload हुँदैछ…';
           const response=await fetch('/api/admin/messages/attach',{method:'POST',headers:{'content-type':file.type||'application/octet-stream','x-file-name':encodeURIComponent(file.name)},body:file});
-          const result=await response.json().catch(()=>({}));
-          if(!response.ok)throw new Error(result.error||result.detail||'Upload failed (HTTP '+response.status+')');
-          files.push({...result,size:file.size});drawFiles();status.textContent=files.length+' attachment(s) ready.';
+          const payload=await response.json().catch(()=>({}));
+          if(!response.ok)throw new Error(payload.error||payload.detail||'Upload failed (HTTP '+response.status+')');
+          files.push({...payload,size:file.size,original_size:original.size,compressed:result.compressed});drawFiles();
+          status.textContent=files.length+' attachment(s) ready.';
         }catch(err){status.textContent='Upload failed: '+err.message}
       }
     };
