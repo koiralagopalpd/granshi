@@ -749,12 +749,19 @@ async function api(req, env) {
     if (!valid) {
       const result = await env.DB.prepare("UPDATE admins SET failed_login_attempts=failed_login_attempts+1, locked_at=CASE WHEN failed_login_attempts+1>=5 THEN CURRENT_TIMESTAMP ELSE locked_at END WHERE email=? RETURNING failed_login_attempts,locked_at").bind(email).first();
       const attempts = Number(result?.failed_login_attempts || 1);
+      const ip = String(req.headers.get("CF-Connecting-IP") || "Unavailable").slice(0,100);
+      const ua = String(req.headers.get("User-Agent") || "Unavailable").slice(0,500);
+      const stamp = new Date().toISOString();
+      let alertResult = { sent: false, error: "Alert threshold not reached." };
       if (attempts === 4) {
-        const ip = String(req.headers.get("CF-Connecting-IP") || "Unavailable").slice(0,100);
-        const ua = String(req.headers.get("User-Agent") || "Unavailable").slice(0,500);
-        const stamp = new Date().toISOString();
-        await sendEmail(env, { to: "koiralagopalpd@gmail.com", subject: "Granshi Admin security alert: failed login", html: "<p>Four failed Admin login attempts detected.</p><p>Time (UTC): "+escapeHtml(stamp)+"</p><p>IP: "+escapeHtml(ip)+"</p><p>Browser/device: "+escapeHtml(ua)+"</p><p>Failed attempts: 4 of 5. Account is not yet locked.</p><p>No password or session token is included.</p>" });
+        alertResult = await sendEmail(env, {
+          to: "koiralagopalpd@gmail.com",
+          subject: "Granshi Admin security alert: failed login",
+          html: "<p>Four failed Admin login attempts detected.</p><p>Time (UTC): "+escapeHtml(stamp)+"</p><p>IP: "+escapeHtml(ip)+"</p><p>Browser/device: "+escapeHtml(ua)+"</p><p>Failed attempts: 4 of 5. Account is not yet locked.</p><p>No password or session token is included.</p>"
+        });
       }
+      await env.DB.prepare("INSERT INTO admin_security_events(event_type,attempt_count,ip_address,user_agent,email_alert_status,email_alert_error,created_at) VALUES(?,?,?,?,?,?,?)")
+        .bind("failed_login",attempts,ip,ua,attempts===4?(alertResult.sent?"sent":"failed"):"not_due",attempts===4?String(alertResult.error||"").slice(0,500):null,stamp).run();
       if (attempts >= 5) return json({ error: "Admin account locked after five failed attempts." }, 423);
       if (attempts === 3) return json({ error: "Incorrect password. Final warning: one more failed attempt will lock the Admin account." }, 401);
       return json({ error: "Incorrect email or password." }, 401);
