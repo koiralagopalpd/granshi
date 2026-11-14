@@ -423,7 +423,7 @@ async function handleResendWebhook(req, env) {
 
 
 const DIAG_PUBLIC_ORIGIN = "https://gopalkoirala.com.np";
-const DIAG_BATCH_SIZE = 5;
+const DIAG_BATCH_SIZE = 10;
 async function buildDiagnosisChecks(env) {
   const checks = [];
   const add = (id,label,kind,target,solution,cause,affected,can_fix="developer") =>
@@ -452,7 +452,7 @@ async function buildDiagnosisChecks(env) {
   checks.find(x=>x.id==="seo_metadata").seo={total:pages.length,missingTitle,missingDesc};
   return checks;
 }
-async function runDiagnosisCheck(env, check) {
+async function runDiagnosisCheckInner(env, check) {
   try {
     if (check.kind==="d1") {
       const row=await env.DB.prepare("SELECT 1 AS ok").first();
@@ -490,6 +490,18 @@ async function runDiagnosisCheck(env, check) {
     return {ok:false,detail:(timed?"TIMEOUT · ":"")+String(e).slice(0,260),timeout:timed};
   }
 }
+async function runDiagnosisCheck(env, check) {
+  let timer;
+  try {
+    return await Promise.race([
+      runDiagnosisCheckInner(env,check),
+      new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("TIMEOUT · check exceeded 5 seconds")),5000);})
+    ]);
+  } catch(e) {
+    const detail=String(e).slice(0,260);
+    return {ok:false,detail,timeout:/timeout/i.test(detail)};
+  } finally { if(timer) clearTimeout(timer); }
+}
 async function createDiagnosisRun(env, triggerType="manual") {
   const checks=await buildDiagnosisChecks(env);
   const now=new Date().toISOString();
@@ -510,16 +522,18 @@ async function advanceDiagnosis(env) {
     const checks=JSON.parse(state.checks_json||"[]");
     let index=Number(state.current_index||0);
     const end=Math.min(checks.length,index+DIAG_BATCH_SIZE);
-    for(;index<end;index++) {
-      const result=await runDiagnosisCheck(env,checks[index]);
-      checks[index]={...checks[index],...result,status:result.ok?"pass":"issue",checked_at:new Date().toISOString()};
+    const batchResults=await Promise.all(checks.slice(index,end).map(check=>runDiagnosisCheck(env,check)));
+    for(let offset=0;offset<batchResults.length;offset++) {
+      const result=batchResults[offset],checkIndex=index+offset;
+      checks[checkIndex]={...checks[checkIndex],...result,status:result.ok?"pass":"issue",checked_at:new Date().toISOString()};
     }
+    index=end;
     const updated=new Date().toISOString();
     if(index>=checks.length) {
       const evaluable=checks.filter(x=>x.status==="pass"||x.status==="issue");
       const issues=evaluable.filter(x=>!x.ok);
       const documented=issues.filter(x=>String(x.solution||"").trim()).length;
-      const report={run_id:state.run_id,trigger_type:state.trigger_type,started_at:state.started_at,completed_at:updated,checks,total_checks:checks.length,evaluable_checks:evaluable.length,passed:evaluable.length-issues.length,issues:issues.length,health_percent:evaluable.length?Math.round((evaluable.length-issues.length)/evaluable.length*100):0,solution_percent:issues.length?Math.round(documented/issues.length*100):100,verified_resolutions:issues.filter(x=>x.resolved===true).length,limitations:["Browser console errors, private account billing metrics and Cloudflare runtime logs are not available to this scheduled Worker scan.","R2 inventory size is checked separately in the Storage card; it is not the Cloudflare monthly GB-month billing meter."]};
+      const report={run_id:state.run_id,trigger_type:state.trigger_type,started_at:state.started_at,completed_at:updated,checks,total_checks:checks.length,evaluable_checks:evaluable.length,passed:evaluable.length-issues.length,issues:issues.length,health_percent:evaluable.length?Math.round((evaluable.length-issues.length)/evaluable.length*100):0,solution_percent:issues.length?Math.round(documented/issues.length*100):null,verified_resolutions:issues.filter(x=>x.resolved===true).length,limitations:["Browser console errors, private account billing metrics and Cloudflare runtime logs are not available to this scheduled Worker scan.","R2 inventory size is checked separately in the Storage card; it is not the Cloudflare monthly GB-month billing meter."]};
       await env.DB.prepare("UPDATE diagnostics_state SET status='complete',updated_at=?,completed_at=?,current_index=?,checks_json=?,latest_report_json=?,lease_until=NULL WHERE id=1")
         .bind(updated,updated,index,JSON.stringify(checks),JSON.stringify(report)).run();
     } else {
