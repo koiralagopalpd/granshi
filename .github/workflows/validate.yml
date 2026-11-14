@@ -35,7 +35,7 @@ jobs:
           for n in sorted(root.glob("*.sql")):
               db.executescript(n.read_text())
           tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-          assert {"admins","messages","inbound_email_events","page_search_index","admin_message_reads","diagnostics_state","pending_work_items"} <= tables
+          assert {"admins","messages","inbound_email_events","page_search_index","admin_message_reads","diagnostics_state","pending_work_items","admin_security_events"} <= tables
           admin_cols={r[1] for r in db.execute("PRAGMA table_info(admins)")}
           assert {"failed_login_attempts","locked_at","session_version","recovery_authorized"} <= admin_cols
           assert "lease_until" in {r[1] for r in db.execute("PRAGMA table_info(diagnostics_state)")}
@@ -55,7 +55,7 @@ jobs:
           db.execute("INSERT INTO pages(slug,title_en,content,updated_at,published) VALUES('keep-me','Existing page','[]','2026-11-15',1)")
           db.execute("INSERT INTO messages(name,email,body,status,created_at,reply_text,replied_at) VALUES('Existing','keep@example.com','Keep this','new','2026-11-15',NULL,NULL)")
           before=(db.execute("SELECT COUNT(*) FROM departments").fetchone()[0],db.execute("SELECT COUNT(*) FROM menus").fetchone()[0])
-          for n in range(5,9):
+          for n in range(5,10):
               f=next(root.glob(f"{n:04d}_*.sql"))
               db.executescript(f.read_text())
           assert db.execute("SELECT title_en FROM pages WHERE slug='keep-me'").fetchone()[0]=="Existing page"
