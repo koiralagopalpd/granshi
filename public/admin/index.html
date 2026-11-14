@@ -734,7 +734,7 @@ async function compressMailImage(file){
 }
 async function renderMessages(v){
   const list=await api('/admin/messages');
-  v.innerHTML=`<div class="box"><h3>Email Inbox</h3><p class="muted">Contact Us का सन्देश र info@gopalkoirala.com.np मा प्राप्त भएका इमेल यहीँ देखिन्छन्। जवाफ Granshi &lt;noreply@gopalkoirala.com.np&gt; बाट पठाइन्छ; जवाफ फर्काउँदा info@ मा आउँछ।</p>
+  v.innerHTML=`<div class="box"><div class="row" style="justify-content:space-between;align-items:center"><h3>Email Inbox</h3><button class="btn gold" id="sync-resend-inbox">Sync Resend Inbox</button></div><div class="muted" id="resend-sync-status" role="status" aria-live="polite"></div><p class="muted">Contact Us का सन्देश र info@gopalkoirala.com.np मा प्राप्त भएका इमेल यहीँ देखिन्छन्। जवाफ Granshi &lt;noreply@gopalkoirala.com.np&gt; बाट पठाइन्छ; जवाफ फर्काउँदा info@ मा आउँछ।</p>
     <p class="muted">Reply थिचेपछि मात्र form खुल्छ। Text + photo/video/file attachment (max 15MB each)।</p>
     ${list.map(m=>{
       const pr=parseReplyDisplay(m.reply_text);
@@ -769,7 +769,14 @@ async function renderMessages(v){
     </div>`;
     }).join('')||'<p class="muted">No messages</p>'}
   </div>`;
-  $$('[data-reply]').forEach(b=>b.onclick=()=>{
+  const syncBtn=$('#sync-resend-inbox');
+  if(syncBtn) syncBtn.onclick=async()=>{
+    const status=$('#resend-sync-status');syncBtn.disabled=true;status.textContent='Resend Inbox बाट Email ल्याउँदै…';
+    try{const result=await api('/admin/messages/sync',{method:'POST',body:JSON.stringify({})});status.textContent=result.imported+' नयाँ Email ल्याइयो ('+result.scanned+' जाँच गरियो)।';await renderMessages(v);}
+    catch(e){status.textContent='Sync असफल: '+e.message;}
+    finally{const b=$('#sync-resend-inbox');if(b)b.disabled=false;}
+  };
+  $('[data-reply]').forEach(b=>b.onclick=()=>{
     $$('.reply-box').forEach(x=>x.classList.remove('open'));
     $('#rb-'+b.dataset.reply).classList.add('open');
   });

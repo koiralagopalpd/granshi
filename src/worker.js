@@ -330,6 +330,45 @@ async function verifyResendWebhook(req, raw, secret) {
   const expected=btoa(binary);
   return signatures.split(" ").some(part=>part.startsWith("v1,") && part.slice(3)===expected);
 }
+
+async function importReceivedEmail(env, emailId, fallback = {}) {
+  if (!emailId || !env.RESEND_API_KEY || !env.DB) return false;
+  const exists=await env.DB.prepare("SELECT id FROM inbound_email_events WHERE resend_email_id=?").bind(emailId).first();
+  if (exists) return false;
+  const response=await fetch("https://api.resend.com/emails/receiving/"+encodeURIComponent(emailId),{headers:{Authorization:"Bearer "+env.RESEND_API_KEY}});
+  if(!response.ok) throw new Error("Resend could not retrieve email "+emailId+": "+response.status);
+  const payload=await response.json(), mail=payload.data||payload;
+  const from=String(mail.from||fallback.from||"").slice(0,250);
+  const match=from.match(/<([^>]+)>/), address=(match?match[1]:from).trim();
+  const name=(match?from.replace(match[0],"").replace(/["']/g,"").trim():address).slice(0,120)||address;
+  const to=Array.isArray(mail.to)?mail.to:(Array.isArray(fallback.to)?fallback.to:[String(mail.to||"")]);
+  const subject=String(mail.subject||fallback.subject||"Incoming email").slice(0,200);
+  const textBody=String(mail.text||"").slice(0,30000);
+  const htmlBody=String(mail.html||"").slice(0,60000);
+  const received=String(mail.created_at||fallback.created_at||new Date().toISOString());
+  const attachmentRows=[];
+  for(const item of (Array.isArray(mail.attachments)?mail.attachments:[]).slice(0,10)){
+    if(!env.MEDIA) break;
+    const aid=String(item.id||""); if(!aid) continue;
+    const ar=await fetch("https://api.resend.com/emails/receiving/"+encodeURIComponent(emailId)+"/attachments/"+encodeURIComponent(aid),{headers:{Authorization:"Bearer "+env.RESEND_API_KEY}});
+    if(!ar.ok) continue;
+    const ad=await ar.json(), obj=ad.data||ad, download=obj.download_url||obj.url;
+    if(!download) continue;
+    const file=await fetch(download); if(!file.ok) continue;
+    const bytes=await file.arrayBuffer(); if(bytes.byteLength>15*1024*1024) continue;
+    const filename=String(item.filename||obj.filename||"attachment").replace(/[^a-zA-Z0-9._-]/g,"_");
+    const key="inbound/"+crypto.randomUUID()+"-"+filename;
+    await env.MEDIA.put(key,bytes,{httpMetadata:{contentType:item.content_type||"application/octet-stream"}});
+    attachmentRows.push({key,url:"/api/admin/messages/attachment?key="+encodeURIComponent(key),name:filename,content_type:item.content_type||"",size:bytes.byteLength});
+  }
+  const cleanText=textBody||String(htmlBody||"").replace(/<\/(p|div|br|li|h[1-6])>/gi,"\\n").replace(/<[^>]*>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").trim()||"(No message body)";
+  const inserted=await env.DB.prepare("INSERT INTO messages(name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(?,?,?,?,?,?,?,?)")
+    .bind(name,address,subject,cleanText.slice(0,30000),"new",received,JSON.stringify({inbound:true,html:htmlBody,attachments:attachmentRows}),null).run();
+  await env.DB.prepare("INSERT INTO inbound_email_events(id,resend_email_id,message_id,sender,recipients,subject,body_text,body_html,headers_json,attachments_json,received_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(),emailId,inserted.meta?.last_row_id||null,from,JSON.stringify(to),subject,textBody,htmlBody,JSON.stringify(mail.headers||{}),JSON.stringify(attachmentRows),received,new Date().toISOString()).run();
+  return true;
+}
+
 async function handleResendWebhook(req, env) {
   const raw=await req.text();
   if (!(await verifyResendWebhook(req,raw,env.RESEND_WEBHOOK_SECRET))) return json({error:"Invalid webhook signature."},401);
@@ -1011,6 +1050,27 @@ async function api(req, env) {
   }
 
   // Messages + reply (text + optional attachments)
+  if (p === "/api/admin/messages/sync" && method === "POST") {
+    if (!env.RESEND_API_KEY || !env.DB) return json({error:"Resend receiving is not configured."},503);
+    let imported=0, scanned=0, after="";
+    try {
+      for(let page=0;page<10;page++){
+        const endpoint=new URL("https://api.resend.com/emails/receiving");
+        endpoint.searchParams.set("limit","100");
+        if(after) endpoint.searchParams.set("after",after);
+        const response=await fetch(endpoint.toString(),{headers:{Authorization:"Bearer "+env.RESEND_API_KEY}});
+        if(!response.ok) return json({error:"Resend inbox list failed: "+(await response.text()).slice(0,300)},502);
+        const payload=await response.json(), data=payload.data||payload;
+        const items=Array.isArray(data)?data:(data.data||[]);
+        if(!items.length) break;
+        for(const item of items){scanned++;const id=String(item.id||item.email_id||"");if(id&&await importReceivedEmail(env,id,item)) imported++;}
+        const hasMore=Boolean(data.has_more||payload.has_more);
+        after=String(items[items.length-1].id||items[items.length-1].email_id||"");
+        if(!hasMore||!after) break;
+      }
+      return json({ok:true,imported,scanned});
+    } catch(error){return json({error:String(error).slice(0,400),imported,scanned},502);}
+  }
   if (p === "/api/admin/messages" && method === "GET") {
     return json(
       (
