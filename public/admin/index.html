@@ -275,8 +275,10 @@ async function startOrResumeDiagnosis(v,resumeOnly=false){
   renderDiagnosisStatus(v,s);
   while(s.active){
    if(btn)btn.textContent='Scanning… '+s.progress+'%';
+   const previousIndex=Number(s.current_index||0);
    s=await api('/admin/diagnostics/continue',{method:'POST',body:'{}'});
    renderDiagnosisStatus(v,s);
+   if(s.active&&Number(s.current_index||0)===previousIndex) await new Promise(resolve=>setTimeout(resolve,900));
   }
   if(s.latest_report){$('#diagDetails',v).classList.remove('hidden');$('#diagDetails',v).innerHTML='<h3>Latest Diagnosis Report</h3>'+diagnosisSummaryMarkup(s.latest_report)}
  }catch(e){
