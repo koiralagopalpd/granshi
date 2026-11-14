@@ -626,10 +626,63 @@ async function api(req, env) {
 
   if (p === "/api/admin/overview") {
     const pub = await allPublic(env);
-    const msgNew = await env.DB.prepare(
-      "SELECT COUNT(*) AS n FROM messages WHERE status='new'"
-    ).first();
-    return json({ email: who, new_messages: msgNew?.n || 0, ...pub });
+    const contactUnread = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM messages m LEFT JOIN admin_message_reads r ON r.message_id=m.id AND r.admin_email=? WHERE r.message_id IS NULL AND (m.reply_text IS NULL OR (m.reply_text NOT LIKE ? AND m.reply_text NOT LIKE ?))"
+    ).bind(who,'{"inbound":true%','{"outbound":true%').first();
+    const emailUnread = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM messages m JOIN inbound_email_events e ON e.message_id=m.id LEFT JOIN admin_message_reads r ON r.message_id=m.id AND r.admin_email=? WHERE r.message_id IS NULL AND m.reply_text LIKE ? AND m.subject NOT LIKE '[Granshi]%'"
+    ).bind(who,'{"inbound":true%').first();
+    return json({ email: who, new_messages: contactUnread?.n || 0, unread_emails: emailUnread?.n || 0, ...pub });
+  }
+
+  // Mark either a Contact Us message or an inbound mailbox email as read for this admin.
+  if (p.match(/^\\/api\\/admin\\/read\\/\\d+$/) && method === "POST") {
+    const id = Number(p.split("/").pop());
+    const row = await env.DB.prepare("SELECT id FROM messages WHERE id=?").bind(id).first();
+    if (!row) return json({ error: "Message not found." }, 404);
+    await env.DB.prepare("INSERT INTO admin_message_reads(admin_email,message_id,read_at) VALUES(?,?,?) ON CONFLICT(admin_email,message_id) DO NOTHING")
+      .bind(who,id,new Date().toISOString()).run();
+    return json({ ok: true, read: true });
+  }
+
+  // R2 inventory is a point-in-time object listing, not Cloudflare's billable GB-month metric.
+  if (p === "/api/admin/storage" && method === "GET") {
+    if (!env.MEDIA) return json({ error: "R2 binding MEDIA is not available." }, 503);
+    let cursor, bytes=0, objects=0, pages=0, truncated=false;
+    do {
+      const batch = await env.MEDIA.list({ limit: 1000, ...(cursor ? { cursor } : {}) });
+      for (const object of (batch.objects || [])) { bytes += Number(object.size || 0); objects++; }
+      pages++;
+      truncated = !!batch.truncated;
+      cursor = batch.truncated ? batch.cursor : undefined;
+      if (pages >= 100 && truncated) break;
+    } while (truncated);
+    const freeBytes = 10 * 1000 * 1000 * 1000;
+    return json({ ok:true, bytes, objects, pages_scanned:pages, complete:!truncated,
+      free_tier_bytes:freeBytes, percent_of_free_tier:Math.round(bytes/freeBytes*10000)/100,
+      note:"Observed current object sizes. Cloudflare bills storage by monthly GB-month average; this is not the invoice usage meter." });
+  }
+
+  if (p === "/api/admin/diagnostics" && method === "GET") {
+    const checks=[];
+    try { await env.DB.prepare("SELECT 1 AS ok").first(); checks.push({id:"d1",label:"D1 database connection",ok:true,detail:"SELECT 1 succeeded"}); }
+    catch(e) { checks.push({id:"d1",label:"D1 database connection",ok:false,detail:String(e).slice(0,300),fix:"Check the Worker D1 binding named DB and database availability."}); }
+    for (const [table,sql] of [
+      ["pages","SELECT COUNT(*) AS n FROM pages"],
+      ["departments","SELECT COUNT(*) AS n FROM departments"],
+      ["messages","SELECT COUNT(*) AS n FROM messages"],
+      ["admin_message_reads","SELECT COUNT(*) AS n FROM admin_message_reads"],
+      ["inbound_email_events","SELECT COUNT(*) AS n FROM inbound_email_events"]
+    ]) {
+      try { const result=await env.DB.prepare(sql).first(); checks.push({id:"table_"+table,label:"Database table: "+table,ok:true,detail:"Accessible · "+Number(result?.n||0)+" rows"}); }
+      catch(e) { checks.push({id:"table_"+table,label:"Database table: "+table,ok:false,detail:String(e).slice(0,250),fix:"Apply the pending D1 migration or verify the schema."}); }
+    }
+    try { if(!env.MEDIA) throw new Error("MEDIA binding missing"); await env.MEDIA.list({limit:1}); checks.push({id:"r2",label:"R2 storage connection",ok:true,detail:"Bucket listing succeeded"}); }
+    catch(e) { checks.push({id:"r2",label:"R2 storage connection",ok:false,detail:String(e).slice(0,250),fix:"Check the Worker R2 binding named MEDIA and bucket granshi-media."}); }
+    checks.push({id:"email",label:"Resend configuration",ok:!!env.RESEND_API_KEY,detail:env.RESEND_API_KEY?"RESEND_API_KEY is configured":"RESEND_API_KEY is not configured",fix:"If email features are needed, configure the Resend API key as a Worker secret."});
+    checks.push({id:"webhook",label:"Resend webhook verification",ok:!!env.RESEND_WEBHOOK_SECRET,detail:env.RESEND_WEBHOOK_SECRET?"Webhook secret is configured":"Webhook secret is not configured",fix:"Configure RESEND_WEBHOOK_SECRET and verify the endpoint in Resend."});
+    return json({ok:checks.every(x=>x.ok),checks,checked_at:new Date().toISOString(),
+      limitations:["This check cannot read Cloudflare dashboard billing metrics or Worker runtime logs.","Public pages and browser-side errors are checked separately by the Admin browser."]});
   }
 
   // Departments
@@ -1075,10 +1128,10 @@ async function api(req, env) {
   if (p === "/api/admin/email" && method === "GET") {
     const folder = u.searchParams.get("folder") === "sent" ? "sent" : "inbox";
     if(folder==="sent"){
-      const rows=await env.DB.prepare("SELECT * FROM messages WHERE reply_text LIKE ? ORDER BY created_at DESC LIMIT 300").bind('{"outbound":true%').all();
+      const rows=await env.DB.prepare("SELECT m.*,1 AS is_read FROM messages m WHERE m.reply_text LIKE ? ORDER BY m.created_at DESC LIMIT 300").bind('{"outbound":true%').all();
       return json(rows.results||[]);
     }
-    const rows=await env.DB.prepare("SELECT m.* FROM messages m JOIN inbound_email_events e ON e.message_id=m.id WHERE m.reply_text LIKE ? AND m.subject NOT LIKE '[Granshi]%' ORDER BY m.created_at DESC LIMIT 500").bind('{"inbound":true%').all();
+    const rows=await env.DB.prepare("SELECT m.*,CASE WHEN r.message_id IS NULL THEN 0 ELSE 1 END AS is_read FROM messages m JOIN inbound_email_events e ON e.message_id=m.id LEFT JOIN admin_message_reads r ON r.message_id=m.id AND r.admin_email=? WHERE m.reply_text LIKE ? AND m.subject NOT LIKE '[Granshi]%' ORDER BY m.created_at DESC LIMIT 500").bind(who,'{"inbound":true%').all();
     const allowed=[];
     for(const row of (rows.results||[])){
       const event=await env.DB.prepare("SELECT recipients FROM inbound_email_events WHERE message_id=? LIMIT 1").bind(row.id).first();
@@ -1127,7 +1180,7 @@ async function api(req, env) {
     return json({ok:true});
   }
   if (p === "/api/admin/messages" && method === "GET") {
-    return json((await env.DB.prepare("SELECT m.*, d.name_en AS department_name FROM messages m LEFT JOIN departments d ON d.id=m.department_id WHERE (m.reply_text IS NULL OR (m.reply_text NOT LIKE ? AND m.reply_text NOT LIKE ?)) ORDER BY m.created_at DESC LIMIT 300").bind('{"inbound":true%','{"outbound":true%').all()).results || []);
+    return json((await env.DB.prepare("SELECT m.*,d.name_en AS department_name,CASE WHEN r.message_id IS NULL THEN 0 ELSE 1 END AS is_read FROM messages m LEFT JOIN departments d ON d.id=m.department_id LEFT JOIN admin_message_reads r ON r.message_id=m.id AND r.admin_email=? WHERE (m.reply_text IS NULL OR (m.reply_text NOT LIKE ? AND m.reply_text NOT LIKE ?)) ORDER BY m.created_at DESC LIMIT 300").bind(who,'{"inbound":true%','{"outbound":true%').all()).results || []);
   }
   // Upload reply attachment → returns url (call before reply POST)
   if (p === "/api/admin/messages/attach" && method === "POST") {
