@@ -1163,7 +1163,7 @@ async function api(req, env) {
     const delivery = await sendEmail(env, {
       from: "noreply@gopalkoirala.com.np",
       to: msg.email,
-      subject: \`Re: \${msg.subject || "Your message to Granshi"}\`,
+      subject: `Re: ${msg.subject || "Your message to Granshi"}`,
       html: "<p>Hello " + escapeHtml(msg.name) + ",</p><p>" + escapeHtml(reply).replace(/\n/g, "<br>") + "</p>" + attHtml + "<p style='margin-top:22px;padding-top:14px;border-top:1px solid #ddd'>" + escapeHtml(contactFooter) + "</p><hr><p>Original: " + escapeHtml(msg.body || "") + "</p>",
       attachments,
     });
