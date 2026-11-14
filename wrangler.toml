@@ -4,7 +4,7 @@ compatibility_date = "2026-11-05"
 workers_dev = true
 
 [triggers]
-crons = ["*/5 * * * *"] # Worker advances the nightly scan in small resumable batches
+crons = ["*/5 1-4 * * *"] # Nightly UTC window; resumes saved checkpoints every 5 minutes
 
 [assets]
 directory = "./public"
