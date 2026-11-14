@@ -1071,14 +1071,38 @@ async function api(req, env) {
       return json({ok:true,imported,scanned});
     } catch(error){return json({error:String(error).slice(0,400),imported,scanned},502);}
   }
+  // Keep Contact Us messages separate from the real info@ mailbox.
+  if (p === "/api/admin/email" && method === "GET") {
+    const folder = u.searchParams.get("folder") === "sent" ? "sent" : "inbox";
+    const marker = folder === "sent" ? '{"outbound":true%' : '{"inbound":true%';
+    const rows = await env.DB.prepare("SELECT * FROM messages WHERE reply_text LIKE ? ORDER BY created_at DESC LIMIT 300").bind(marker).all();
+    return json(rows.results || []);
+  }
+  if (p === "/api/admin/email/send" && method === "POST") {
+    const x = await body(req), to = String(x.to || "").trim().slice(0,180);
+    const subject = String(x.subject || "").trim().slice(0,200), textBody = String(x.body || "").trim().slice(0,20000);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({error:"Valid recipient email required."},400);
+    if (!subject || !textBody) return json({error:"Subject and message are required."},400);
+    const html = '<div style="font:15px/1.7 Arial,sans-serif;white-space:pre-wrap">'+escapeHtml(textBody).replace(/\n/g,"<br>")+'</div>';
+    const delivery = await sendEmail(env,{from:"info@gopalkoirala.com.np",to,subject,html});
+    if (!delivery.sent) return json({error:"Email could not be sent.",detail:delivery.error||"Email service unavailable."},502);
+    await env.DB.prepare("INSERT INTO messages(department_id,name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(NULL,?,?,?,?,?,?,?,?)").bind("Granshi",to,subject,textBody,"sent",new Date().toISOString(),JSON.stringify({outbound:true,from:"info@gopalkoirala.com.np"}),null).run();
+    return json({ok:true});
+  }
+  if (p.match(/^\/api\/admin\/email\/\d+\/reply$/) && method === "POST") {
+    const id = p.split("/")[4], x = await body(req);
+    const subject = String(x.subject || "").trim().slice(0,200), textBody = String(x.body || "").trim().slice(0,20000);
+    const original = await env.DB.prepare("SELECT * FROM messages WHERE id=? AND reply_text LIKE ?").bind(id,'{"inbound":true%').first();
+    if (!original) return json({error:"Incoming email not found."},404);
+    if (!subject || !textBody) return json({error:"Subject and message are required."},400);
+    const html = '<div style="font:15px/1.7 Arial,sans-serif;white-space:pre-wrap">'+escapeHtml(textBody).replace(/\n/g,"<br>")+'</div>';
+    const delivery = await sendEmail(env,{from:"info@gopalkoirala.com.np",to:original.email,subject,html});
+    if (!delivery.sent) return json({error:"Reply could not be sent.",detail:delivery.error||"Email service unavailable."},502);
+    await env.DB.prepare("INSERT INTO messages(department_id,name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(NULL,?,?,?,?,?,?,?,?)").bind("Granshi",original.email,subject,textBody,"sent",new Date().toISOString(),JSON.stringify({outbound:true,from:"info@gopalkoirala.com.np",in_reply_to:Number(id)}),null).run();
+    return json({ok:true});
+  }
   if (p === "/api/admin/messages" && method === "GET") {
-    return json(
-      (
-        await env.DB.prepare(
-          `SELECT m.*, d.name_en AS department_name FROM messages m LEFT JOIN departments d ON d.id=m.department_id ORDER BY m.created_at DESC LIMIT 300`
-        ).all()
-      ).results || []
-    );
+    return json((await env.DB.prepare("SELECT m.*, d.name_en AS department_name FROM messages m LEFT JOIN departments d ON d.id=m.department_id WHERE (m.reply_text IS NULL OR (m.reply_text NOT LIKE ? AND m.reply_text NOT LIKE ?)) ORDER BY m.created_at DESC LIMIT 300").bind('{"inbound":true%','{"outbound":true%').all()).results || []);
   }
   // Upload reply attachment → returns url (call before reply POST)
   if (p === "/api/admin/messages/attach" && method === "POST") {
@@ -1133,20 +1157,18 @@ async function api(req, env) {
         return `<p>Attachment: <a href="${u}">${n}</a></p>`;
       })
       .join("");
+    const contactFooter = "थप सहयोग वा जानकारी आवश्यक परे हामीलाई info@gopalkoirala.com.np मा सिधै इमेल गर्नुहोला।";
+    const finalReply = reply + "\n\n" + contactFooter;
+    const storedReply = attachments.length > 0 ? finalReply + "\n\n<!--ATTACH:" + JSON.stringify(attachments) + "-->" : finalReply;
     const delivery = await sendEmail(env, {
       from: "noreply@gopalkoirala.com.np",
       to: msg.email,
-      subject: `Re: ${msg.subject || "Your message to Granshi"}`,
-      replyTo: "info@gopalkoirala.com.np",
-      html: `<p>Hello ${escapeHtml(msg.name)},</p><p>${escapeHtml( reply ).replace(/\n/g, "<br>")}</p>${attHtml}<hr><p>Original: ${escapeHtml( msg.body || "" )}</p>`,
+      subject: \`Re: \${msg.subject || "Your message to Granshi"}\`,
+      html: "<p>Hello " + escapeHtml(msg.name) + ",</p><p>" + escapeHtml(reply).replace(/\n/g, "<br>") + "</p>" + attHtml + "<p style='margin-top:22px;padding-top:14px;border-top:1px solid #ddd'>" + escapeHtml(contactFooter) + "</p><hr><p>Original: " + escapeHtml(msg.body || "") + "</p>",
       attachments,
     });
     if (!delivery.sent) return json({ error: "Reply could not be sent.", detail: delivery.error || "Email service unavailable." }, 502);
-    await env.DB.prepare(
-      "UPDATE messages SET reply_text=?,replied_at=?,status=? WHERE id=?"
-    )
-      .bind(stored, new Date().toISOString(), "replied", id)
-      .run();
+    await env.DB.prepare("UPDATE messages SET reply_text=?,replied_at=?,status=? WHERE id=?").bind(storedReply, new Date().toISOString(), "replied", id).run();
     return json({ ok: true });
   }
   if (p.startsWith("/api/admin/messages/") && method === "POST") {
