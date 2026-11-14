@@ -636,7 +636,7 @@ async function api(req, env) {
   }
 
   // Mark either a Contact Us message or an inbound mailbox email as read for this admin.
-  if (p.match(/^\\/api\\/admin\\/read\\/\\d+$/) && method === "POST") {
+  if (p.match(/^\/api\/admin\/read\/\d+$/) && method === "POST") {
     const id = Number(p.split("/").pop());
     const row = await env.DB.prepare("SELECT id FROM messages WHERE id=?").bind(id).first();
     if (!row) return json({ error: "Message not found." }, 404);
