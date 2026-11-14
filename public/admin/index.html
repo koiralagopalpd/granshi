@@ -14,10 +14,7 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 .btn{background:#172640;color:#fff;border:0;border-radius:9px;padding:10px 14px;font-weight:750;cursor:pointer;font-size:13px}
 .gold{background:#d8b46a;color:#182338}.danger{background:#a83333}.muted{color:#68758a;font-size:13px}
 .shell{display:block;min-height:100vh;width:100%}
-.side{position:sticky;top:0;z-index:50;min-height:58px;height:auto;display:flex;align-items:center;gap:5px;overflow-x:auto;overflow-y:hidden;padding:7px clamp(10px,2vw,24px);background:linear-gradient(110deg,#101a2c,#1b2c46 65%,#243b58);border-bottom:1px solid #d8b46a55;box-shadow:0 8px 24px #101a2c20;scrollbar-width:thin}
-.side h2{flex:0 0 auto;padding:0 14px 0 2px;margin:0 8px 0 0;font-size:14px;letter-spacing:2px;color:#f2d99e;white-space:nowrap}
-.side button{flex:0 0 auto;width:auto;white-space:nowrap;text-align:center;background:#ffffff0b;color:#dce3ed;border:1px solid #ffffff12;padding:8px 12px;border-radius:9px;cursor:pointer;font:600 12px system-ui}
-.side button.active,.side button:hover{background:linear-gradient(135deg,#f3dfa9,#d8b46a);border-color:transparent;color:#182338}
+.side{position:sticky;top:0;z-index:80;min-height:58px;display:flex;align-items:center;justify-content:space-between;padding:7px 16px;background:#101a2c;border-bottom:1px solid #d8b46a55;overflow:visible}.brand-menu{position:relative}.brand-trigger{background:transparent;border:0;color:#f2d99e;font-size:16px;letter-spacing:2px;padding:10px 12px;cursor:pointer}.brand-dropdown{display:none;position:absolute;top:calc(100% + 8px);left:0;min-width:230px;max-height:75vh;overflow:auto;padding:7px;background:#142238;border:1px solid #d8b46a66;border-radius:10px;z-index:100}.brand-dropdown.open{display:block}.brand-dropdown button{display:block;width:100%;text-align:left;padding:11px 12px;margin:2px 0;border:0;border-radius:7px;background:transparent;color:#e6edf7;font:600 13px system-ui}.brand-dropdown button:hover,.brand-dropdown button.active{background:#d8b46a;color:#182338}
 .main{padding:16px clamp(12px,2.4vw,30px);min-width:0;width:100%;max-width:none}
 #tabTitle{font-size:17px!important;color:#25344d!important;margin:0 0 8px!important}
 
@@ -84,21 +81,10 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 </div>
 
 <div id="app" class="shell hidden">
-  <aside class="side">
-    <h2>GRANSHI</h2>
-    <button data-tab="overview" class="active">Overview</button>
-    <button data-tab="departments">Departments</button>
-    <button data-tab="messages">Email Communication</button>
-    <button data-tab="comments">Comments</button>
-    <button data-tab="menus">Menus</button>
-    <button data-tab="usefulLinks">Useful Links</button>
-    <button data-tab="settings">Settings</button>
-    <button data-tab="security">Security</button>
-    <button id="logout" style="margin-top:16px;color:#f5a8a8">Log out</button>
-  </aside>
+  <aside class="side"><div class="brand-menu"><button type="button" class="brand-trigger" id="brandMenuBtn">GRANSHI ▾</button><nav class="brand-dropdown" id="brandDropdown"><button data-tab="departments">Departments & Content</button><button data-tab="messages">Inbox</button><button data-tab="comments">Comments & Feedback</button><button data-tab="menus">Menus</button><button data-tab="usefulLinks">Useful Links</button><button data-tab="settings">Settings</button><button data-tab="security">Security</button></nav></div><button id="logout" class="btn danger">Logout</button></aside>
   <main class="main">
     <button class="btn" id="exitFocus" type="button">← Back to Admin menu</button>
-    <h1 id="tabTitle" style="margin:0 0 8px;font-size:20px">Overview</h1>
+    <h1 id="tabTitle" style="display:none;margin:0 0 8px;font-size:20px">Overview</h1>
     <div id="view"></div>
   </main>
 </div>
@@ -143,22 +129,22 @@ $('#logout').onclick=async()=>{await api('/auth/logout',{method:'POST'});locatio
 $('#exitFocus').onclick=()=>{setRoute({tab:'overview',deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab('overview')};
 function showApp(email){
   $('#login').classList.add('hidden');$('#app').classList.remove('hidden');
-  $$('.side button[data-tab]').forEach(b=>b.onclick=()=>{$$('.side button[data-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');setRoute({tab:b.dataset.tab,deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab(b.dataset.tab)});
+  const menu=$('#brandDropdown'),brand=$('#brandMenuBtn');
+  brand.onclick=()=>menu.classList.toggle('open');
+  document.addEventListener('click',ev=>{if(!ev.target.closest('.brand-menu'))menu.classList.remove('open')});
+  $$('#brandDropdown button[data-tab]').forEach(btn=>btn.onclick=()=>{menu.classList.remove('open');$$('#brandDropdown button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');setRoute({tab:btn.dataset.tab,deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab(btn.dataset.tab)});
   const saved=getRoute();tab(saved.tab||'overview');
 }
-const titles={overview:'Overview',departments:'Departments & content',messages:'Email Communication',comments:'Comments / Feedback',menus:'Menus',usefulLinks:'Useful Links',settings:'Settings',security:'Security'};
+const titles={overview:'',departments:'Departments & content',messages:'Inbox',comments:'Comments / Feedback',menus:'Menus',usefulLinks:'Useful Links',settings:'Settings',security:'Security'};
+
 async function tab(name){
   setRoute({tab:name});
   $('#app').classList.toggle('focus-mode',name!=='overview');
-  $('#tabTitle').textContent=titles[name]||name;
+  $('#tabTitle').textContent=titles[name]||name;$('#tabTitle').style.display=name==='overview'?'none':'block';
   const v=$('#view');v.innerHTML='<div class="box"><p class="muted">Loading…</p></div>';
   try{
-    if(name==='overview'){
-      const d=await api('/admin/overview');
-      v.innerHTML=`<div class="box"><p>Logged in. New messages: <b>${d.new_messages||0}</b> · Departments: <b>${(d.departments||[]).length}</b> · Published pages: <b>${(d.pages||[]).length}</b></p>
-        <p class="notice">Open <b>Departments</b> to manage pages, categories and media inside each department.</p></div>`;
-    }
-    if(name==='departments'){
+    if(name==='overview'){ await renderAdminOverview(v); }
+     if(name==='departments'){
       await renderDepartments(v);
       const st=getRoute();if(st.deptId)await openDeptHub(Number(st.deptId),st.deptSub||'pages',st.editorSlug||null,!!st.editorNew);
     }
@@ -179,6 +165,20 @@ async function tab(name){
 
 
 /* ---- Footer useful links ---- */
+async function renderAdminOverview(v){
+ const d=await api('/admin/overview'),pages=d.pages||[],depts=d.departments||[],n=Number(d.new_messages||0);
+ v.innerHTML='<div class="box"><div class="row" style="justify-content:space-between"><div><h2>Granshi Admin Control Center</h2><p class="muted">Operational dashboard and diagnostics</p></div><button class="btn gold" id="runDiagnosis">Run Website Diagnosis</button></div><div id="diagSummary" class="notice">Scan चलाइएको छैन।</div></div><div class="grid2"><div class="box"><h3>Website Health</h3><b id="healthValue">Not checked</b></div><div class="box"><h3>Content Overview</h3>Published pages: <b>'+pages.length+'</b><br>Departments: <b>'+depts.length+'</b></div><div class="box"><h3>Messages & Email</h3>New contact messages: <b>'+n+'</b><br><button class="btn" data-go="messages">Open Inbox</button></div><div class="box"><h3>Quick Actions</h3><div class="row"><button class="btn" data-go="departments">Manage Content</button><button class="btn" data-go="comments">Comments</button><button class="btn" data-go="menus">Menus</button><button class="btn" data-go="settings">Settings</button><button class="btn" id="previewSite">Website Preview</button></div></div><div class="box"><h3>Pending Tasks</h3><p class="muted">Draft status and unresolved tasks are not exposed by current API.</p><span id="pendingErrors">Not scanned</span></div><div class="box"><h3>SEO Health</h3><span id="seoReport">Not scanned</span></div><div class="box"><h3>Media & Storage</h3><p class="muted">Media is managed in Departments. Storage quota is not exposed by current API.</p></div><div class="box"><h3>Security & Activity</h3><p class="muted">Current admin session authenticated. Login history and activity logs are not exposed by current API.</p></div><div class="box"><h3>Backup & Recovery</h3><p class="notice">Backup status endpoint छैन; backup सफल भएको दाबी गरिएको छैन।</p></div><div class="box"><h3>Diagnosis Report</h3><div id="diagnosisReport">No scan yet.</div></div></div>';
+ $('[data-go]',v).forEach(x=>x.onclick=()=>tab(x.dataset.go));$('#previewSite',v).onclick=()=>window.open('/','_blank','noopener');$('#runDiagnosis',v).onclick=()=>runWebsiteDiagnosis(v,d);
+}
+async function runWebsiteDiagnosis(v,d){
+ const checks=[],run=async(label,path)=>{try{await api(path);checks.push({label,ok:true,detail:'API responded'})}catch(e){checks.push({label,ok:false,detail:e.message})}};
+ $('#diagSummary',v).textContent='Running checks…';
+ await Promise.all([run('Overview API','/admin/overview'),run('Departments API','/admin/departments'),run('Messages API','/admin/messages?kind=contact'),run('Comments API','/admin/comments')]);
+ for(const [label,url] of [['Homepage','/'],['Sitemap','/sitemap.xml'],['Robots','/robots.txt']])try{const r=await fetch(url,{cache:'no-store'});checks.push({label,ok:r.ok,detail:'HTTP '+r.status})}catch(e){checks.push({label,ok:false,detail:e.message})}
+ const p=d.pages||[];let mt=0,md=0;for(const x of p){if(!String(x.title_en||x.title_ne||'').trim())mt++;if(!String(x.description_en||x.description_ne||x.thumbnail_summary_en||'').trim())md++}
+ const fail=checks.filter(x=>!x.ok);$('#healthValue',v).textContent=fail.length?'Issues found':'Tested checks passed';$('#pendingErrors',v).textContent=fail.length+' failed checks';$('#seoReport',v).textContent=mt+' missing titles · '+md+' missing descriptions';$('#diagSummary',v).textContent=checks.length+' checks completed · '+fail.length+' failed';
+ $('#diagnosisReport',v).innerHTML=checks.map(x=>'<p><b>'+(x.ok?'✓ PASS':'✕ FAIL')+' '+esc(x.label)+'</b><br><span class="muted">'+esc(x.detail)+'</span>'+(x.ok?'':'<br>Next: check the matching Cloudflare route, bindings and deployment logs.')+'</p>').join('')+'<div class="notice">यो scan ले उपलब्ध Admin API र सार्वजनिक URL मात्र जाँच्छ। DB/R2 quota, email delivery, security logs, backup र browser-side JavaScript errors का लागि थप backend monitoring आवश्यक छ।</div>';
+}
 async function renderUsefulLinks(v){
   const cfg=await api('/admin/overview');
   let links=[];
