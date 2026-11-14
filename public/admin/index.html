@@ -836,7 +836,7 @@ async function renderMessages(v){
           try{await api('/admin/messages/'+btn.dataset.deleteMessage,{method:'DELETE'});await draw()}
           catch(err){alert('Message Delete असफल: '+err.message);btn.disabled=false}
         });
-        $('[data-open-message]').forEach(btn=>btn.onclick=async()=>{
+        $$('[data-open-message]').forEach(btn=>btn.onclick=async()=>{
           const m=list.find(x=>String(x.id)===btn.dataset.openMessage);if(!m)return;
           try{await api('/admin/read/'+m.id,{method:'POST'});m.is_read=1}catch(e){console.warn('Could not save message read state',e)}
           const pr=parseReplyDisplay(m.reply_text);
@@ -859,7 +859,7 @@ async function renderMessages(v){
          $$('[data-edit-draft]').forEach(btn=>btn.onclick=()=>{const d=list.find(x=>String(x.id)===btn.dataset.editDraft);if(d)compose('draft',d.id,d.to,d.subject,d.body)});
          Array.from(document.querySelectorAll('[data-folder]')).forEach(btn=>btn.onclick=()=>{folder=btn.dataset.folder;draw()});
          $('#newEmail').onclick=()=>compose('new',null,'','');
-         $('[data-open-email]').forEach(btn=>btn.onclick=async()=>{
+         $$('[data-open-email]').forEach(btn=>btn.onclick=async()=>{
           const m=list.find(x=>String(x.id)===btn.dataset.openEmail);if(!m)return;
           const parsed=parseReplyDisplay(m.reply_text),atts=parsed.atts||[];
            if(folder==='inbox'&&!Number(m.is_read)){try{await api('/admin/read/'+m.id,{method:'POST'});m.is_read=1}catch(e){console.warn('Could not save email read state',e)}}
