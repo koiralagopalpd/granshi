@@ -240,7 +240,7 @@ async function renderDepartments(v){
   </div>`;
   $('#newDept').onclick=()=>{ $('#deptList').classList.add('hidden'); $('#deptHub').classList.add('hidden'); editDept(); };
   $$('[data-edit]').forEach(b=>b.onclick=()=>{ $('#deptList').classList.add('hidden'); $('#deptHub').classList.add('hidden'); editDept(list.find(x=>x.id==b.dataset.edit)); });
-  $('[data-del]').forEach(b=>b.onclick=async()=>{
+  $('#deptList [data-del]').forEach(b=>b.onclick=async()=>{
     if(!confirm('यो department मेटाउने हो? यो कार्य उल्ट्याउन मिल्दैन।'))return;
     if(!confirm('Confirm delete?'))return;
     await api('/admin/departments/'+b.dataset.del,{method:'DELETE'});
