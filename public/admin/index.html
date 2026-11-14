@@ -84,7 +84,7 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
     <h2>GRANSHI</h2>
     <button data-tab="overview" class="active">Overview</button>
     <button data-tab="departments">Departments</button>
-    <button data-tab="messages">Messages</button>
+    <button data-tab="messages">Email Communication</button>
     <button data-tab="comments">Comments</button>
     <button data-tab="menus">Menus</button>
     <button data-tab="usefulLinks">Useful Links</button>
@@ -142,7 +142,7 @@ function showApp(email){
   $$('.side button[data-tab]').forEach(b=>b.onclick=()=>{$$('.side button[data-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');setRoute({tab:b.dataset.tab,deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab(b.dataset.tab)});
   const saved=getRoute();tab(saved.tab||'overview');
 }
-const titles={overview:'Overview',departments:'Departments & content',messages:'Messages',comments:'Comments / Feedback',menus:'Menus',usefulLinks:'Useful Links',settings:'Settings',security:'Security'};
+const titles={overview:'Overview',departments:'Departments & content',messages:'Email Communication',comments:'Comments / Feedback',menus:'Menus',usefulLinks:'Useful Links',settings:'Settings',security:'Security'};
 async function tab(name){
   setRoute({tab:name});
   $('#app').classList.toggle('focus-mode',name!=='overview');
@@ -734,7 +734,7 @@ async function compressMailImage(file){
 }
 async function renderMessages(v){
   const list=await api('/admin/messages');
-  v.innerHTML=`<div class="box"><h3>Inbox</h3>
+  v.innerHTML=`<div class="box"><h3>Email Inbox</h3><p class="muted">Contact Us का सन्देश र info@gopalkoirala.com.np मा प्राप्त भएका इमेल यहीँ देखिन्छन्। जवाफ Granshi &lt;noreply@gopalkoirala.com.np&gt; बाट पठाइन्छ; जवाफ फर्काउँदा info@ मा आउँछ।</p>
     <p class="muted">Reply थिचेपछि मात्र form खुल्छ। Text + photo/video/file attachment (max 15MB each)।</p>
     ${list.map(m=>{
       const pr=parseReplyDisplay(m.reply_text);
