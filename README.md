@@ -129,7 +129,7 @@ Enough for a growing personal / brand site.
 ## Security
 
 - One admin only  
-- PBKDF2 180k iterations  
+- PBKDF2 10,000 iterations  
 - HttpOnly + Secure session cookie  
 - Never commit secrets  
 
