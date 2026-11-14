@@ -342,6 +342,8 @@ async function importReceivedEmail(env, emailId, fallback = {}) {
   const match=from.match(/<([^>]+)>/), address=(match?match[1]:from).trim();
   const name=(match?from.replace(match[0],"").replace(/["']/g,"").trim():address).slice(0,120)||address;
   const to=Array.isArray(mail.to)?mail.to:(Array.isArray(fallback.to)?fallback.to:[String(mail.to||"")]);
+  const recipientAddresses=to.map(v=>{const s=String(v||"").toLowerCase();const m=s.match(/<([^>]+)>/);return (m?m[1]:s).trim()});
+  if(!recipientAddresses.includes("info@gopalkoirala.com.np")) return false;
   const subject=String(mail.subject||fallback.subject||"Incoming email").slice(0,200);
   const textBody=String(mail.text||"").slice(0,30000);
   const htmlBody=String(mail.html||"").slice(0,60000);
@@ -385,6 +387,12 @@ async function handleResendWebhook(req, env) {
   const match=from.match(/<([^>]+)>/), address=(match?match[1]:from).trim();
   const name=(match?from.replace(match[0],"").replace(/["']/g,"").trim():address).slice(0,120)||address;
   const to=Array.isArray(mail.to)?mail.to:(Array.isArray(meta.to)?meta.to:[String(mail.to||"")]);
+  const recipientAddresses=to.map(v=>{const s=String(v||"").toLowerCase();const m=s.match(/<([^>]+)>/);return (m?m[1]:s).trim()});
+  if(!recipientAddresses.includes("info@gopalkoirala.com.np")){
+    await env.DB.prepare("INSERT INTO inbound_email_events(id,resend_email_id,message_id,sender,recipients,subject,body_text,body_html,headers_json,attachments_json,received_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(crypto.randomUUID(),emailId,null,String(mail.from||meta.from||""),JSON.stringify(to),String(mail.subject||meta.subject||""),"","","{}", "[]",String(mail.created_at||event.created_at||new Date().toISOString()),new Date().toISOString()).run();
+    return json({received:true,ignored:true,reason:"Recipient is not the Granshi info mailbox."});
+  }
   const subject=String(mail.subject||meta.subject||"Incoming email").slice(0,200);
   const textBody=String(mail.text||"").slice(0,30000);
   const htmlBody=String(mail.html||"").slice(0,60000);
@@ -543,16 +551,8 @@ async function api(req, env) {
         new Date().toISOString()
       )
       .run();
-    const settings = await getSettings(env);
-    const target = deptEmail || settings.contact_email || null;
-    if (target) {
-      await sendEmail(env, {
-        to: target,
-        subject: `[Granshi] ${subject || "Message"} — ${name}`,
-        replyTo: email,
-        html: `<p><b>From:</b> ${escapeHtml(name)} &lt;${escapeHtml( email )}&gt;</p><p>${escapeHtml(msg).replace(/\n/g, "<br>")}</p>`,
-      });
-    }
+    // Contact Us submissions belong only to the Messages module.
+    // Do not forward them into the real info@ mailbox.
     return json({ ok: true });
   }
 
@@ -1074,9 +1074,19 @@ async function api(req, env) {
   // Keep Contact Us messages separate from the real info@ mailbox.
   if (p === "/api/admin/email" && method === "GET") {
     const folder = u.searchParams.get("folder") === "sent" ? "sent" : "inbox";
-    const marker = folder === "sent" ? '{"outbound":true%' : '{"inbound":true%';
-    const rows = await env.DB.prepare("SELECT * FROM messages WHERE reply_text LIKE ? ORDER BY created_at DESC LIMIT 300").bind(marker).all();
-    return json(rows.results || []);
+    if(folder==="sent"){
+      const rows=await env.DB.prepare("SELECT * FROM messages WHERE reply_text LIKE ? ORDER BY created_at DESC LIMIT 300").bind('{"outbound":true%').all();
+      return json(rows.results||[]);
+    }
+    const rows=await env.DB.prepare("SELECT m.* FROM messages m JOIN inbound_email_events e ON e.message_id=m.id WHERE m.reply_text LIKE ? ORDER BY m.created_at DESC LIMIT 500").bind('{"inbound":true%').all();
+    const allowed=[];
+    for(const row of (rows.results||[])){
+      const event=await env.DB.prepare("SELECT recipients FROM inbound_email_events WHERE message_id=? LIMIT 1").bind(row.id).first();
+      let recipients=[];try{recipients=JSON.parse(event?.recipients||"[]")}catch{}
+      const addresses=recipients.map(v=>{const s=String(v||"").toLowerCase();const match=s.match(/<([^>]+)>/);return (match?match[1]:s).trim()});
+      if(addresses.includes("info@gopalkoirala.com.np"))allowed.push(row);
+    }
+    return json(allowed.slice(0,300));
   }
   if (p === "/api/admin/email/send" && method === "POST") {
     const x = await body(req), to = String(x.to || "").trim().slice(0,180);
@@ -1090,6 +1100,15 @@ async function api(req, env) {
     if (!delivery.sent) return json({error:"Email could not be sent.",detail:delivery.error||"Email service unavailable."},502);
     const stored = JSON.stringify({outbound:true,from:"info@gopalkoirala.com.np",attachments});
     await env.DB.prepare("INSERT INTO messages(department_id,name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(NULL,?,?,?,?,?,?,?,?)").bind("Granshi",to,subject,textBody,"sent",new Date().toISOString(),stored,null).run();
+    return json({ok:true});
+  }
+  if (p.match(/^\/api\/admin\/email\/\d+$/) && method === "DELETE") {
+    const id=Number(p.split("/").pop());
+    const row=await env.DB.prepare("SELECT id,reply_text FROM messages WHERE id=?").bind(id).first();
+    if(!row || !(String(row.reply_text||"").startsWith('{"inbound":true') || String(row.reply_text||"").startsWith('{"outbound":true'))) return json({error:"Email not found."},404);
+    // Keep the Resend event as a tombstone so manual Sync cannot restore a deleted email.
+    await env.DB.prepare("UPDATE inbound_email_events SET message_id=NULL WHERE message_id=?").bind(id).run();
+    await env.DB.prepare("DELETE FROM messages WHERE id=?").bind(id).run();
     return json({ok:true});
   }
   if (p.match(/^\/api\/admin\/email\/\d+\/reply$/) && method === "POST") {
