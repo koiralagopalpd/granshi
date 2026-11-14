@@ -240,7 +240,7 @@ async function renderDepartments(v){
   </div>`;
   $('#newDept').onclick=()=>{ $('#deptList').classList.add('hidden'); $('#deptHub').classList.add('hidden'); editDept(); };
   $$('[data-edit]').forEach(b=>b.onclick=()=>{ $('#deptList').classList.add('hidden'); $('#deptHub').classList.add('hidden'); editDept(list.find(x=>x.id==b.dataset.edit)); });
-  $$$('[data-del]').forEach(b=>b.onclick=async()=>{
+  $('[data-del]').forEach(b=>b.onclick=async()=>{
     if(!confirm('यो department मेटाउने हो? यो कार्य उल्ट्याउन मिल्दैन।'))return;
     if(!confirm('Confirm delete?'))return;
     await api('/admin/departments/'+b.dataset.del,{method:'DELETE'});
@@ -733,7 +733,8 @@ async function compressMailImage(file){
   }catch{return file}
 }
 async function renderMessages(v){
-  const list=await api('/admin/messages');
+  const response=await api('/admin/messages');
+  const list=Array.isArray(response)?response:(Array.isArray(response?.results)?response.results:(Array.isArray(response?.data)?response.data:[]));
   v.innerHTML=`<div class="box"><div class="row" style="justify-content:space-between;align-items:center"><h3>Email Inbox</h3><button class="btn gold" id="sync-resend-inbox">Sync Resend Inbox</button></div><div class="muted" id="resend-sync-status" role="status" aria-live="polite"></div><p class="muted">Contact Us का सन्देश र info@gopalkoirala.com.np मा प्राप्त भएका इमेल यहीँ देखिन्छन्। जवाफ Granshi &lt;noreply@gopalkoirala.com.np&gt; बाट पठाइन्छ; जवाफ फर्काउँदा info@ मा आउँछ।</p>
     <p class="muted">Reply थिचेपछि मात्र form खुल्छ। Text + photo/video/file attachment (max 15MB each)।</p>
     ${list.map(m=>{
