@@ -297,7 +297,7 @@ async function sendEmail(env, { to, subject, html, replyTo, attachments = [], fr
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `Granshi <${String(arguments[0] || "info@gopalkoirala.com.np")}>`,
+        from: `Granshi <${from}>`,
         to: [to],
         subject,
         html: finalHtml,
