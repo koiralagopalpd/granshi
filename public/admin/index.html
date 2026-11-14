@@ -240,7 +240,7 @@ async function renderDepartments(v){
   </div>`;
   $('#newDept').onclick=()=>{ $('#deptList').classList.add('hidden'); $('#deptHub').classList.add('hidden'); editDept(); };
   $$('[data-edit]').forEach(b=>b.onclick=()=>{ $('#deptList').classList.add('hidden'); $('#deptHub').classList.add('hidden'); editDept(list.find(x=>x.id==b.dataset.edit)); });
-  $$('[data-del]').forEach(b=>b.onclick=async()=>{
+  $$$('[data-del]').forEach(b=>b.onclick=async()=>{
     if(!confirm('यो department मेटाउने हो? यो कार्य उल्ट्याउन मिल्दैन।'))return;
     if(!confirm('Confirm delete?'))return;
     await api('/admin/departments/'+b.dataset.del,{method:'DELETE'});
@@ -776,12 +776,12 @@ async function renderMessages(v){
     catch(e){status.textContent='Sync असफल: '+e.message;}
     finally{const b=$('#sync-resend-inbox');if(b)b.disabled=false;}
   };
-  $('[data-reply]').forEach(b=>b.onclick=()=>{
-    $$('.reply-box').forEach(x=>x.classList.remove('open'));
+  $$('[data-reply]').forEach(b=>b.onclick=()=>{
+    $$$('.reply-box').forEach(x=>x.classList.remove('open'));
     $('#rb-'+b.dataset.reply).classList.add('open');
   });
-  $$('[data-cancel]').forEach(b=>b.onclick=()=>$('#rb-'+b.dataset.cancel).classList.remove('open'));
-  $$('[data-send]').forEach(b=>b.onclick=async()=>{
+  $$$('[data-cancel]').forEach(b=>b.onclick=()=>$('#rb-'+b.dataset.cancel).classList.remove('open'));
+  $$$('[data-send]').forEach(b=>b.onclick=async()=>{
     const id=b.dataset.send;const text=$('#rt-'+id).value.trim();
     const msg=$('#rm-'+id);
     if(!text){msg.textContent='Write a reply';return}
@@ -806,7 +806,7 @@ async function renderMessages(v){
     }catch(e){msg.textContent=e.message}
     finally{sendButton.disabled=false}
   });
-  $$('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/messages/'+b.dataset.del,{method:'DELETE'});tab('messages')});
+  $$$('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/messages/'+b.dataset.del,{method:'DELETE'});tab('messages')});
 }
 
 async function renderComments(v){
