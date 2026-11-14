@@ -840,8 +840,8 @@ async function renderMessages(v){
            $('.mail-list').classList.add('hidden');$('.mail-toolbar').classList.add('hidden');
            $('#mailDetail').innerHTML='<div class="mail-detail-full"><div class="mail-detail-actions"><button class="btn" id="backEmail">← Back to '+(folder==='sent'?'Sent':'Inbox')+'</button><span style="flex:1"></span><button class="btn gold" id="replyEmail" '+(folder==='sent'?'disabled':'')+'>Reply</button><button class="btn" id="forwardEmail">Forward</button><button class="btn danger" id="deleteOpenEmail">Delete</button></div><h2>'+esc(m.subject||'(no subject)')+'</h2><div class="mail-meta"><b>'+esc(folder==='sent'?'Granshi':(m.name||m.email))+'</b> &lt;'+esc(m.email)+'&gt;<small>'+date(m.created_at)+'</small></div><div class="mail-body">'+esc(m.body||'')+'</div>'+atts.map(x=>'<p>📎 <a target="_blank" rel="noopener" href="'+esc(x.url)+'">'+esc(x.name||'Attachment')+'</a></p>').join('')+'</div>';
            $('#backEmail').onclick=()=>draw();
-          $('#replyEmail').onclick=()=>compose('reply',m.id,m.email,/^re:/i.test(m.subject||'')?m.subject:'Re: '+(m.subject||''));$('#forwardEmail').onclick=()=>compose('new',null,'','Fwd: '+(m.subject||''));$('#forwardEmail').onclick=()=>compose('new',null,'','Fwd: '+(m.subject||''));
-          $('#deleteOpenEmail').onclick=async()=>{if(!confirm('यो इमेल स्थायी रूपमा Delete गर्ने?'))return;try{await api('/admin/email/'+m.id,{method:'DELETE'});draw()}catch(err){alert('Delete असफल: '+err.message)}};
+          $('#replyEmail').onclick=()=>compose('reply',m.id,m.email,/^re:/i.test(m.subject||'')?m.subject:'Re: '+(m.subject||''));$('#forwardEmail').onclick=()=>compose('new',null,'','Fwd: '+(m.subject||''));
+          $('#deleteOpenEmail').onclick=async()=>{if(!confirm('यो इमेल स्थायी रूपमा Delete गर्ने?'))return;try{if(folder==='drafts'){localStorage.setItem('granshi_email_drafts',JSON.stringify(list.filter(x=>String(x.id)!==String(m.id))))}else await api('/admin/email/'+m.id,{method:'DELETE'});draw()}catch(err){alert('Delete असफल: '+err.message)}};
         });
       }
     }catch(err){v.innerHTML='<div class="box">Error: '+esc(err.message)+'</div>'}
