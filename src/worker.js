@@ -1081,24 +1081,30 @@ async function api(req, env) {
   if (p === "/api/admin/email/send" && method === "POST") {
     const x = await body(req), to = String(x.to || "").trim().slice(0,180);
     const subject = String(x.subject || "").trim().slice(0,200), textBody = String(x.body || "").trim().slice(0,20000);
+    const attachments = Array.isArray(x.attachments) ? x.attachments.slice(0,10) : [];
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({error:"Valid recipient email required."},400);
     if (!subject || !textBody) return json({error:"Subject and message are required."},400);
-    const html = '<div style="font:15px/1.7 Arial,sans-serif;white-space:pre-wrap">'+escapeHtml(textBody).replace(/\n/g,"<br>")+'</div>';
-    const delivery = await sendEmail(env,{from:"info@gopalkoirala.com.np",to,subject,html});
+    const attHtml = attachments.map(x=>'<p>Attachment: <a href="'+escapeHtml(x.url||"")+'">'+escapeHtml(x.name||"file")+'</a></p>').join("");
+    const html = '<div style="font:15px/1.7 Arial,sans-serif;white-space:pre-wrap">'+escapeHtml(textBody).replace(/\n/g,"<br>")+'</div>'+attHtml;
+    const delivery = await sendEmail(env,{from:"info@gopalkoirala.com.np",to,subject,html,attachments});
     if (!delivery.sent) return json({error:"Email could not be sent.",detail:delivery.error||"Email service unavailable."},502);
-    await env.DB.prepare("INSERT INTO messages(department_id,name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(NULL,?,?,?,?,?,?,?,?)").bind("Granshi",to,subject,textBody,"sent",new Date().toISOString(),JSON.stringify({outbound:true,from:"info@gopalkoirala.com.np"}),null).run();
+    const stored = JSON.stringify({outbound:true,from:"info@gopalkoirala.com.np",attachments});
+    await env.DB.prepare("INSERT INTO messages(department_id,name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(NULL,?,?,?,?,?,?,?,?)").bind("Granshi",to,subject,textBody,"sent",new Date().toISOString(),stored,null).run();
     return json({ok:true});
   }
   if (p.match(/^\/api\/admin\/email\/\d+\/reply$/) && method === "POST") {
     const id = p.split("/")[4], x = await body(req);
     const subject = String(x.subject || "").trim().slice(0,200), textBody = String(x.body || "").trim().slice(0,20000);
+    const attachments = Array.isArray(x.attachments) ? x.attachments.slice(0,10) : [];
     const original = await env.DB.prepare("SELECT * FROM messages WHERE id=? AND reply_text LIKE ?").bind(id,'{"inbound":true%').first();
     if (!original) return json({error:"Incoming email not found."},404);
     if (!subject || !textBody) return json({error:"Subject and message are required."},400);
-    const html = '<div style="font:15px/1.7 Arial,sans-serif;white-space:pre-wrap">'+escapeHtml(textBody).replace(/\n/g,"<br>")+'</div>';
-    const delivery = await sendEmail(env,{from:"info@gopalkoirala.com.np",to:original.email,subject,html});
+    const attHtml = attachments.map(x=>'<p>Attachment: <a href="'+escapeHtml(x.url||"")+'">'+escapeHtml(x.name||"file")+'</a></p>').join("");
+    const html = '<div style="font:15px/1.7 Arial,sans-serif;white-space:pre-wrap">'+escapeHtml(textBody).replace(/\n/g,"<br>")+'</div>'+attHtml;
+    const delivery = await sendEmail(env,{from:"info@gopalkoirala.com.np",to:original.email,subject,html,attachments});
     if (!delivery.sent) return json({error:"Reply could not be sent.",detail:delivery.error||"Email service unavailable."},502);
-    await env.DB.prepare("INSERT INTO messages(department_id,name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(NULL,?,?,?,?,?,?,?,?)").bind("Granshi",original.email,subject,textBody,"sent",new Date().toISOString(),JSON.stringify({outbound:true,from:"info@gopalkoirala.com.np",in_reply_to:Number(id)}),null).run();
+    const stored = JSON.stringify({outbound:true,from:"info@gopalkoirala.com.np",in_reply_to:Number(id),attachments});
+    await env.DB.prepare("INSERT INTO messages(department_id,name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(NULL,?,?,?,?,?,?,?,?)").bind("Granshi",original.email,subject,textBody,"sent",new Date().toISOString(),stored,null).run();
     return json({ok:true});
   }
   if (p === "/api/admin/messages" && method === "GET") {
