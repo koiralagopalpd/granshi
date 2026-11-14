@@ -65,6 +65,8 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 .admin-dept-card .row{gap:4px}
 .admin-dept-card .btn{padding:6px 8px;font-size:11px}
 @media(max-width:900px){.admin-dept-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.admin-dept-art{height:82px}.admin-dept-copy{padding:8px}.admin-dept-card .item{margin:0}}
+
+.mail-app{padding:16px!important}.mail-top,.mail-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.mail-top h3{margin:0}.mail-switch,.mail-folders{display:flex;gap:7px;flex-wrap:wrap}.mail-list{border:1px solid #e4e8ef;border-radius:12px;overflow:hidden;margin-top:12px}.mail-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 14px;border-bottom:1px solid #e9edf3;background:#fff}.mail-row:last-child{border-bottom:0}.mail-row-main{min-width:0;flex:1}.mail-sender{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:13px}.mail-sender span,.mail-sender small,.mail-row p{color:#718096;font-size:12px}.mail-sender small{margin-left:auto}.mail-subject{display:block;margin-top:6px;font-size:14px}.mail-row p{margin:4px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mail-row-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}.mail-reading{margin-top:14px;background:#fff;border:1px solid #e2e7ef;border-radius:14px;padding:clamp(14px,3vw,26px)}.mail-reading h2{font-size:21px;margin:20px 0 14px;overflow-wrap:anywhere}.mail-meta{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid #e9edf3;font-size:13px}.mail-meta small{margin-left:auto;color:#778195}.mail-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;padding:20px 0;min-height:90px}.mail-compose-overlay{position:fixed;inset:0;z-index:1000;background:#101a2caa;display:flex;align-items:center;justify-content:center;padding:12px}.mail-compose{width:min(820px,100%);height:min(94dvh,900px);background:#fff;border-radius:16px;display:flex;flex-direction:column;box-shadow:0 20px 70px #0005;overflow:hidden}.mail-compose>header,.mail-compose>footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid #e8ecf2}.mail-compose>footer{border-top:1px solid #e8ecf2;border-bottom:0;margin-top:auto}.mail-compose-fields{padding:14px 18px;overflow:auto}.mail-compose-fields label{display:block;font-size:12px;font-weight:750;margin:9px 0 3px}.mail-compose-fields input,.mail-compose-fields textarea{margin:0 0 7px}.mail-compose-fields textarea{min-height:240px;resize:vertical}.mail-toolbar{margin:14px 0}@media(max-width:600px){.mail-row{padding:11px;align-items:flex-start}.mail-row-actions{flex-direction:column;align-items:flex-end}.mail-sender small{margin-left:0}.mail-compose-overlay{padding:0;align-items:stretch}.mail-compose{width:100%;height:100dvh;max-height:100dvh;border-radius:0}.mail-compose-fields textarea{min-height:42vh}.mail-reading{padding:14px}.mail-reading h2{font-size:18px}}
 </style>
 </head>
 <body>
@@ -733,81 +735,59 @@ async function compressMailImage(file){
   }catch{return file}
 }
 async function renderMessages(v){
-  const response=await api('/admin/messages');
-  const list=Array.isArray(response)?response:(Array.isArray(response?.results)?response.results:(Array.isArray(response?.data)?response.data:[]));
-  v.innerHTML=`<div class="box"><div class="row" style="justify-content:space-between;align-items:center"><h3>Email Inbox</h3><button class="btn gold" id="sync-resend-inbox">Sync Resend Inbox</button></div><div class="muted" id="resend-sync-status" role="status" aria-live="polite"></div><p class="muted">Contact Us का सन्देश र info@gopalkoirala.com.np मा प्राप्त भएका इमेल यहीँ देखिन्छन्। जवाफ Granshi &lt;noreply@gopalkoirala.com.np&gt; बाट पठाइन्छ; जवाफ फर्काउँदा info@ मा आउँछ।</p>
-    <p class="muted">Reply थिचेपछि मात्र form खुल्छ। Text + photo/video/file attachment (max 15MB each)।</p>
-    ${list.map(m=>{
-      const pr=parseReplyDisplay(m.reply_text);
-      return `<div class="item" style="flex-direction:column;align-items:stretch">
-      <div class="row" style="justify-content:space-between">
-        <div><b>${esc(m.name)}</b> &lt;${esc(m.email)}&gt;
-          <span class="badge ${m.status==='replied'?'replied':'new'}">${esc(m.status)}</span>
-          <br><small class="muted">${esc(m.department_name||'General')} · ${esc((m.created_at||'').replace('T',' ').slice(0,19))}</small>
-        </div>
-        <div class="row">
-          <button class="btn" data-reply="${m.id}">Reply</button>
-          <button class="btn danger" data-del="${m.id}">Delete</button>
-        </div>
-      </div>
-      <div style="margin-top:8px"><b>${esc(m.subject||'(no subject)')}</b><div style="white-space:pre-wrap;margin-top:4px">${esc(m.body)}</div></div>
-      ${pr.inbound&&pr.atts.length?'<div class="notice" style="margin-top:8px"><b>Received attachments:</b>'+pr.atts.map(a=>'<div style="margin-top:5px"><a href="'+esc(a.url)+'" target="_blank" rel="noopener">'+esc(a.name||'file')+'</a> · '+Math.ceil((a.size||0)/1024)+' KB</div>').join('')+'</div>':''}
-      ${pr.text?`<div class="notice" style="margin-top:8px"><b>Your reply:</b><div style="white-space:pre-wrap">${esc(pr.text)}</div>
-        ${pr.atts.map(a=>`<div style="margin-top:6px"><a href="${esc(a.url)}" target="_blank">${esc(a.name||'file')}</a></div>`).join('')}
-      </div>`:''}
-      <div class="reply-box" id="rb-${m.id}">
-        <label>Reply text</label>
-        <textarea id="rt-${m.id}" rows="4" placeholder="Write reply…"></textarea>
-        <label style="margin-top:8px;display:block">Attachments (photo / video / file)</label>
-        <input type="file" id="ra-${m.id}" multiple accept="image/*,video/*,.pdf,.doc,.docx,.zip">
-        <div class="muted" id="ral-${m.id}" style="margin-top:4px"></div>
-        <div class="row" style="margin-top:8px">
-          <button class="btn gold" data-send="${m.id}">Send reply</button>
-          <button class="btn" data-cancel="${m.id}">Cancel</button>
-        </div>
-        <div class="muted" id="rm-${m.id}"></div>
-      </div>
-    </div>`;
-    }).join('')||'<p class="muted">No messages</p>'}
-  </div>`;
-  const syncBtn=$('#sync-resend-inbox');
-  if(syncBtn) syncBtn.onclick=async()=>{
-    const status=$('#resend-sync-status');syncBtn.disabled=true;status.textContent='Resend Inbox बाट Email ल्याउँदै…';
-    try{const result=await api('/admin/messages/sync',{method:'POST',body:JSON.stringify({})});status.textContent=result.imported+' नयाँ Email ल्याइयो ('+result.scanned+' जाँच गरियो)।';await renderMessages(v);}
-    catch(e){status.textContent='Sync असफल: '+e.message;}
-    finally{const b=$('#sync-resend-inbox');if(b)b.disabled=false;}
-  };
-  $$('[data-reply]').forEach(b=>b.onclick=()=>{
-    $$('.reply-box').forEach(x=>x.classList.remove('open'));
-    $('#rb-'+b.dataset.reply).classList.add('open');
-  });
-  $$('[data-cancel]').forEach(b=>b.onclick=()=>$('#rb-'+b.dataset.cancel).classList.remove('open'));
-  $$('[data-send]').forEach(b=>b.onclick=async()=>{
-    const id=b.dataset.send;const text=$('#rt-'+id).value.trim();
-    const msg=$('#rm-'+id);
-    if(!text){msg.textContent='Write a reply';return}
-    const sendButton=b;
-    sendButton.disabled=true;
-    msg.textContent='Uploading attachments…';
+  let section='messages',folder='inbox';
+  const date=s=>{try{return new Date(s).toLocaleString()}catch{return s||''}};
+  function compose(mode,id,to,subject){
+    const prior=$('#mailComposer');if(prior)prior.remove();
+    const modal=document.createElement('div');modal.id='mailComposer';modal.className='mail-compose-overlay';
+    const from=mode==='contact'?'Granshi <noreply@gopalkoirala.com.np>':'Granshi <info@gopalkoirala.com.np>';
+    modal.innerHTML='<section class="mail-compose"><header><b>'+(mode==='contact'?'Reply to message':mode==='reply'?'Reply email':'New email')+'</b><button class="btn" id="mailClose">✕</button></header><div class="mail-compose-fields"><label>From</label><input disabled value="'+from+'"><label>To</label><input id="mailTo" type="email" value="'+esc(to||'')+'" '+(mode==='contact'?'readonly':'')+'><label>Subject</label><input id="mailSubject" value="'+esc(subject||'')+'"><label>Message</label><textarea id="mailBody" rows="12" placeholder="Write your email…"></textarea>'+(mode==='contact'?'<p class="notice">यो जवाफ noreply@ बाट पठाइन्छ। थप सहयोगका लागि info@ मा नयाँ इमेल गर्न अनुरोध स्वतः जोडिन्छ।</p>':'')+'</div><footer><span id="mailSendStatus" class="muted"></span><button class="btn gold" id="mailSend">Send email</button></footer></section>';
+    document.body.appendChild(modal);
+    $('#mailClose',modal).onclick=()=>modal.remove();
+    $('#mailSend',modal).onclick=async()=>{
+      const recipient=$('#mailTo',modal).value.trim(),sub=$('#mailSubject',modal).value.trim(),textBody=$('#mailBody',modal).value.trim(),status=$('#mailSendStatus',modal),button=$('#mailSend',modal);
+      if(!recipient||!/^\S+@\S+\.\S+$/.test(recipient)){status.textContent='Valid recipient email required.';return}
+      if(!sub||!textBody){status.textContent='Subject and message are required.';return}
+      button.disabled=true;status.textContent='Sending…';
+      try{
+        if(mode==='contact')await api('/admin/messages/'+id+'/reply',{method:'POST',body:JSON.stringify({reply_text:textBody})});
+        else if(mode==='reply')await api('/admin/email/'+id+'/reply',{method:'POST',body:JSON.stringify({subject:sub,body:textBody})});
+        else await api('/admin/email/send',{method:'POST',body:JSON.stringify({to:recipient,subject:sub,body:textBody})});
+        status.textContent='Email sent successfully.';setTimeout(()=>{modal.remove();draw()},600);
+      }catch(err){status.textContent=err.message;button.disabled=false}
+    };
+  }
+  async function draw(){
+    v.innerHTML='<div class="box"><p class="muted">Loading…</p></div>';
     try{
-      const files=$('#ra-'+id).files||[];
-      const attachments=[];
-      for(const original of files){
-        const f=await compressMailImage(original);
-        const r=await fetch('/api/admin/messages/attach',{method:'POST',headers:{
-          'content-type':f.type||'application/octet-stream','x-file-name':encodeURIComponent(f.name)
-        },body:f});
-        const d=await r.json();if(!r.ok)throw new Error(d.error||'Attach failed');
-        attachments.push({key:d.key,url:d.url,name:d.name,content_type:d.content_type,size:d.size});
-        msg.textContent='Uploaded '+attachments.length+' / '+files.length+' · Sending email…';
+      if(section==='messages'){
+        const data=await api('/admin/messages?kind=contact'),list=Array.isArray(data)?data:[];
+        v.innerHTML='<div class="box mail-app"><div class="mail-top"><h3>Communication</h3><div class="mail-switch"><button class="btn gold" id="showMessages">💬 Messages</button><button class="btn" id="showEmail">✉ Email</button></div></div><p class="muted">Contact Us Form बाट आएका सन्देशहरू। Reply गर्दा noreply@ बाट जान्छ र info@ मा नयाँ इमेल गर्न सुझाव स्वतः जोडिन्छ।</p><div class="mail-list">'+(list.map(m=>'<article class="mail-row"><div class="mail-row-main"><div class="mail-sender"><b>'+esc(m.name)+'</b><span>'+esc(m.email)+'</span><small>'+date(m.created_at)+'</small></div><b class="mail-subject">'+esc(m.subject||'(no subject)')+'</b><p>'+esc(String(m.body||'').slice(0,130))+'</p></div><div class="mail-row-actions"><span class="badge '+(m.status==='replied'?'replied':'new')+'">'+esc(m.status)+'</span><button class="btn" data-open-message="'+m.id+'">Open</button></div></article>').join('')||'<p class="muted">No contact messages yet.</p>')+'</div><div id="mailDetail"></div></div>';
+        $('#showEmail').onclick=()=>{section='email';folder='inbox';draw()};
+        $$('[data-open-message]').forEach(btn=>btn.onclick=()=>{
+          const m=list.find(x=>String(x.id)===btn.dataset.openMessage);if(!m)return;
+          const pr=parseReplyDisplay(m.reply_text);
+          $('#mailDetail').innerHTML='<div class="mail-reading"><button class="btn" id="backMessages">← Back to list</button><h2>'+esc(m.subject||'(no subject)')+'</h2><div class="mail-meta"><b>'+esc(m.name)+'</b> &lt;'+esc(m.email)+'&gt;<small>'+date(m.created_at)+'</small></div><div class="mail-body">'+esc(m.body)+'</div>'+(pr.text?'<hr><h4>Previous reply</h4><div class="mail-body">'+esc(pr.text)+'</div>':'')+'<button class="btn gold" id="replyContact">↩ Reply</button></div>';
+          $('#backMessages').onclick=()=>$('#mailDetail').innerHTML='';
+          $('#replyContact').onclick=()=>compose('contact',m.id,m.email,'Re: '+(m.subject||'Your message to Granshi'));
+        });
+      }else{
+        const data=await api('/admin/email?folder='+folder),list=Array.isArray(data)?data:[];
+        v.innerHTML='<div class="box mail-app"><div class="mail-top"><h3>Email</h3><div class="mail-switch"><button class="btn" id="showMessages">💬 Messages</button><button class="btn gold" id="showEmail">✉ Email</button></div></div><div class="mail-toolbar"><div class="mail-folders"><button class="btn '+(folder==='inbox'?'gold':'')+'" data-folder="inbox">📥 Inbox</button><button class="btn '+(folder==='sent'?'gold':'')+'" data-folder="sent">📤 Sent</button></div><div class="row"><button class="btn" id="sync-resend-inbox">↻ Sync</button><button class="btn gold" id="newEmail">＋ Compose</button></div></div><div class="muted" id="resend-sync-status" role="status"></div><div class="mail-list">'+(list.map(m=>'<article class="mail-row"><div class="mail-row-main"><div class="mail-sender"><b>'+esc(folder==='sent'?'To: '+m.email:(m.name||m.email))+'</b><small>'+date(m.created_at)+'</small></div><b class="mail-subject">'+esc(m.subject||'(no subject)')+'</b><p>'+esc(String(m.body||'').slice(0,150))+'</p></div><div class="mail-row-actions"><span class="badge '+(folder==='sent'?'replied':'new')+'">'+(folder==='sent'?'Sent':'New')+'</span><button class="btn" data-open-email="'+m.id+'">Open</button></div></article>').join('')||'<p class="muted">No emails in this folder.</p>')+'</div><div id="mailDetail"></div></div>';
+        $('#showMessages').onclick=()=>{section='messages';draw()};
+        $$('[data-folder]').forEach(btn=>btn.onclick=()=>{folder=btn.dataset.folder;draw()});
+        $('#newEmail').onclick=()=>compose('new',null,'','');
+        $('#sync-resend-inbox').onclick=async()=>{const b=$('#sync-resend-inbox'),st=$('#resend-sync-status');b.disabled=true;st.textContent='Resend Inbox बाट Email Sync हुँदैछ…';try{const r=await api('/admin/messages/sync',{method:'POST',body:JSON.stringify({})});st.textContent=r.imported+' नयाँ इमेल Sync भयो ('+r.scanned+' जाँच गरियो)।';draw()}catch(err){st.textContent='Sync असफल: '+err.message;b.disabled=false}};
+        $$('[data-open-email]').forEach(btn=>btn.onclick=()=>{
+          const m=list.find(x=>String(x.id)===btn.dataset.openEmail);if(!m)return;
+          $('#mailDetail').innerHTML='<div class="mail-reading"><button class="btn" id="backEmail">← Back to '+(folder==='sent'?'Sent':'Inbox')+'</button><h2>'+esc(m.subject||'(no subject)')+'</h2><div class="mail-meta"><b>'+esc(folder==='sent'?'Granshi':(m.name||m.email))+'</b> &lt;'+esc(m.email)+'&gt;<small>'+date(m.created_at)+'</small></div><div class="mail-body">'+esc(m.body||'')+'</div><button class="btn gold" id="replyEmail" '+(folder==='sent'?'disabled':'')+'>↩ Reply</button></div>';
+          $('#backEmail').onclick=()=>$('#mailDetail').innerHTML='';
+          $('#replyEmail').onclick=()=>compose('reply',m.id,m.email,/^re:/i.test(m.subject||'')?m.subject:'Re: '+(m.subject||''));
+        });
       }
-      await api('/admin/messages/'+id+'/reply',{method:'POST',body:JSON.stringify({reply_text:text,attachments})});
-      msg.textContent='Sent';
-      setTimeout(()=>tab('messages'),500);
-    }catch(e){msg.textContent=e.message}
-    finally{sendButton.disabled=false}
-  });
-  $$('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/messages/'+b.dataset.del,{method:'DELETE'});tab('messages')});
+    }catch(err){v.innerHTML='<div class="box">Error: '+esc(err.message)+'</div>'}
+  }
+  await draw();
 }
 
 async function renderComments(v){
