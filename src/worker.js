@@ -1118,8 +1118,8 @@ async function api(req, env) {
     const name = decodeURIComponent(
       req.headers.get("x-file-name") || "attach.bin"
     ).replace(/[^a-zA-Z0-9._-]/g, "_");
-    if (file.byteLength > 15 * 1024 * 1024)
-      return json({ error: "Attachment max 15 MB." }, 413);
+    if (file.byteLength > 2 * 1024 * 1024)
+      return json({ error: "Attachment max 2 MB after compression." }, 413);
     const key = `replies/${crypto.randomUUID()}-${name}`;
     await env.MEDIA.put(key, file, { httpMetadata: { contentType: type } });
     const url = `/media/${key}`;
