@@ -18,6 +18,26 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 .main{padding:16px clamp(12px,2.4vw,30px);min-width:0;width:100%;max-width:none}
 #tabTitle{font-size:17px!important;color:#25344d!important;margin:0 0 8px!important}
 
+
+.diag-signal{display:flex;align-items:center;gap:9px;background:#f1f5f9;border:1px solid #dbe3ed;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13px;font-weight:800;color:#26364c}
+.diag-signal.is-running{background:#eaf4ff;border-color:#8fc6ff;color:#07569b}
+.signal-dot{width:10px;height:10px;border-radius:50%;background:#8995a5;display:inline-block;flex:0 0 auto}
+.diag-signal.is-running .signal-dot{background:#1685e8;box-shadow:0 0 0 0 #1685e855;animation:diagPulse 1.5s infinite}
+@keyframes diagPulse{70%{box-shadow:0 0 0 9px #1685e800}100%{box-shadow:0 0 0 0 #1685e800}}
+.diag-progress{height:7px;border-radius:99px;background:#e8edf3;overflow:hidden;margin-top:9px}
+.diag-progress i{display:block;height:100%;width:0;background:#2684d9;transition:width .25s}
+.diag-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+.diag-card{border:1px solid #dfe5ed;background:#fff;border-radius:12px;padding:13px;text-align:left;min-width:0;cursor:pointer;color:#1d2b40}
+.diag-card:hover{border-color:#8ca9ca;background:#f9fbff}
+.diag-card small{display:block;font-size:10px;letter-spacing:.06em;font-weight:800;color:#66758a}
+.diag-card strong{display:block;font-size:21px;margin:8px 0 3px;overflow-wrap:anywhere}
+.diag-card span{display:block;font-size:11px;color:#66758a}
+.diag-report-row{border:1px solid #e4e9f0;border-radius:10px;padding:11px;margin:8px 0;background:#fbfcfe;font-size:13px}
+.diag-report-row p{margin:5px 0;color:#66758a;overflow-wrap:anywhere}
+.pending-stats{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;font-size:12px;color:#66758a}
+.pending-stats b{color:#1d2b40;margin-left:3px}
+@media(max-width:800px){.diag-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.grid2{grid-template-columns:1fr}}
+
 .box{background:#fff;border:1px solid #e4e8ef;border-radius:14px;padding:16px 18px;margin-top:12px}
 .item{padding:12px;border:1px solid #e5e9ef;border-radius:10px;margin:8px 0;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;background:#fafbfd}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -166,45 +186,115 @@ async function tab(name){
 
 
 /* ---- Footer useful links ---- */
+
 async function renderAdminOverview(v){
  const d=await api('/admin/overview'),pages=d.pages||[],depts=d.departments||[];
  const newMessages=Number(d.new_messages||0),newEmails=Number(d.unread_emails||0),totalNew=newMessages+newEmails;
- v.innerHTML='<div class="box"><div class="row" style="justify-content:space-between"><div><h2>Granshi Admin Control Center</h2><p class="muted">Operational dashboard and diagnostics</p></div><button class="btn gold" id="runDiagnosis">Run Website Diagnosis</button></div><div id="diagSummary" class="notice">Scan चलाइएको छैन।</div></div><div class="grid2"><div class="box"><h3>Website Health</h3><b id="healthValue">Not checked</b></div><div class="box"><h3>Content Overview</h3>Published pages: <b>'+pages.length+'</b><br>Departments: <b>'+depts.length+'</b></div><div class="box"><h3>New Messages & Email</h3><div>Messages: <b>'+newMessages+'</b></div><div>Unread Email: <b>'+newEmails+'</b></div><p>Total New: <b>'+totalNew+'</b></p><button class="btn" data-go="messages">Open Inbox</button></div><div class="box"><h3>Quick Actions</h3><div class="row"><button class="btn" data-go="departments">Manage Content</button><button class="btn" data-go="comments">Comments</button><button class="btn" data-go="menus">Menus</button><button class="btn" data-go="settings">Settings</button><button class="btn" id="previewSite">Website Preview</button></div></div><div class="box"><h3>Pending Work · Later Phase</h3><p class="muted">यी काम अहिले सुरु गरिएको छैन; अर्को चरणका लागि सुरक्षित सूची हो।</p><ol><li>Draft Email लाई सबै डिभाइसमा उपलब्ध गराउने</li><li>Database तथा R2 Backup / Restore</li><li>Login History र Failed Login Record</li><li>Admin Activity Log</li><li>Email Delivery / Bounce Status</li></ol></div><div class="box"><h3>R2 Storage Usage</h3><p class="muted">आवश्यक पर्दा मात्र Scan गर्नुहोस्; प्रत्येक scan मा R2 object listing operation लाग्छ।</p><button class="btn gold" id="scanStorage">Check Storage Usage</button><div id="storageReport" class="muted" style="margin-top:10px">Not checked yet.</div></div><div class="box"><h3>Security & Activity</h3><p class="muted">Login history र activity log अर्को चरणको Pending Work मा छन्।</p></div><div class="box"><h3>Backup & Recovery</h3><p class="notice">Backup/Restore अर्को चरणमा। अहिले backup सफल भएको दाबी गरिएको छैन।</p></div><div class="box"><h3>Diagnosis Report</h3><div id="diagnosisReport">No scan yet.</div></div></div>';
- $$('[data-go]',v).forEach(x=>x.onclick=()=>tab(x.dataset.go));$('#previewSite',v).onclick=()=>window.open('/','_blank','noopener');$('#runDiagnosis',v).onclick=()=>runWebsiteDiagnosis(v,d);
- $('#scanStorage',v).onclick=async()=>{const out=$('#storageReport',v),btn=$('#scanStorage',v);btn.disabled=true;out.textContent='Scanning R2 objects…';try{const x=await api('/admin/storage');const gb=(Number(x.bytes||0)/1e9).toFixed(3),pct=Number(x.percent_of_free_tier||0);out.innerHTML='<b>'+gb+' GB</b> observed · '+Number(x.objects||0)+' objects · '+pct+'% of 10 GB-month free-tier reference'+(x.complete?'':' · <b>Partial scan</b>')+'<br><small>'+esc(x.note||'')+'</small>'+(x.complete?'':'<br><small>Object count धेरै भएकाले scan पूरा भएन; हालको संख्या न्यूनतम अनुमान हो।</small>');}catch(e){out.textContent='Storage scan failed: '+e.message}finally{btn.disabled=false}};
+ v.innerHTML=`
+ <div class="box">
+  <div class="row" style="justify-content:space-between"><div><h2>Granshi Admin Control Center</h2><p class="muted">Operational dashboard and diagnostics</p></div><button class="btn gold" id="runDiagnosis">▶ Run Website Diagnosis</button></div>
+  <div id="diagSummary" class="diag-signal"><span class="signal-dot"></span><span id="diagSignalText">Checking saved scan status…</span><span id="diagProgressText" style="margin-left:auto">—</span></div>
+  <div class="diag-progress"><i id="diagProgressBar"></i></div>
+  <div id="diagCurrent" class="muted" style="font-size:12px;margin-top:6px">Progress and last checkpoint will appear here.</div>
+ </div>
+ <div class="diag-cards">
+  <button class="diag-card" id="diagOpenRun"><small>LIVE DIAGNOSIS</small><strong id="diagCardRun">Not scanned</strong><span id="diagCardRunSub">Tap for scan controls</span></button>
+  <button class="diag-card" id="diagOpenHealth"><small>WEBSITE HEALTH</small><strong id="diagCardHealth">—</strong><span id="diagCardHealthSub">Waiting for completed scan</span></button>
+  <button class="diag-card" id="diagOpenReport"><small>LATEST REPORT</small><strong id="diagCardReport">No report</strong><span id="diagCardReportSub">No completed report saved</span></button>
+  <button class="diag-card" id="diagOpenStorage"><small>R2 + D1 STORAGE</small><strong id="diagCardStorage">Tap to inspect</strong><span id="diagCardStorageSub">R2 object inventory · D1 connection</span></button>
+ </div>
+ <div id="diagDetails" class="box hidden"></div>
+ <div class="grid2">
+  <div class="box"><h3>Content Overview</h3>Published pages: <b>${pages.length}</b><br>Departments: <b>${depts.length}</b></div>
+  <div class="box"><h3>New Messages & Email</h3><div>Messages: <b>${newMessages}</b></div><div>Unread Email: <b>${newEmails}</b></div><p>Total New: <b>${totalNew}</b></p><button class="btn" data-go="messages">Open Inbox</button></div>
+  <div class="box"><h3>Quick Actions</h3><div class="row"><button class="btn" data-go="departments">Manage Content</button><button class="btn" data-go="comments">Comments</button><button class="btn" data-go="menus">Menus</button><button class="btn" data-go="settings">Settings</button><button class="btn" id="previewSite">Website Preview</button></div></div>
+  <div class="box">
+   <div class="row" style="justify-content:space-between;align-items:center"><div><h3 style="margin:0">Pending Work</h3><p class="muted" style="margin:5px 0">Saved in D1 · available across devices</p></div><button class="btn gold" id="togglePending">Open Pending Work ▾</button></div>
+   <div class="pending-stats"><span>Total <b id="pwTotal">—</b></span><span>Success <b id="pwSuccess">—</b></span><span>Remaining <b id="pwRemaining">—</b></span><span>Complete <b id="pwPercent">—</b></span></div>
+   <div class="diag-progress"><i id="pwProgress"></i></div>
+   <div id="pendingPanel" class="hidden" style="margin-top:12px"><div class="row"><input id="pendingNewTitle" placeholder="Add a future task…" style="flex:1;min-width:180px;margin:0"><button class="btn" id="pendingAdd">+ Add</button></div><div id="pendingItems" style="margin-top:10px"></div></div>
+  </div>
+ </div>`;
+ $$('[data-go]',v).forEach(x=>x.onclick=()=>tab(x.dataset.go));
+ $('#previewSite',v).onclick=()=>window.open('/','_blank','noopener');
+ $('#runDiagnosis',v).onclick=()=>startOrResumeDiagnosis(v);
+ $('#diagOpenRun',v).onclick=()=>{$('#diagDetails',v).classList.remove('hidden');$('#diagDetails',v).innerHTML='<h3>Website Diagnosis Control</h3><p class="muted">Scan पाँचवटा जाँच प्रति चरणमा चल्छ। Refresh वा network interruption भए D1 checkpoint बाट जारी हुन्छ।</p><button class="btn gold" id="diagRunAgain">Run / Resume Diagnosis</button><div id="diagRunNote" class="muted" style="margin-top:8px"></div>';$('#diagRunAgain',v).onclick=()=>startOrResumeDiagnosis(v)};
+ $('#diagOpenHealth',v).onclick=()=>showDiagnosisDetails(v,'health');
+ $('#diagOpenReport',v).onclick=()=>showDiagnosisDetails(v,'report');
+ $('#diagOpenStorage',v).onclick=()=>showStorageDetails(v);
+ $('#togglePending',v).onclick=()=>{const p=$('#pendingPanel',v);p.classList.toggle('hidden');$('#togglePending',v).textContent=p.classList.contains('hidden')?'Open Pending Work ▾':'Hide Pending Work ▴'};
+ $('#pendingAdd',v).onclick=async()=>{const input=$('#pendingNewTitle',v),title=input.value.trim();if(!title)return;try{await api('/admin/pending-work',{method:'POST',body:JSON.stringify({title})});input.value='';await loadPendingWork(v)}catch(e){alert(e.message)}};
+ $('#pendingNewTitle',v).onkeydown=e=>{if(e.key==='Enter')$('#pendingAdd',v).click()};
+ await Promise.all([loadPendingWork(v),loadDiagnosisState(v)]);
 }
-async function runWebsiteDiagnosis(v,d){
- const checks=[];const add=(label,ok,detail,fix='')=>checks.push({label,ok:!!ok,detail:String(detail||''),fix});
- $('#diagSummary',v).textContent='Running detailed checks…';
+function diagnosisSummaryMarkup(report){
+ if(!report)return '<p class="muted">अहिलेसम्म कुनै completed report छैन।</p>';
+ const rows=(report.checks||[]).map(x=>`<div class="diag-report-row"><div class="row" style="justify-content:space-between"><b>${x.ok?'✓ PASS':'✕ ISSUE'} · ${esc(x.label)}</b><span class="badge ${x.ok?'published':'draft'}">${x.ok?'PASS':'ISSUE'}</span></div><p>${esc(x.detail||'')}</p>${!x.ok?`<div><b>सम्भावित कारण:</b> ${esc(x.cause||'जाँचबाट थप कारण पुष्टि हुन सकेन।')}</div><div><b>प्रभावित स्थान:</b> ${esc(x.affected||'थाहा छैन')}</div><div><b>समाधान:</b> ${esc(x.solution||'अहिलेसम्म समाधान सुझाव उपलब्ध छैन।')}</div><div><b>कसले मिलाउने:</b> ${x.can_fix==='admin'?'Admin':'Developer'}</div><div><b>समाधान लागू भयो?</b> ${x.resolved?'हो · पुनःजाँचबाट पुष्टि':'होइन · सुझाव मात्र, लागू/पुष्टि भएको छैन'}</div>`:''}</div>`).join('');
+ return `<div class="pending-stats"><span>Health <b>${report.health_percent}%</b></span><span>Issues <b>${report.issues}</b></span><span>Solution coverage <b>${report.solution_percent}%</b></span><span>Verified fixed <b>${report.verified_resolutions||0}</b></span></div><p class="muted">Completed: ${esc(report.completed_at||'—')} · ${report.trigger_type==='nightly'?'Nightly automatic scan':'Manual scan'} · ${report.total_checks} checks</p>${rows}<h4>Scan limitations</h4><ul>${(report.limitations||[]).map(x=>'<li>'+esc(x)+'</li>').join('')}</ul>`;
+}
+function renderDiagnosisStatus(v,s){
+ const active=!!s.active,report=s.latest_report;
+ const done=Number(s.current_index||0),total=Number(s.total_checks||0),pct=Number(s.progress||0);
+ const current=(s.checks||[])[done];
+ $('#diagSummary',v).classList.toggle('is-running',active);
+ $('#diagSignalText',v).textContent=active?'SCANNING · checkpoint saved':(s.status==='complete'?'SCAN COMPLETE':s.status==='not_scanned'?'NOT SCANNED':'SCAN '+String(s.status||'UNKNOWN').toUpperCase());
+ $('#diagProgressText',v).textContent=active?pct+'%':(report?report.total_checks+' checks':'—');
+ $('#diagProgressBar',v).style.width=(active?pct:(report?100:0))+'%';
+ $('#diagCurrent',v).textContent=active?'Current check: '+(current?.label||'Preparing next batch')+' · '+done+'/'+total+' checks · Updated '+(s.updated_at||'—'):(report?'Last completed: '+report.completed_at+' · '+report.issues+' issues · '+report.health_percent+'% health':'No saved scan yet.');
+ $('#diagCardRun',v).textContent=active?'Scanning '+pct+'%':(s.status==='complete'?'Completed':'Not scanned');
+ $('#diagCardRunSub',v).textContent=active?'At: '+(current?.label||'next checkpoint'):'Tap to inspect scan status';
+ $('#diagCardHealth',v).textContent=report?report.health_percent+'%':'—';
+ $('#diagCardHealthSub',v).textContent=report?report.issues+' issues · '+report.evaluable_checks+' evaluable checks':'Waiting for completed scan';
+ $('#diagCardReport',v).textContent=report?report.issues+' issue(s)':'No report';
+ $('#diagCardReportSub',v).textContent=report?new Date(report.completed_at).toLocaleString():'Previous report remains until new scan completes';
+ $('#diagCardStorage',v).textContent='R2 + D1';
+ $('#diagCardStorageSub',v).textContent='Tap to check current storage status';
+ if(active) $('#runDiagnosis',v).textContent='↻ Resume Website Diagnosis'; else $('#runDiagnosis',v).textContent='▶ Run Website Diagnosis';
+}
+async function loadDiagnosisState(v){
+ try{const s=await api('/admin/diagnostics/status');renderDiagnosisStatus(v,s);if(s.latest_report)$('#diagDetails',v).innerHTML=diagnosisSummaryMarkup(s.latest_report);if(s.active)startOrResumeDiagnosis(v,true)}
+ catch(e){$('#diagSignalText',v).textContent='STATUS UNAVAILABLE · '+e.message}
+}
+async function startOrResumeDiagnosis(v,resumeOnly=false){
+ const btn=$('#runDiagnosis',v);if(btn)btn.disabled=true;
  try{
-  const report=await api('/admin/diagnostics');
-  (report.checks||[]).forEach(x=>add(x.label,x.ok,x.detail,x.fix||''));
-  (report.limitations||[]).forEach(x=>add('Limitation / scope',true,x));
- }catch(e){add('Backend diagnostics API',false,e.message,'Check Worker deployment and /api/admin/diagnostics route.')}
- for(const [label,url] of [['Homepage','/'],['Sitemap','/sitemap.xml'],['Robots','/robots.txt']]){
-  try{const r=await fetch(url,{cache:'no-store'});add(label,r.ok,'HTTP '+r.status,r.ok?'':'Check public asset, Worker route or file availability.')}
-  catch(e){add(label,false,e.message,'Check domain routing and Cloudflare deployment.')}
- }
- const pages=(d.pages||[]).slice(0,40);
- for(const pg of pages){
-  const path='/'+encodeURIComponent(pg.slug);
-  try{const r=await fetch(path,{cache:'no-store'});add('Published page: /'+pg.slug,r.ok,'HTTP '+r.status,r.ok?'':'Check page publication, slug and Worker page rendering.')}
-  catch(e){add('Published page: /'+pg.slug,false,e.message,'Check the page record and public route.')}
-  if(pg.thumbnail_image&&/^\//.test(pg.thumbnail_image)){
-   try{const r=await fetch(pg.thumbnail_image,{method:'HEAD',cache:'no-store'});add('Thumbnail: /'+pg.slug,r.ok,'HTTP '+r.status,r.ok?'':'Check the media object or thumbnail URL.')}
-   catch(e){add('Thumbnail: /'+pg.slug,false,e.message,'Check that the image exists in R2 and the URL is correct.')}
+  let s=await api(resumeOnly?'/admin/diagnostics/continue':'/admin/diagnostics/start',{method:'POST',body:'{}'});
+  renderDiagnosisStatus(v,s);
+  while(s.active){
+   if(btn)btn.textContent='Scanning… '+s.progress+'%';
+   s=await api('/admin/diagnostics/continue',{method:'POST',body:'{}'});
+   renderDiagnosisStatus(v,s);
   }
- }
- let missingTitle=0,missingDesc=0;
- for(const pg of d.pages||[]){if(!String(pg.title_en||pg.title_ne||'').trim())missingTitle++;if(!String(pg.description_en||pg.description_ne||pg.thumbnail_summary_en||'').trim())missingDesc++}
- add('SEO metadata',missingTitle===0&&missingDesc===0,missingTitle+' pages missing title · '+missingDesc+' pages missing description',missingTitle||missingDesc?'Edit the affected page metadata in Departments → Pages.':'');
- const fail=checks.filter(x=>!x.ok),warnings=checks.filter(x=>x.ok&&x.label.startsWith('Limitation'));
- $('#healthValue',v).textContent=fail.length?'Issues found':(warnings.length?'Checks passed · limitations remain':'All tested checks passed');
- $('#pendingErrors',v).textContent=fail.length+' failed checks';
- $('#seoReport',v).textContent=missingTitle+' missing titles · '+missingDesc+' missing descriptions';
- $('#diagSummary',v).textContent=checks.length+' checks completed · '+fail.length+' failed · '+warnings.length+' scope notes';
- $('#diagnosisReport',v).innerHTML=checks.map(x=>'<div class="item" style="display:block"><b>'+(x.ok?'✓ PASS':'✕ ISSUE')+' · '+esc(x.label)+'</b><p class="muted" style="margin:5px 0">'+esc(x.detail)+'</p>'+(x.fix?'<div class="notice"><b>Next step:</b> '+esc(x.fix)+'</div>':'')+'</div>').join('');
+  if(s.latest_report){$('#diagDetails',v).classList.remove('hidden');$('#diagDetails',v).innerHTML='<h3>Latest Diagnosis Report</h3>'+diagnosisSummaryMarkup(s.latest_report)}
+ }catch(e){
+  $('#diagSignalText',v).textContent='PAUSED / CONNECTION ISSUE · checkpoint saved';
+  $('#diagCurrent',v).textContent=e.message+' · Refresh or press Resume to continue from the last saved check.';
+ }finally{if(btn){btn.disabled=false;btn.textContent='▶ Run Website Diagnosis'}}
 }
+function showDiagnosisDetails(v,kind){
+ const s=$('#diagDetails',v);s.classList.remove('hidden');
+ const reportWindow=s.innerHTML;
+ if(kind==='health'){
+  api('/admin/diagnostics/status').then(x=>{s.innerHTML='<h3>Website Health Details</h3>'+diagnosisSummaryMarkup(x.latest_report)}).catch(e=>s.textContent=e.message);
+ }else api('/admin/diagnostics/status').then(x=>{s.innerHTML='<h3>Latest Full Diagnosis Report</h3>'+diagnosisSummaryMarkup(x.latest_report)}).catch(e=>s.textContent=e.message);
+}
+async function showStorageDetails(v){
+ const box=$('#diagDetails',v);box.classList.remove('hidden');box.innerHTML='<h3>R2 + D1 Storage Status</h3><p class="muted">Checking live bindings…</p>';
+ const results=[];
+ try{const d=await api('/admin/diagnostics');const x=(d.checks||[]).find(c=>c.id==='d1');results.push('<div class="diag-report-row"><b>D1 Database</b><p>'+(x?.ok?'✓ Connected':'✕ Issue')+' · '+esc(x?.detail||'Status unavailable')+'</p></div>')}catch(e){results.push('<div class="diag-report-row"><b>D1 Database</b><p>✕ '+esc(e.message)+'</p></div>')}
+ try{const r=await api('/admin/storage');results.push('<div class="diag-report-row"><b>R2 Bucket · granshi-media</b><p>✓ Listing completed: '+Number(r.objects||0)+' objects · '+(Number(r.bytes||0)/1e9).toFixed(4)+' GB observed · '+Number(r.percent_of_free_tier||0)+'% of 10 GB free-tier reference</p><p>'+esc(r.note||'')+(r.complete?'':' · Partial inventory; total is a lower bound')+'</p></div>')}catch(e){results.push('<div class="diag-report-row"><b>R2 Bucket</b><p>✕ '+esc(e.message)+'</p></div>')}
+ box.innerHTML='<h3>R2 + D1 Storage Status</h3>'+results.join('')+'<p class="muted">R2 observed object sizes are not the invoice GB-month metric. D1 billing/usage totals are not exposed by this Worker binding.</p>';
+}
+async function loadPendingWork(v){
+ try{
+  const x=await api('/admin/pending-work'),total=Number(x.total||0),success=Number(x.success||0),remaining=Number(x.remaining||0),pct=total?Math.round(success/total*100):0;
+  $('#pwTotal',v).textContent=total;$('#pwSuccess',v).textContent=success;$('#pwRemaining',v).textContent=remaining;$('#pwPercent',v).textContent=pct+'%';$('#pwProgress',v).style.width=pct+'%';
+  $('#pendingItems',v).innerHTML=(x.items||[]).map(t=>`<div class="diag-report-row"><div class="row" style="justify-content:space-between"><b>${esc(t.title)}</b><span class="badge ${t.status==='success'?'published':'draft'}">${t.status==='success'?'SUCCESS':'PENDING'}</span></div><div class="row" style="margin-top:8px">${t.status!=='success'?'<button class="btn" data-pwcomplete="'+t.id+'">✓ Mark Success</button>':'<button class="btn danger" data-pwdelete="'+t.id+'">Delete completed task</button>'}</div></div>`).join('')||'<p class="muted">No tasks yet. Add a future task above.</p>';
+  $$('[data-pwcomplete]',v).forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/admin/pending-work/'+b.dataset.pwcomplete+'/complete',{method:'POST',body:'{}'});await loadPendingWork(v)}catch(e){alert(e.message);b.disabled=false}});
+  $$('[data-pwdelete]',v).forEach(b=>b.onclick=async()=>{if(!confirm('Delete this completed task?'))return;b.disabled=true;try{await api('/admin/pending-work/'+b.dataset.pwdelete,{method:'DELETE'});await loadPendingWork(v)}catch(e){alert(e.message);b.disabled=false}});
+ }catch(e){$('#pendingItems',v).textContent='Pending Work unavailable: '+e.message}
+}
+
 async function renderUsefulLinks(v){
   const cfg=await api('/admin/overview');
   let links=[];
