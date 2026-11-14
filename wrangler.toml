@@ -1,10 +1,10 @@
 name = "granshi"
 main = "src/worker.js"
 compatibility_date = "2026-11-05"
+workers_dev = true
 
 [triggers]
 crons = ["*/5 * * * *"] # Worker advances the nightly scan in small resumable batches
-workers_dev = true
 
 [assets]
 directory = "./public"
