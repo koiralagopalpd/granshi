@@ -1078,7 +1078,7 @@ async function api(req, env) {
       const rows=await env.DB.prepare("SELECT * FROM messages WHERE reply_text LIKE ? ORDER BY created_at DESC LIMIT 300").bind('{"outbound":true%').all();
       return json(rows.results||[]);
     }
-    const rows=await env.DB.prepare("SELECT m.* FROM messages m JOIN inbound_email_events e ON e.message_id=m.id WHERE m.reply_text LIKE ? ORDER BY m.created_at DESC LIMIT 500").bind('{"inbound":true%').all();
+    const rows=await env.DB.prepare("SELECT m.* FROM messages m JOIN inbound_email_events e ON e.message_id=m.id WHERE m.reply_text LIKE ? AND m.subject NOT LIKE '[Granshi]%' ORDER BY m.created_at DESC LIMIT 500").bind('{"inbound":true%').all();
     const allowed=[];
     for(const row of (rows.results||[])){
       const event=await env.DB.prepare("SELECT recipients FROM inbound_email_events WHERE message_id=? LIMIT 1").bind(row.id).first();
