@@ -67,6 +67,8 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 @media(max-width:900px){.admin-dept-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.admin-dept-art{height:82px}.admin-dept-copy{padding:8px}.admin-dept-card .item{margin:0}}
 
 .mail-app{padding:16px!important}.mail-top,.mail-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.mail-top h3{margin:0}.mail-switch,.mail-folders{display:flex;gap:7px;flex-wrap:wrap}.mail-list{border:1px solid #e4e8ef;border-radius:12px;overflow:hidden;margin-top:12px}.mail-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 14px;border-bottom:1px solid #e9edf3;background:#fff}.mail-row:last-child{border-bottom:0}.mail-row-main{min-width:0;flex:1}.mail-sender{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:13px}.mail-sender span,.mail-sender small,.mail-row p{color:#718096;font-size:12px}.mail-sender small{margin-left:auto}.mail-subject{display:block;margin-top:6px;font-size:14px}.mail-row p{margin:4px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mail-row-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}.mail-reading{margin-top:14px;background:#fff;border:1px solid #e2e7ef;border-radius:14px;padding:clamp(14px,3vw,26px)}.mail-reading h2{font-size:21px;margin:20px 0 14px;overflow-wrap:anywhere}.mail-meta{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid #e9edf3;font-size:13px}.mail-meta small{margin-left:auto;color:#778195}.mail-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;padding:20px 0;min-height:90px}.mail-compose-overlay{position:fixed;inset:0;z-index:1000;background:#101a2caa;display:flex;align-items:center;justify-content:center;padding:12px}.mail-compose{width:min(820px,100%);height:min(94dvh,900px);background:#fff;border-radius:16px;display:flex;flex-direction:column;box-shadow:0 20px 70px #0005;overflow:hidden}.mail-compose>header,.mail-compose>footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid #e8ecf2}.mail-compose>footer{border-top:1px solid #e8ecf2;border-bottom:0;margin-top:auto}.mail-compose-fields{padding:14px 18px;overflow:auto}.mail-compose-fields label{display:block;font-size:12px;font-weight:750;margin:9px 0 3px}.mail-compose-fields input,.mail-compose-fields textarea{margin:0 0 7px}.mail-compose-fields textarea{min-height:240px;resize:vertical}.mail-toolbar{margin:14px 0}@media(max-width:600px){.mail-row{padding:11px;align-items:flex-start}.mail-row-actions{flex-direction:column;align-items:flex-end}.mail-sender small{margin-left:0}.mail-compose-overlay{padding:0;align-items:stretch}.mail-compose{width:100%;height:100dvh;max-height:100dvh;border-radius:0}.mail-compose-fields textarea{min-height:42vh}.mail-reading{padding:14px}.mail-reading h2{font-size:18px}}
+
+.mail-attachments{margin:15px 0;padding:12px;border:1px dashed #cbd5e1;border-radius:10px}.mail-attachments>label{display:inline-block;padding:9px 13px;background:#f1f5f9;border-radius:8px;cursor:pointer}.mail-attachments input[type=file]{display:block;margin:8px 0;max-width:100%}.mail-attachments small{display:block;color:#64748b}.mail-attachment-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #e8edf3;font-size:13px;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -741,18 +743,39 @@ async function renderMessages(v){
     const prior=$('#mailComposer');if(prior)prior.remove();
     const modal=document.createElement('div');modal.id='mailComposer';modal.className='mail-compose-overlay';
     const from=mode==='contact'?'Granshi <noreply@gopalkoirala.com.np>':'Granshi <info@gopalkoirala.com.np>';
-    modal.innerHTML='<section class="mail-compose"><header><b>'+(mode==='contact'?'Reply to message':mode==='reply'?'Reply email':'New email')+'</b><button class="btn" id="mailClose">✕</button></header><div class="mail-compose-fields"><label>From</label><input disabled value="'+from+'"><label>To</label><input id="mailTo" type="email" value="'+esc(to||'')+'" '+(mode==='contact'?'readonly':'')+'><label>Subject</label><input id="mailSubject" value="'+esc(subject||'')+'"><label>Message</label><textarea id="mailBody" rows="12" placeholder="Write your email…"></textarea>'+(mode==='contact'?'<p class="notice">यो जवाफ noreply@ बाट पठाइन्छ। थप सहयोगका लागि info@ मा नयाँ इमेल गर्न अनुरोध स्वतः जोडिन्छ।</p>':'')+'</div><footer><span id="mailSendStatus" class="muted"></span><button class="btn gold" id="mailSend">Send email</button></footer></section>';
+    modal.innerHTML='<section class="mail-compose"><header><b>'+(mode==='contact'?'Reply to message':mode==='reply'?'Reply email':'New email')+'</b><button class="btn" id="mailClose">✕</button></header><div class="mail-compose-fields"><label>From</label><input disabled value="'+from+'"><label>To</label><input id="mailTo" type="email" value="'+esc(to||'')+'" '+(mode==='contact'?'readonly':'')+'><label>Subject</label><input id="mailSubject" value="'+esc(subject||'')+'"><label>Message</label><textarea id="mailBody" rows="12" placeholder="Write your email…"></textarea><div class="mail-attachments"><label for="mailFiles">📎 Attach files</label><input id="mailFiles" type="file" multiple><small>Maximum 10 files · 15 MB per file · 20 MB total</small><div id="mailAttachmentList"></div></div>'+(mode==='contact'?'<p class="notice">यो जवाफ noreply@ बाट पठाइन्छ। थप सहयोगका लागि info@ मा नयाँ इमेल गर्न अनुरोध स्वतः जोडिन्छ।</p>':'')+'</div><footer><span id="mailSendStatus" class="muted"></span><button class="btn gold" id="mailSend">Send email</button></footer></section>';
     document.body.appendChild(modal);
+    const files=[];
+    const list=$('#mailAttachmentList',modal),status=$('#mailSendStatus',modal);
+    function drawFiles(){
+      list.innerHTML=files.map((f,i)=>'<div class="mail-attachment-item"><span>📎 '+esc(f.name)+' ('+(f.size/1024/1024).toFixed(2)+' MB)</span><button type="button" class="btn" data-remove-attachment="'+i+'">Remove</button></div>').join('');
+      $$('[data-remove-attachment]',list).forEach(b=>b.onclick=()=>{files.splice(Number(b.dataset.removeAttachment),1);drawFiles()});
+    }
+    $('#mailFiles',modal).onchange=async ev=>{
+      const selected=[...ev.target.files];ev.target.value='';
+      for(const file of selected){
+        if(files.length>=10){status.textContent='Maximum 10 attachments allowed.';break}
+        if(file.size>15*1024*1024){status.textContent=file.name+': 15 MB भन्दा ठूलो फाइल स्वीकार हुँदैन।';continue}
+        if(files.reduce((n,x)=>n+x.size,0)+file.size>20*1024*1024){status.textContent='सबै attachment को कुल आकार 20 MB भन्दा बढी हुन मिल्दैन।';break}
+        status.textContent='Uploading '+file.name+'…';
+        try{
+          const response=await fetch('/api/admin/messages/attach',{method:'POST',headers:{'content-type':file.type||'application/octet-stream','x-file-name':encodeURIComponent(file.name)},body:file});
+          const result=await response.json().catch(()=>({}));
+          if(!response.ok)throw new Error(result.error||result.detail||'Upload failed (HTTP '+response.status+')');
+          files.push({...result,size:file.size});drawFiles();status.textContent=files.length+' attachment(s) ready.';
+        }catch(err){status.textContent='Upload failed: '+err.message}
+      }
+    };
     $('#mailClose',modal).onclick=()=>modal.remove();
     $('#mailSend',modal).onclick=async()=>{
-      const recipient=$('#mailTo',modal).value.trim(),sub=$('#mailSubject',modal).value.trim(),textBody=$('#mailBody',modal).value.trim(),status=$('#mailSendStatus',modal),button=$('#mailSend',modal);
+      const recipient=$('#mailTo',modal).value.trim(),sub=$('#mailSubject',modal).value.trim(),textBody=$('#mailBody',modal).value.trim(),button=$('#mailSend',modal);
       if(!recipient||!/^\S+@\S+\.\S+$/.test(recipient)){status.textContent='Valid recipient email required.';return}
       if(!sub||!textBody){status.textContent='Subject and message are required.';return}
-      button.disabled=true;status.textContent='Sending…';
+      button.disabled=true;status.textContent='Sending email…';
       try{
-        if(mode==='contact')await api('/admin/messages/'+id+'/reply',{method:'POST',body:JSON.stringify({reply_text:textBody})});
-        else if(mode==='reply')await api('/admin/email/'+id+'/reply',{method:'POST',body:JSON.stringify({subject:sub,body:textBody})});
-        else await api('/admin/email/send',{method:'POST',body:JSON.stringify({to:recipient,subject:sub,body:textBody})});
+        if(mode==='contact')await api('/admin/messages/'+id+'/reply',{method:'POST',body:JSON.stringify({reply_text:textBody,attachments:files})});
+        else if(mode==='reply')await api('/admin/email/'+id+'/reply',{method:'POST',body:JSON.stringify({subject:sub,body:textBody,attachments:files})});
+        else await api('/admin/email/send',{method:'POST',body:JSON.stringify({to:recipient,subject:sub,body:textBody,attachments:files})});
         status.textContent='Email sent successfully.';setTimeout(()=>{modal.remove();draw()},600);
       }catch(err){status.textContent=err.message;button.disabled=false}
     };
