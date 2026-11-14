@@ -19,6 +19,10 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 #tabTitle{font-size:17px!important;color:#25344d!important;margin:0 0 8px!important}
 
 
+
+.diag-live-metrics{display:flex;gap:14px;flex-wrap:wrap;margin-top:9px;font-size:11px;color:#65748a}
+.diag-live-metrics b{color:#1c2d43;margin-left:3px}
+
 .diag-signal{display:flex;align-items:center;gap:9px;background:#f1f5f9;border:1px solid #dbe3ed;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13px;font-weight:800;color:#26364c}
 .diag-signal.is-running{background:#eaf4ff;border-color:#8fc6ff;color:#07569b}
 .signal-dot{width:10px;height:10px;border-radius:50%;background:#8995a5;display:inline-block;flex:0 0 auto}
@@ -195,7 +199,7 @@ async function renderAdminOverview(v){
   <div class="row" style="justify-content:space-between"><div><h2>Granshi Admin Control Center</h2><p class="muted">Operational dashboard and diagnostics</p></div><button class="btn gold" id="runDiagnosis">▶ Run Website Diagnosis</button></div>
   <div id="diagSummary" class="diag-signal"><span class="signal-dot"></span><span id="diagSignalText">Checking saved scan status…</span><span id="diagProgressText" style="margin-left:auto">—</span></div>
   <div class="diag-progress"><i id="diagProgressBar"></i></div>
-  <div id="diagCurrent" class="muted" style="font-size:12px;margin-top:6px">Progress and last checkpoint will appear here.</div>
+  <div id="diagCurrent" class="muted" style="font-size:12px;margin-top:6px">Progress and last checkpoint will appear here.</div><div class="diag-live-metrics"><span>Health <b id="diagMetricHealth">—</b></span><span>Issues <b id="diagMetricIssues">—</b></span><span>Solution coverage <b id="diagMetricSolutions">—</b></span></div>
  </div>
  <div class="diag-cards">
   <button class="diag-card" id="diagOpenRun"><small>LIVE DIAGNOSIS</small><strong id="diagCardRun">Not scanned</strong><span id="diagCardRunSub">Tap for scan controls</span></button>
@@ -241,6 +245,15 @@ function renderDiagnosisStatus(v,s){
  $('#diagProgressText',v).textContent=active?pct+'%':(report?report.total_checks+' checks':'—');
  $('#diagProgressBar',v).style.width=(active?pct:(report?100:0))+'%';
  $('#diagCurrent',v).textContent=active?'Current check: '+(current?.label||'Preparing next batch')+' · '+done+'/'+total+' checks · Updated '+(s.updated_at||'—'):(report?'Last completed: '+report.completed_at+' · '+report.issues+' issues · '+report.health_percent+'% health':'No saved scan yet.');
+ const partial=(s.checks||[]).filter(x=>x.status==='pass'||x.status==='issue');
+ const issueCount=partial.filter(x=>!x.ok).length;
+ const documented=partial.filter(x=>!x.ok&&String(x.solution||'').trim()).length;
+ const health=report?report.health_percent:(partial.length?Math.round((partial.length-issueCount)/partial.length*100):null);
+ const issues=report?report.issues:issueCount;
+ const solutions=report?report.solution_percent:(issueCount?Math.round(documented/issueCount*100):0);
+ $('#diagMetricHealth',v).textContent=health===null?'—':health+'%';
+ $('#diagMetricIssues',v).textContent=active?issueCount:(report?report.issues:'—');
+ $('#diagMetricSolutions',v).textContent=report||active?solutions+'%':'—';
  $('#diagCardRun',v).textContent=active?'Scanning '+pct+'%':(s.status==='complete'?'Completed':'Not scanned');
  $('#diagCardRunSub',v).textContent=active?'At: '+(current?.label||'next checkpoint'):'Tap to inspect scan status';
  $('#diagCardHealth',v).textContent=report?report.health_percent+'%':'—';
@@ -281,7 +294,7 @@ function showDiagnosisDetails(v,kind){
 async function showStorageDetails(v){
  const box=$('#diagDetails',v);box.classList.remove('hidden');box.innerHTML='<h3>R2 + D1 Storage Status</h3><p class="muted">Checking live bindings…</p>';
  const results=[];
- try{const d=await api('/admin/diagnostics');const x=(d.checks||[]).find(c=>c.id==='d1');results.push('<div class="diag-report-row"><b>D1 Database</b><p>'+(x?.ok?'✓ Connected':'✕ Issue')+' · '+esc(x?.detail||'Status unavailable')+'</p></div>')}catch(e){results.push('<div class="diag-report-row"><b>D1 Database</b><p>✕ '+esc(e.message)+'</p></div>')}
+ try{const d=await api('/admin/diagnostics');const checks=d.checks||[];const x=checks.find(c=>c.id==='d1');results.push('<div class="diag-report-row"><b>D1 Database</b><p>'+(x?.ok?'✓ Connected':'✕ Issue')+' · '+esc(x?.detail||'Status unavailable')+'</p>'+checks.filter(c=>String(c.id||'').startsWith('table_')).map(c=>'<p>'+(c.ok?'✓ ':'✕ ')+esc(c.label)+' · '+esc(c.detail)+'</p>').join('')+'</div>')}catch(e){results.push('<div class="diag-report-row"><b>D1 Database</b><p>✕ '+esc(e.message)+'</p></div>')}
  try{const r=await api('/admin/storage');results.push('<div class="diag-report-row"><b>R2 Bucket · granshi-media</b><p>✓ Listing completed: '+Number(r.objects||0)+' objects · '+(Number(r.bytes||0)/1e9).toFixed(4)+' GB observed · '+Number(r.percent_of_free_tier||0)+'% of 10 GB free-tier reference</p><p>'+esc(r.note||'')+(r.complete?'':' · Partial inventory; total is a lower bound')+'</p></div>')}catch(e){results.push('<div class="diag-report-row"><b>R2 Bucket</b><p>✕ '+esc(e.message)+'</p></div>')}
  box.innerHTML='<h3>R2 + D1 Storage Status</h3>'+results.join('')+'<p class="muted">R2 observed object sizes are not the invoice GB-month metric. D1 billing/usage totals are not exposed by this Worker binding.</p>';
 }
