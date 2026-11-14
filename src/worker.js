@@ -498,26 +498,37 @@ async function createDiagnosisRun(env, triggerType="manual") {
     .bind(triggerType,crypto.randomUUID(),now,now,JSON.stringify(checks),old?.latest_report_json||null).run();
 }
 async function advanceDiagnosis(env) {
-  const state=await env.DB.prepare("SELECT * FROM diagnostics_state WHERE id=1").first();
-  if(!state || state.status!=="running") return state;
-  const checks=JSON.parse(state.checks_json||"[]");
-  let index=Number(state.current_index||0);
-  const end=Math.min(checks.length,index+DIAG_BATCH_SIZE);
-  for(;index<end;index++) {
-    const result=await runDiagnosisCheck(env,checks[index]);
-    checks[index]={...checks[index],...result,status:result.ok?"pass":"issue",checked_at:new Date().toISOString()};
-  }
-  const now=new Date().toISOString();
-  if(index>=checks.length) {
-    const evaluable=checks.filter(x=>x.status==="pass"||x.status==="issue");
-    const issues=evaluable.filter(x=>!x.ok);
-    const documented=issues.filter(x=>String(x.solution||"").trim()).length;
-    const report={run_id:state.run_id,trigger_type:state.trigger_type,started_at:state.started_at,completed_at:now,checks,total_checks:checks.length,evaluable_checks:evaluable.length,passed:evaluable.length-issues.length,issues:issues.length,health_percent:evaluable.length?Math.round((evaluable.length-issues.length)/evaluable.length*100):0,solution_percent:issues.length?Math.round(documented/issues.length*100):100,verified_resolutions:issues.filter(x=>x.resolved===true).length,limitations:["Browser console errors, private account billing metrics and Cloudflare runtime logs are not available to this scheduled Worker scan.","R2 inventory size is checked separately in the Storage card; it is not the Cloudflare monthly GB-month billing meter."]};
-    await env.DB.prepare("UPDATE diagnostics_state SET status='complete',updated_at=?,completed_at=?,current_index=?,checks_json=?,latest_report_json=? WHERE id=1")
-      .bind(now,now,index,JSON.stringify(checks),JSON.stringify(report)).run();
-  } else {
-    await env.DB.prepare("UPDATE diagnostics_state SET updated_at=?,current_index=?,checks_json=? WHERE id=1")
-      .bind(now,index,JSON.stringify(checks)).run();
+  const nowDate=new Date();
+  const now=nowDate.toISOString();
+  const leaseUntil=new Date(nowDate.getTime()+45000).toISOString();
+  const claim=await env.DB.prepare("UPDATE diagnostics_state SET lease_until=? WHERE id=1 AND status='running' AND (lease_until IS NULL OR lease_until<?)")
+    .bind(leaseUntil,now).run();
+  if(!claim.meta?.changes) return await env.DB.prepare("SELECT * FROM diagnostics_state WHERE id=1").first();
+  try {
+    const state=await env.DB.prepare("SELECT * FROM diagnostics_state WHERE id=1").first();
+    if(!state || state.status!=="running") return state;
+    const checks=JSON.parse(state.checks_json||"[]");
+    let index=Number(state.current_index||0);
+    const end=Math.min(checks.length,index+DIAG_BATCH_SIZE);
+    for(;index<end;index++) {
+      const result=await runDiagnosisCheck(env,checks[index]);
+      checks[index]={...checks[index],...result,status:result.ok?"pass":"issue",checked_at:new Date().toISOString()};
+    }
+    const updated=new Date().toISOString();
+    if(index>=checks.length) {
+      const evaluable=checks.filter(x=>x.status==="pass"||x.status==="issue");
+      const issues=evaluable.filter(x=>!x.ok);
+      const documented=issues.filter(x=>String(x.solution||"").trim()).length;
+      const report={run_id:state.run_id,trigger_type:state.trigger_type,started_at:state.started_at,completed_at:updated,checks,total_checks:checks.length,evaluable_checks:evaluable.length,passed:evaluable.length-issues.length,issues:issues.length,health_percent:evaluable.length?Math.round((evaluable.length-issues.length)/evaluable.length*100):0,solution_percent:issues.length?Math.round(documented/issues.length*100):100,verified_resolutions:issues.filter(x=>x.resolved===true).length,limitations:["Browser console errors, private account billing metrics and Cloudflare runtime logs are not available to this scheduled Worker scan.","R2 inventory size is checked separately in the Storage card; it is not the Cloudflare monthly GB-month billing meter."]};
+      await env.DB.prepare("UPDATE diagnostics_state SET status='complete',updated_at=?,completed_at=?,current_index=?,checks_json=?,latest_report_json=?,lease_until=NULL WHERE id=1")
+        .bind(updated,updated,index,JSON.stringify(checks),JSON.stringify(report)).run();
+    } else {
+      await env.DB.prepare("UPDATE diagnostics_state SET updated_at=?,current_index=?,checks_json=?,lease_until=NULL WHERE id=1")
+        .bind(updated,index,JSON.stringify(checks)).run();
+    }
+  } catch(e) {
+    await env.DB.prepare("UPDATE diagnostics_state SET lease_until=NULL,updated_at=? WHERE id=1").bind(new Date().toISOString()).run();
+    throw e;
   }
   return await env.DB.prepare("SELECT * FROM diagnostics_state WHERE id=1").first();
 }
