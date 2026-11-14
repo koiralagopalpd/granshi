@@ -836,9 +836,9 @@ async function renderMessages(v){
           try{await api('/admin/messages/'+btn.dataset.deleteMessage,{method:'DELETE'});await draw()}
           catch(err){alert('Message Delete असफल: '+err.message);btn.disabled=false}
         });
-        $$('[data-open-message]').forEach(btn=>btn.onclick=()=>{
+        $('[data-open-message]').forEach(btn=>btn.onclick=async()=>{
           const m=list.find(x=>String(x.id)===btn.dataset.openMessage);if(!m)return;
-          api('/admin/read/'+m.id,{method:'POST'}).then(()=>{m.is_read=1}).catch(e=>console.warn('Could not save message read state',e));
+          try{await api('/admin/read/'+m.id,{method:'POST'});m.is_read=1}catch(e){console.warn('Could not save message read state',e)}
           const pr=parseReplyDisplay(m.reply_text);
           $('.mail-list').classList.add('hidden');$('.mail-app>p.muted').classList.add('hidden');$('#mailDetail').innerHTML='<div class="mail-detail-full"><div class="row" style="justify-content:space-between"><button class="btn" id="backMessages">← Back to list</button><button class="btn danger" id="deleteOpenMessage">🗑 Delete</button></div><h2>'+esc(m.subject||'(no subject)')+'</h2><div class="mail-meta"><b>'+esc(m.name)+'</b> &lt;'+esc(m.email)+'&gt;<small>'+date(m.created_at)+'</small></div><div class="mail-body">'+esc(m.body)+'</div>'+(pr.text?'<hr><h4>Previous reply</h4><div class="mail-body">'+esc(pr.text)+'</div>':'')+'<button class="btn gold" id="replyContact">↩ Reply</button></div>';
           $('#backMessages').onclick=()=>{$('.mail-list').classList.remove('hidden');$('.mail-app>p.muted').classList.remove('hidden');$('#mailDetail').innerHTML=''};
