@@ -250,10 +250,10 @@ function renderDiagnosisStatus(v,s){
  const documented=partial.filter(x=>!x.ok&&String(x.solution||'').trim()).length;
  const health=report?report.health_percent:(partial.length?Math.round((partial.length-issueCount)/partial.length*100):null);
  const issues=report?report.issues:issueCount;
- const solutions=report?report.solution_percent:(issueCount?Math.round(documented/issueCount*100):0);
+ const solutions=report?report.solution_percent:(issueCount?Math.round(documented/issueCount*100):null);
  $('#diagMetricHealth',v).textContent=health===null?'—':health+'%';
  $('#diagMetricIssues',v).textContent=active?issueCount:(report?report.issues:'—');
- $('#diagMetricSolutions',v).textContent=report||active?solutions+'%':'—';
+ $('#diagMetricSolutions',v).textContent=report||active?(solutions===null?'N/A':solutions+'%'):'—';
  $('#diagCardRun',v).textContent=active?'Scanning '+pct+'%':(s.status==='complete'?'Completed':'Not scanned');
  $('#diagCardRunSub',v).textContent=active?'At: '+(current?.label||'next checkpoint'):'Tap to inspect scan status';
  $('#diagCardHealth',v).textContent=report?report.health_percent+'%':'—';
