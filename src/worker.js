@@ -258,7 +258,7 @@ function granshiHeader(lang = "en") {
 }
 
 const GRANSHI_HEADER_CSS = `
-  #granshi-site-header{position:relative;z-index:10000;width:100%;margin:0;overflow:hidden;background:linear-gradient(110deg,#0878cf 0%,#dff5ff 28%,#1769b6 58%,#082e68 100%);color:#fff;border-bottom:5px solid #e8ad27;box-shadow:0 5px 20px rgba(4,28,68,.22);font-family:system-ui,-apple-system,sans-serif}
+  #granshi-site-header{position:relative;z-index:10000;width:100%;margin:0;overflow:hidden;background:linear-gradient(110deg,rgba(8,120,207,.70),rgba(223,245,255,.46) 28%,rgba(23,105,182,.62) 58%,rgba(8,46,104,.78)),url("/granshi-brand.webp") center 43%/cover no-repeat;color:#fff;border-bottom:5px solid #e8ad27;box-shadow:0 5px 20px rgba(4,28,68,.22);font-family:system-ui,-apple-system,sans-serif}
   #granshi-site-header:before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 15% 0%,rgba(255,255,255,.82),transparent 38%),linear-gradient(180deg,rgba(255,255,255,.08),rgba(4,33,83,.22));pointer-events:none}
   #granshi-site-header:after{content:"";position:absolute;left:-3%;right:-3%;bottom:-27px;height:40px;background:#0b3d86;border-top:4px solid #f2bd37;border-radius:50% 50% 0 0/55% 55% 0 0;pointer-events:none}
   #granshi-site-header *{box-sizing:border-box}
