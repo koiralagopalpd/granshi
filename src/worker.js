@@ -1801,50 +1801,37 @@ async function renderAnyPage(page, env, u) {
         html = html.replace(/<\/body>/i, widget + "\n</body>");
       else html += widget;
     }
-    // Preserve each ZIP page's own header and language controls. Replace only its Granshi wordmark.
-    const granshiZipBrand = `<style id="granshi-zip-brand-style">
-      .granshi-zip-brand-image{display:block;width:124px;max-width:34vw;height:auto;max-height:44px;object-fit:contain}
-      @media(max-width:480px){.granshi-zip-brand-image{width:108px;max-height:40px}}
+    // ZIP pages use the same site-owned header as standard pages. Their own header and language controls are removed.
+    const siteLang = u.searchParams.get("lang") === "ne" ? "ne" : "en";
+    const siteHeader = `<style id="granshi-site-header-style">
+      #granshi-site-header{position:sticky;top:0;z-index:2147483000;width:100%;background:#101a2cf5;color:#fff;border-bottom:1px solid #ffffff20;font-family:system-ui,sans-serif;box-sizing:border-box}
+      #granshi-site-header *{box-sizing:border-box}
+      #granshi-site-header .granshi-site-nav{width:min(960px,92%);height:64px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+      #granshi-site-header .granshi-site-brand img{display:block;width:132px;max-width:38vw;height:auto;max-height:44px;object-fit:contain}
+      #granshi-site-header .granshi-site-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+      #granshi-site-header a{text-decoration:none;white-space:nowrap}
+      #granshi-site-header .granshi-site-lang{display:inline-block;padding:10px 13px;border:1px solid #ffffff70;border-radius:10px;background:#ffffff12;color:#fff;font:600 13px system-ui,sans-serif}
+      #granshi-site-header .granshi-site-home{display:inline-block;padding:12px 18px;border-radius:10px;font-weight:700;background:linear-gradient(135deg,#f3dfa9,#e5c77e);color:#182235}
+      @media(max-width:480px){#granshi-site-header .granshi-site-nav{height:58px}#granshi-site-header .granshi-site-brand img{width:112px;max-height:40px}#granshi-site-header .granshi-site-home{padding:10px 12px}}
     </style>
-    <script id="granshi-zip-brand-script">
+    <script id="granshi-site-header-script">
     (function(){
-      function replaceBrand(){
-        var roots=document.querySelectorAll('header,nav,[role="banner"],[class*="header"],[id*="header"],[class*="navbar"],[id*="navbar"]');
-        for(var r=0;r<roots.length;r++){
-          var nodes=roots[r].querySelectorAll('a,span,div,h1,h2,p,strong');
-          for(var i=0;i<nodes.length;i++){
-            var el=nodes[i];
-            if(el.querySelector('img,select,button,input,[aria-label*="language" i],[class*="lang" i],[id*="lang" i]')) continue;
-            var label=(el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
-            if(label!=='granshi' && label!=='granshi home') continue;
-            if(el.querySelector('a')) continue;
-            var img=document.createElement('img');
-            img.src='/granshi-brand.webp';
-            img.alt='Granshi';
-            img.className='granshi-zip-brand-image';
-            el.textContent='';
-            el.appendChild(img);
-            el.setAttribute('data-granshi-logo-replaced','true');
-            return true;
-          }
-        }
-        return false;
+      var lang=__LANG__;
+      var header='<header id="granshi-site-header"><div class="granshi-site-nav"><a class="granshi-site-brand" href="/" aria-label="Granshi Home"><img src="/granshi-brand.webp" alt="Granshi"></a><div class="granshi-site-actions"><a class="granshi-site-lang" href="?lang='+(lang==="en"?"ne":"en")+'">'+(lang==="en"?"नेपाली":"English")+'</a><a class="granshi-site-home" href="/">← Home</a></div></div></header>';
+      function install(){
+        if(!document.body)return;
+        document.querySelectorAll('body>header:not(#granshi-site-header),body>nav,body>.header,body>#header,body>.navbar,body>#navbar,body>.site-header,body>#site-header,body>[role="banner"]:not(#granshi-site-header)').forEach(function(el){el.remove()});
+        if(!document.getElementById('granshi-site-header'))document.body.insertAdjacentHTML('afterbegin',header);
       }
-      function start(){
-        if(replaceBrand()) return;
-        var observer=new MutationObserver(function(){
-          if(replaceBrand()) observer.disconnect();
-        });
-        observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
-        setTimeout(function(){observer.disconnect()},8000);
-      }
-      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true});
-      else start();
+      if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
+      var observer=new MutationObserver(install);
+      observer.observe(document.documentElement,{childList:true,subtree:true});
+      setTimeout(function(){observer.disconnect();install()},5000);
     })();
-    </script>`;
-    if (!html.includes('id="granshi-zip-brand-script"')) {
-      if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, (m) => m + granshiZipBrand);
-      else html = granshiZipBrand + html;
+    </script>`.replace("__LANG__", JSON.stringify(siteLang));
+    if (!html.includes('id="granshi-site-header-script"')) {
+      if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, (m) => m + siteHeader);
+      else html = siteHeader + html;
     }
     const contentNotice = '<footer id="granshi-content-note" style="margin:36px auto 0;padding:22px 20px;background:#101b35;color:#d4dbea;font:13px/1.7 system-ui,sans-serif"><div style="max-width:1050px;margin:auto"><p><strong>सामग्रीसम्बन्धी सूचना:</strong> यस पेजमा प्रस्तुत जानकारी सार्वजनिक रूपमा उपलब्ध अनलाइन स्रोत तथा सन्दर्भहरूको अध्ययन र संकलनमा आधारित हुन सक्छ। प्रकाशित सबै कुरा स्वतन्त्र रूपमा शतप्रतिशत प्रमाणित वा त्रुटिरहित छन् भन्ने ग्यारेन्टी छैन। महत्त्वपूर्ण निर्णय गर्नुअघि आधिकारिक तथा विश्वसनीय मूल स्रोतबाट पुष्टि गर्नुहोस्। कुनै सुझाव, सुधार वा त्रुटि भेटिएमा <a href="/legal/contact" style="color:#edbd62">Contact Us</a> मार्फत जानकारी दिनुहोस्।</p><p><strong>Content note:</strong> Information on this page may be compiled from publicly available online sources and references. We cannot guarantee that every statement has been independently verified or is error-free. Please verify important information with authoritative original sources. Suggestions and corrections are welcome via <a href="/legal/contact" style="color:#edbd62">Contact Us</a>.</p></div></footer>';
     if (!html.includes('id="granshi-content-note"')) {
