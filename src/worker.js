@@ -301,7 +301,7 @@ async function sendEmail(env, { to, subject, html, replyTo, attachments = [], fr
       });
     }
 
-    const brandedFooter = '<div style="margin:24px 0 0;padding:14px 0 0;border-top:1px solid #e7eaf0;font:12px/1.55 Arial,sans-serif;color:#667085"><a href="https://gopalkoirala.com.np" style="display:inline-block;text-decoration:none"><img src="https://gopalkoirala.com.np/granshi-brand.webp" alt="Granshi" width="88" style="display:block;width:88px;max-width:100%;height:auto;border:0"></a><p style="margin:8px 0 0">Granshi · Learn Together · Explore Freely · Grow Together</p><p style="margin:5px 0 0"><a href="https://gopalkoirala.com.np/legal/about" style="color:#667085;text-decoration:none">About Granshi</a> · <a href="https://gopalkoirala.com.np/legal/contact" style="color:#667085;text-decoration:none">Contact</a></p></div>';
+    const brandedFooter = '<div style="margin:24px 0 0;padding:14px 0 0;border-top:1px solid #e7eaf0;font:12px/1.55 Arial,sans-serif;color:#667085"><a href="https://gopalkoirala.com.np" style="display:inline-block;text-decoration:none"><img src="https://gopalkoirala.com.np/granshi-brand.webp" alt="Granshi" width="72" style="display:block;width:72px;max-width:100%;height:auto;border:0"></a><p style="margin:8px 0 0">Granshi · Learn Together · Explore Freely · Grow Together</p></div>';
     const emailHtml = String(html || '');
     const footerHtml = brandedFooter.replace('<div style=', '<div id="granshi-email-footer" style=');
     const finalHtml = emailHtml.includes('granshi-email-footer') ? emailHtml : /<\/body>/i.test(emailHtml) ? emailHtml.replace(/<\/body>/i, footerHtml + '</body>') : emailHtml + footerHtml;
