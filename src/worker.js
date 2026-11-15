@@ -1823,8 +1823,8 @@ async function renderAnyPage(page, env, u) {
     if (!html.includes('id="granshi-site-header"')) {
       if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, (m) => m + zipHeaderCss);
       else html = zipHeaderCss + html;
-      if (/<header\\b[^>]*>[\\s\\S]*?<\\/header>/i.test(html)) {
-        html = html.replace(/<header\\b[^>]*>[\\s\\S]*?<\\/header>/i, granshiHeader(lang));
+      if (/<header\b[^>]*>[\s\S]*?<\/header>/i.test(html)) {
+        html = html.replace(/<header\b[^>]*>[\s\S]*?<\/header>/i, granshiHeader(lang));
       } else if (/<body[^>]*>/i.test(html)) {
         html = html.replace(/<body[^>]*>/i, (m) => m + granshiHeader(lang));
       } else {
