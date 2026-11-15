@@ -1,4 +1,4 @@
-# GRANSHI CMS v3 — Full Free-Tier Power
+# GRANSHI CMS v4 — Department-Centric CMS
 
 **Cloudflare Workers + D1 + R2**  
 Domain target: `gopalkoirala.com.np`  
@@ -35,7 +35,7 @@ Completely free-tier friendly. No paid services required (optional Resend for re
 
 ---
 
-## Deploy (free)
+## Initial deployment (new environment only)
 
 ```bash
 npm install
@@ -128,10 +128,23 @@ Enough for a growing personal / brand site.
 
 ## Security
 
-- One admin only  
-- PBKDF2 10,000 iterations  
-- HttpOnly + Secure session cookie  
-- Never commit secrets  
+- Single-admin login with PBKDF2 password hashing and signed session cookie.
+- Session cookies are HttpOnly, Secure and SameSite=Lax.
+- Login lockout, recovery authorization, session revocation and security-event logging are managed by the Admin Security feature.
+- Never commit secrets or place them in public files.
+
+## Repository maintenance
+
+- `src/worker.js` is the Cloudflare Worker/API implementation.
+- `public/index.html` and `public/admin/index.html` are the public site and Admin interface.
+- `database/0001_*.sql` through `database/0009_*.sql` are ordered, historical D1 migrations. Keep every applied migration; do not edit or delete an old migration to clean up the repository. Add a new numbered migration for future schema changes.
+- `wrangler.toml` contains the Worker, D1, R2 and asset bindings. Keep credentials in Cloudflare Worker secrets, never in this file.
+- `.github/workflows/validate.yml` checks JavaScript syntax and migration compatibility on pushes and pull requests to `main`.
+- `database/README.txt` contains the short D1 migration commands.
+
+The GitHub Actions checks validate repository code and SQL against fresh/in-memory SQLite databases. They do not prove that production Cloudflare bindings, secrets, DNS, R2, Resend webhooks or the live website are working.
+
+Before changing or deleting a tracked file, search its references and confirm it is not used by the Worker, public site, Admin, migrations or deployment configuration. Do not delete historical migrations.  
 
 ---
 
