@@ -1820,8 +1820,8 @@ async function renderAnyPage(page, env, u) {
     if (!/id=["']granshi-site-header["']/.test(html)) {
       const sharedHeader = granshiHeader(lang);
       const sharedStyle = "<style>" + GRANSHI_HEADER_CSS + "</style>";
-      if (/<\\/head>/i.test(html)) html = html.replace(/<\\/head>/i, sharedStyle + "\\n</head>");
-      else html = sharedStyle + html;
+      if (/<\/head>/i.test(html)) html = html.replace(/<\/head>/i, sharedStyle + "\n</head>");
+      if (/<body\b[^>]*>/i.test(html)) html = html.replace(/<body\b[^>]*>/i, (m) => m + "\n" + sharedHeader);
       if (/<body\\b[^>]*>/i.test(html)) html = html.replace(/<body\\b[^>]*>/i, (m) => m + "\\n" + sharedHeader);
       else html = sharedHeader + html;
     }
