@@ -317,6 +317,14 @@ async function showStorageDetails(v){
  box.innerHTML='<h3>R2 + D1 Storage Status</h3>'+results.join('')+'<p class="muted">R2 observed object sizes are not the invoice GB-month metric. D1 billing/usage totals are not exposed by this Worker binding.</p>';
 }
 async function loadContentProject(v){
+ // Bind the open/close control before the API request. If the D1 migration
+ // is missing or the API temporarily fails, the project panel must still open
+ // and display the actual error instead of leaving the button inert.
+ const toggle=$('#cpToggle',v);
+ if(toggle && !toggle.dataset.bound){
+  toggle.dataset.bound='1';
+  toggle.onclick=()=>{const w=$('#cpWorkspace',v);w.classList.toggle('hidden');toggle.textContent=w.classList.contains('hidden')?'Open Project':'Close Project';};
+ }
  try{
   const x=await api('/admin/content-project');
   const total=Number(x.total||0),completed=Number(x.completed||0),target=Number(x.target||800),pct=target?Math.round(completed/target*100):0;
@@ -324,7 +332,7 @@ async function loadContentProject(v){
   const depts=x.departments||[];
   $('#cpDepartments',v).innerHTML='<h4 style="margin:8px 0">Departments</h4>'+depts.map(d=>{const n=Number(d.total_topics||0),done=Number(d.completed_topics||0);return '<button class="item" style="width:100%;text-align:left;cursor:pointer" data-cp-dept="'+d.id+'"><span><b>'+esc(d.title_en)+'</b><br><small class="muted">'+esc(d.title_ne||'')+'</small></span><span class="badge '+(done===n?'published':'draft')+'">'+done+'/'+n+'</span></button>'}).join('');
   $('#cpCategories',v).innerHTML='';$('#cpTopics',v).innerHTML='';
-  $('#cpToggle',v).onclick=()=>{const w=$('#cpWorkspace',v);w.classList.toggle('hidden');$('#cpToggle',v).textContent=w.classList.contains('hidden')?'Open Project':'Close Project';};
+
   $('[data-cp-dept]',v).forEach(b=>b.onclick=async()=>{const id=b.dataset.cpDept;$('#cpTopics',v).innerHTML='';$('#cpCategories',v).innerHTML='<p class="muted">Loading categories…</p>';try{const r=await api('/admin/content-project/categories?department_id='+id);$('#cpCategories',v).innerHTML='<h4>Categories</h4>'+(r.categories||[]).map(c=>'<button class="item" style="width:100%;text-align:left;cursor:pointer" data-cp-cat="'+c.id+'"><span><b>'+esc(c.title_en)+'</b><br><small class="muted">'+esc(c.title_ne||'')+'</small></span><span class="badge '+(Number(c.completed_topics||0)===Number(c.total_topics||0)?'published':'draft')+'">'+Number(c.completed_topics||0)+'/'+Number(c.total_topics||0)+'</span></button>').join('');$('[data-cp-cat]',v).forEach(c=>c.onclick=()=>loadContentTopics(v,c.dataset.cpCat));}catch(e){$('#cpCategories',v).textContent=e.message;}});
  }catch(e){$('#cpDepartments',v).textContent='Content project unavailable: '+e.message;}
 }
