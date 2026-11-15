@@ -1,7 +1,7 @@
 name: Validate Granshi
 on:
   push:
-    branches: [main, security/admin-lockout-session-ci]
+    branches: [main]
   pull_request:
     branches: [main]
 jobs:
