@@ -302,7 +302,9 @@ async function sendEmail(env, { to, subject, html, replyTo, attachments = [], fr
     }
 
     const brandedFooter = '<div style="margin:30px 0 0;padding:18px 0 0;border-top:1px solid #e7eaf0;font:13px/1.6 Arial,sans-serif;color:#667085"><a href="https://gopalkoirala.com.np" style="display:inline-block;text-decoration:none"><img src="https://gopalkoirala.com.np/granshi-brand.webp" alt="Granshi" width="132" style="display:block;width:132px;max-width:100%;height:auto;border:0"></a><p style="margin:12px 0 0">Granshi · Learn Together · Explore Freely · Grow Together</p><p style="margin:6px 0 0"><a href="https://gopalkoirala.com.np/legal/contact" style="color:#8a6b2a;text-decoration:none;font-weight:700">Contact Us / सम्पर्क गर्नुहोस्</a> · <a href="https://gopalkoirala.com.np" style="color:#667085;text-decoration:none">gopalkoirala.com.np</a></p></div>';
-    const finalHtml = String(html || '').replace(/<\/body>/i, brandedFooter + '</body>');
+    const emailHtml = String(html || '');
+    const footerHtml = brandedFooter.replace('<div style=', '<div id="granshi-email-footer" style=');
+    const finalHtml = emailHtml.includes('granshi-email-footer') ? emailHtml : /<\\/body>/i.test(emailHtml) ? emailHtml.replace(/<\\/body>/i, footerHtml + '</body>') : emailHtml + footerHtml;
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
