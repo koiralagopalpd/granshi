@@ -1532,6 +1532,37 @@ export default {
   },
   async fetch(req, env) {
     const u = new URL(req.url);
+    // Public SEO routes: generate from currently published database content.
+    if (u.pathname === "/sitemap.xml") {
+      const origin = u.origin;
+      const xmlEscape = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+      const urls = new Map();
+      const addUrl = (path, updatedAt = "") => {
+        const loc = origin + path;
+        const entry = { loc, updatedAt: String(updatedAt || "") };
+        const previous = urls.get(loc);
+        if (!previous || entry.updatedAt > previous.updatedAt) urls.set(loc, entry);
+      };
+      addUrl("/");
+      const pages = await safeAll(env, "SELECT slug,updated_at FROM pages WHERE published=1 AND slug IS NOT NULL AND slug<>'' ORDER BY updated_at DESC LIMIT 5000");
+      for (const page of pages) addUrl("/" + encodeURIComponent(String(page.slug).split("/").pop()), page.updated_at);
+      const departments = await safeAll(env, "SELECT slug FROM departments WHERE visible=1 AND slug IS NOT NULL AND slug<>'' ORDER BY sort_order LIMIT 500");
+      for (const dept of departments) addUrl("/dept/" + encodeURIComponent(dept.slug));
+      for (const slug of ["about","contact","privacy","terms","disclaimer","cookies","copyright"]) addUrl("/legal/" + slug);
+      const entries = [...urls.values()].sort((a,b) => a.loc.localeCompare(b.loc)).map(item =>
+        "<url><loc>" + xmlEscape(item.loc) + "</loc>" +
+        (item.updatedAt && !Number.isNaN(Date.parse(item.updatedAt)) ? "<lastmod>" + new Date(item.updatedAt).toISOString() + "</lastmod>" : "") +
+        "</url>"
+      ).join("");
+      return new Response('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + entries + "</urlset>", {
+        headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=300" }
+      });
+    }
+    if (u.pathname === "/robots.txt") {
+      return new Response("User-agent: *\\nAllow: /\\nDisallow: /admin\\nDisallow: /api/\\nDisallow: /_preview/\\nSitemap: " + u.origin + "/sitemap.xml\\n", {
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=300" }
+      });
+    }
     if (u.pathname.startsWith("/api/")) {
       try {
         return await api(req, env);
