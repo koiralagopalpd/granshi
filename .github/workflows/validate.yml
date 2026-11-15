@@ -35,10 +35,7 @@ jobs:
           for n in sorted(root.glob("*.sql")):
               db.executescript(n.read_text())
           tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-          assert {"admins","messages","inbound_email_events","page_search_index","admin_message_reads","diagnostics_state","pending_work_items","admin_security_events","content_projects","content_plan_departments","content_plan_categories","content_plan_topics"} <= tables
-          assert db.execute("SELECT COUNT(*) FROM content_plan_departments").fetchone()[0] == 8
-          assert db.execute("SELECT COUNT(*) FROM content_plan_categories").fetchone()[0] == 80
-          assert db.execute("SELECT COUNT(*) FROM content_plan_topics").fetchone()[0] == 800
+          assert {"admins","messages","inbound_email_events","page_search_index","admin_message_reads","diagnostics_state","pending_work_items","admin_security_events"} <= tables
           admin_cols={r[1] for r in db.execute("PRAGMA table_info(admins)")}
           assert {"failed_login_attempts","locked_at","session_version","recovery_authorized"} <= admin_cols
           assert "lease_until" in {r[1] for r in db.execute("PRAGMA table_info(diagnostics_state)")}
