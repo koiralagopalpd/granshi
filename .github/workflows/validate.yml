@@ -35,7 +35,10 @@ jobs:
           for n in sorted(root.glob("*.sql")):
               db.executescript(n.read_text())
           tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-          assert {"admins","messages","inbound_email_events","page_search_index","admin_message_reads","diagnostics_state","pending_work_items","admin_security_events"} <= tables
+          assert {"admins","messages","inbound_email_events","page_search_index","admin_message_reads","diagnostics_state","pending_work_items","admin_security_events","content_projects","content_plan_departments","content_plan_categories","content_plan_topics"} <= tables
+          assert db.execute("SELECT COUNT(*) FROM content_plan_departments").fetchone()[0] == 8
+          assert db.execute("SELECT COUNT(*) FROM content_plan_categories").fetchone()[0] == 80
+          assert db.execute("SELECT COUNT(*) FROM content_plan_topics").fetchone()[0] == 800
           admin_cols={r[1] for r in db.execute("PRAGMA table_info(admins)")}
           assert {"failed_login_attempts","locked_at","session_version","recovery_authorized"} <= admin_cols
           assert "lease_until" in {r[1] for r in db.execute("PRAGMA table_info(diagnostics_state)")}
@@ -55,7 +58,7 @@ jobs:
           db.execute("INSERT INTO pages(slug,title_en,content,updated_at,published) VALUES('keep-me','Existing page','[]','2026-11-15',1)")
           db.execute("INSERT INTO messages(name,email,body,status,created_at,reply_text,replied_at) VALUES('Existing','keep@example.com','Keep this','new','2026-11-15',NULL,NULL)")
           before=(db.execute("SELECT COUNT(*) FROM departments").fetchone()[0],db.execute("SELECT COUNT(*) FROM menus").fetchone()[0])
-          for n in range(5,10):
+          for n in range(5,11):
               f=next(root.glob(f"{n:04d}_*.sql"))
               db.executescript(f.read_text())
           assert db.execute("SELECT title_en FROM pages WHERE slug='keep-me'").fetchone()[0]=="Existing page"
@@ -63,7 +66,7 @@ jobs:
           assert before==(db.execute("SELECT COUNT(*) FROM departments").fetchone()[0],db.execute("SELECT COUNT(*) FROM menus").fetchone()[0])
           assert db.execute("SELECT COUNT(*) FROM pending_work_items WHERE title LIKE 'Resend API Key%'").fetchone()[0] == 1
           assert "admin_security_events" in {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-          print("Upgrade test: existing records retained; migrations 0005-0009 applied.")
+          print("Upgrade test: existing records retained; migrations 0005-0010 applied; 800-topic project seeded.")
           PY
   security-scan:
     runs-on: ubuntu-latest
