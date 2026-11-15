@@ -824,6 +824,77 @@ async function api(req, env) {
     return json({ok:true});
   }
 
+  // Private, persistent hierarchical content-development project tracker.
+  if (p === "/api/admin/content-project" && method === "GET") {
+    const project = await env.DB.prepare("SELECT * FROM content_projects WHERE id=1").first();
+    if (!project) return json({ error: "Content project is not initialized. Apply migration 0010." }, 503);
+    const departments = (await env.DB.prepare(`
+      SELECT d.id,d.code,d.title_en,d.title_ne,d.sort_order,
+        COUNT(t.id) AS total_topics,
+        SUM(CASE WHEN t.status='completed' THEN 1 ELSE 0 END) AS completed_topics
+      FROM content_plan_departments d
+      LEFT JOIN content_plan_categories c ON c.department_id=d.id
+      LEFT JOIN content_plan_topics t ON t.category_id=c.id
+      WHERE d.project_id=1
+      GROUP BY d.id ORDER BY d.sort_order,d.id
+    `).all()).results || [];
+    const totals = departments.reduce((a,d)=>({total:a.total+Number(d.total_topics||0),completed:a.completed+Number(d.completed_topics||0)}),{total:0,completed:0});
+    return json({project,departments,total:totals.total,completed:totals.completed,remaining:totals.total-totals.completed,target:800});
+  }
+  if (p === "/api/admin/content-project/categories" && method === "GET") {
+    const departmentId=Number(u.searchParams.get("department_id")||0);
+    if(!Number.isInteger(departmentId)||departmentId<1) return json({error:"Valid department_id is required."},400);
+    const department=await env.DB.prepare("SELECT id FROM content_plan_departments WHERE id=? AND project_id=1").bind(departmentId).first();
+    if(!department) return json({error:"Department not found."},404);
+    const categories=(await env.DB.prepare(`
+      SELECT c.id,c.title_en,c.title_ne,c.sort_order,COUNT(t.id) AS total_topics,
+        SUM(CASE WHEN t.status='completed' THEN 1 ELSE 0 END) AS completed_topics
+      FROM content_plan_categories c LEFT JOIN content_plan_topics t ON t.category_id=c.id
+      WHERE c.department_id=? GROUP BY c.id ORDER BY c.sort_order,c.id
+    `).bind(departmentId).all()).results||[];
+    return json({categories});
+  }
+  if (p === "/api/admin/content-project/topics" && method === "GET") {
+    const categoryId=Number(u.searchParams.get("category_id")||0);
+    if(!Number.isInteger(categoryId)||categoryId<1) return json({error:"Valid category_id is required."},400);
+    const category=await env.DB.prepare("SELECT id FROM content_plan_categories WHERE id=?").bind(categoryId).first();
+    if(!category) return json({error:"Category not found."},404);
+    const topics=(await env.DB.prepare("SELECT id,title_en,title_ne,status,sort_order,completed_at FROM content_plan_topics WHERE category_id=? ORDER BY sort_order,id").bind(categoryId).all()).results||[];
+    return json({topics});
+  }
+  if (p === "/api/admin/content-project/topics" && method === "POST") {
+    const x=await body(req),categoryId=Number(x.category_id);
+    const titleEn=String(x.title_en||"").trim().slice(0,240),titleNe=String(x.title_ne||"").trim().slice(0,240);
+    if(!Number.isInteger(categoryId)||categoryId<1||!titleEn) return json({error:"Category and English topic title are required."},400);
+    const category=await env.DB.prepare("SELECT id FROM content_plan_categories WHERE id=?").bind(categoryId).first();
+    if(!category) return json({error:"Category not found."},404);
+    const now=new Date().toISOString();
+    const r=await env.DB.prepare("INSERT INTO content_plan_topics(category_id,title_en,title_ne,status,sort_order,created_at,updated_at) VALUES(?,?,?,'pending',COALESCE((SELECT MAX(sort_order)+1 FROM content_plan_topics WHERE category_id=?),1),?,?)")
+      .bind(categoryId,titleEn,titleNe,categoryId,now,now).run();
+    await env.DB.prepare("UPDATE content_projects SET updated_at=? WHERE id=1").bind(now).run();
+    return json({ok:true,id:r.meta?.last_row_id||null});
+  }
+  if (p.match(/^\/api\/admin\/content-project\/topics\/\d+$/) && method === "PATCH") {
+    const id=Number(p.split("/").pop()),x=await body(req);
+    const existing=await env.DB.prepare("SELECT id FROM content_plan_topics WHERE id=?").bind(id).first();
+    if(!existing) return json({error:"Topic not found."},404);
+    const titleEn=String(x.title_en||"").trim().slice(0,240),titleNe=String(x.title_ne||"").trim().slice(0,240);
+    const status=x.status==="completed"?"completed":"pending";
+    if(!titleEn) return json({error:"English topic title is required."},400);
+    const now=new Date().toISOString();
+    await env.DB.prepare("UPDATE content_plan_topics SET title_en=?,title_ne=?,status=?,updated_at=?,completed_at=? WHERE id=?")
+      .bind(titleEn,titleNe,status,now,status==="completed"?now:null,id).run();
+    await env.DB.prepare("UPDATE content_projects SET updated_at=? WHERE id=1").bind(now).run();
+    return json({ok:true});
+  }
+  if (p.match(/^\/api\/admin\/content-project\/topics\/\d+$/) && method === "DELETE") {
+    const id=Number(p.split("/").pop());
+    const r=await env.DB.prepare("DELETE FROM content_plan_topics WHERE id=?").bind(id).run();
+    if(!r.meta?.changes) return json({error:"Topic not found."},404);
+    await env.DB.prepare("UPDATE content_projects SET updated_at=? WHERE id=1").bind(new Date().toISOString()).run();
+    return json({ok:true});
+  }
+
   if (p === "/api/admin/overview") {
     const pub = await allPublic(env);
     const contactUnread = await env.DB.prepare(
