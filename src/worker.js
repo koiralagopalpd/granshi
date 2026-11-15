@@ -258,20 +258,17 @@ function granshiHeader(lang = "en") {
 }
 
 const GRANSHI_HEADER_CSS = `
-  #granshi-site-header{position:relative;z-index:10000;width:100%;margin:0;overflow:hidden;background:linear-gradient(110deg,rgba(8,120,207,.70),rgba(223,245,255,.46) 28%,rgba(23,105,182,.62) 58%,rgba(8,46,104,.78)),url("/granshi-brand.webp") center 43%/cover no-repeat;color:#fff;border-bottom:5px solid #e8ad27;box-shadow:0 5px 20px rgba(4,28,68,.22);font-family:system-ui,-apple-system,sans-serif}
-  #granshi-site-header:before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 15% 0%,rgba(255,255,255,.82),transparent 38%),linear-gradient(180deg,rgba(255,255,255,.08),rgba(4,33,83,.22));pointer-events:none}
-  #granshi-site-header:after{content:"";position:absolute;left:-3%;right:-3%;bottom:-27px;height:40px;background:#0b3d86;border-top:4px solid #f2bd37;border-radius:50% 50% 0 0/55% 55% 0 0;pointer-events:none}
+  #granshi-site-header{position:sticky;top:0;z-index:10000;width:100%;margin:0;background:linear-gradient(110deg,#0b172b 0%,#142640 52%,#0b172b 100%);color:#fff;border-bottom:3px solid #d8b66d;box-shadow:0 4px 18px rgba(7,16,32,.18);font-family:system-ui,-apple-system,sans-serif}
   #granshi-site-header *{box-sizing:border-box}
-  #granshi-site-header .granshi-header-inner{position:relative;z-index:1;width:min(1500px,96%);min-height:126px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:22px;padding:12px 0 18px}
+  #granshi-site-header .granshi-header-inner{width:min(1180px,94%);min-height:82px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:20px}
   #granshi-site-header .granshi-header-logo{display:flex;align-items:center;min-width:0;text-decoration:none}
-  #granshi-site-header .granshi-header-logo img{display:block;width:clamp(210px,28vw,360px);height:100px;max-width:52vw;object-fit:cover;object-position:center 51%;border-radius:10px}
-  #granshi-site-header .granshi-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:0;padding:0;flex-wrap:wrap}
-  #granshi-site-header .granshi-header-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 20px;border:2px solid #efb52e;border-radius:28px;text-decoration:none;white-space:nowrap;font:750 16px/1 system-ui,-apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.16)}
-  #granshi-site-header .granshi-header-language{color:#fff;background:rgba(5,39,91,.78)}
-  #granshi-site-header .granshi-header-home{color:#fff;background:linear-gradient(135deg,#126ac0,#082d68)}
-  @media(max-width:650px){#granshi-site-header .granshi-header-inner{width:94%;min-height:94px;gap:8px;padding:8px 0 14px}#granshi-site-header .granshi-header-logo img{width:clamp(135px,42vw,205px);height:72px;max-width:44vw}#granshi-site-header .granshi-header-actions{gap:6px}#granshi-site-header .granshi-header-actions a{min-height:38px;padding:0 10px;font-size:12px;border-width:1.5px}}
-  @media(max-width:380px){#granshi-site-header .granshi-header-inner{min-height:84px}#granshi-site-header .granshi-header-logo img{width:128px;height:64px}#granshi-site-header .granshi-header-actions{gap:4px}#granshi-site-header .granshi-header-actions a{padding:0 8px;font-size:11px}}
-`;;
+  #granshi-site-header .granshi-header-logo img{display:block;width:176px;max-width:48vw;max-height:62px;height:auto;object-fit:contain}
+  #granshi-site-header .granshi-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin:0;padding:0}
+  #granshi-site-header .granshi-header-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 16px;border-radius:10px;text-decoration:none;white-space:nowrap;font:650 14px/1 system-ui,-apple-system,sans-serif}
+  #granshi-site-header .granshi-header-language{color:#fff;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.08)}
+  #granshi-site-header .granshi-header-home{color:#172235;background:linear-gradient(135deg,#f5e4b8,#d8b66d);border:1px solid #f2d99e}
+  @media(max-width:520px){#granshi-site-header .granshi-header-inner{width:94%;min-height:68px;gap:8px}#granshi-site-header .granshi-header-logo img{width:132px;max-height:48px}#granshi-site-header .granshi-header-actions{gap:6px}#granshi-site-header .granshi-header-actions a{min-height:38px;padding:0 10px;font-size:12px}}
+`;
 function pageChrome(title, desc, bodyHtml, settings, lang = "en") {
   const brand = settings.brand_name || "Granshi";
   const primary = settings.primary_color || "#101a2c";
@@ -1816,20 +1813,12 @@ async function renderAnyPage(page, env, u) {
     } else {
       html = `<base href="${base}">` + html;
     }
-    // Shared header is inserted without replacing or removing ZIP page body content.
-    if (!/id=["']granshi-site-header["']/.test(html)) {
-      const sharedHeader = granshiHeader(lang);
-      const sharedStyle = "<style>" + GRANSHI_HEADER_CSS + "</style>";
-      if (/<\/head>/i.test(html)) html = html.replace(/<\/head>/i, sharedStyle + "\n</head>");
-      if (/<body\b[^>]*>/i.test(html)) html = html.replace(/<body\b[^>]*>/i, (m) => m + "\n" + sharedHeader);
-      else html = sharedHeader + html;
-    }
     if (widget) {
       if (/<\/body>/i.test(html))
         html = html.replace(/<\/body>/i, widget + "\n</body>");
       else html += widget;
     }
-    // Preserve the uploaded ZIP body and scripts; only the shared site header is added above the page content.
+    // ZIP page HTML is preserved exactly; do not inject, replace, or remove its header/body until a safe shared-header adapter is tested.
     const contentNotice = '<footer id="granshi-content-note" style="margin:36px auto 0;padding:22px 20px;background:#101b35;color:#d4dbea;font:13px/1.7 system-ui,sans-serif"><div style="max-width:1050px;margin:auto"><p><strong>सामग्रीसम्बन्धी सूचना:</strong> यस पेजमा प्रस्तुत जानकारी सार्वजनिक रूपमा उपलब्ध अनलाइन स्रोत तथा सन्दर्भहरूको अध्ययन र संकलनमा आधारित हुन सक्छ। प्रकाशित सबै कुरा स्वतन्त्र रूपमा शतप्रतिशत प्रमाणित वा त्रुटिरहित छन् भन्ने ग्यारेन्टी छैन। महत्त्वपूर्ण निर्णय गर्नुअघि आधिकारिक तथा विश्वसनीय मूल स्रोतबाट पुष्टि गर्नुहोस्। कुनै सुझाव, सुधार वा त्रुटि भेटिएमा <a href="/legal/contact" style="color:#edbd62">Contact Us</a> मार्फत जानकारी दिनुहोस्।</p><p><strong>Content note:</strong> Information on this page may be compiled from publicly available online sources and references. We cannot guarantee that every statement has been independently verified or is error-free. Please verify important information with authoritative original sources. Suggestions and corrections are welcome via <a href="/legal/contact" style="color:#edbd62">Contact Us</a>.</p></div></footer>';
     if (!html.includes('id="granshi-content-note"')) {
       if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, contentNotice + "\n</body>");
