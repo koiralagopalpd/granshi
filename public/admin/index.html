@@ -216,7 +216,23 @@ async function renderAdminOverview(v){
    <div class="row" style="justify-content:space-between;align-items:center"><div><h3 style="margin:0">Pending Work</h3><p class="muted" style="margin:5px 0">Saved in D1 · available across devices</p></div><button class="btn gold" id="togglePending">Open Pending Work ▾</button></div>
    <div class="pending-stats"><span>Total <b id="pwTotal">—</b></span><span>Success <b id="pwSuccess">—</b></span><span>Remaining <b id="pwRemaining">—</b></span><span>Complete <b id="pwPercent">—</b></span></div>
    <div class="diag-progress"><i id="pwProgress"></i></div>
-   <div id="pendingPanel" class="hidden" style="margin-top:12px"><div class="row"><input id="pendingNewTitle" placeholder="Add a future task…" style="flex:1;min-width:180px;margin:0"><button class="btn" id="pendingAdd">+ Add</button></div><div id="pendingItems" style="margin-top:10px"></div></div>
+   <div id="pendingPanel" class="hidden" style="margin-top:12px">
+    <div class="box" style="background:#f8fafc;border-color:#d8e2ee">
+      <div class="row" style="justify-content:space-between;align-items:center"><div><b>GRANSHI – Content Development (800 Pages)</b><p class="muted" style="margin:4px 0">One project · Department → Category → Topic · private checklist saved in D1</p></div><button class="btn gold" id="cpToggle">Open Project</button></div>
+      <div class="pending-stats"><span>Topics <b id="cpTotal">800</b></span><span>Completed <b id="cpCompleted">0</b></span><span>Remaining <b id="cpRemaining">800</b></span><span>Progress <b id="cpPercent">0%</b></span></div>
+      <div class="diag-progress"><i id="cpProgress"></i></div>
+      <div id="cpWorkspace" class="hidden" style="margin-top:12px">
+        <div id="cpDepartments"></div>
+        <div id="cpCategories" style="margin-top:10px"></div>
+        <div id="cpTopics" style="margin-top:10px"></div>
+      </div>
+    </div>
+    <div class="box" style="background:#fff">
+      <b>Other Pending Tasks</b>
+      <div class="row" style="margin-top:8px"><input id="pendingNewTitle" placeholder="Add a separate future task…" style="flex:1;min-width:180px;margin:0"><button class="btn" id="pendingAdd">+ Add</button></div>
+      <div id="pendingItems" style="margin-top:10px"></div>
+    </div>
+  </div>
   </div>
  </div>`;
  $$('[data-go]',v).forEach(x=>x.onclick=()=>tab(x.dataset.go));
@@ -229,7 +245,7 @@ async function renderAdminOverview(v){
  $('#togglePending',v).onclick=()=>{const p=$('#pendingPanel',v);p.classList.toggle('hidden');$('#togglePending',v).textContent=p.classList.contains('hidden')?'Open Pending Work ▾':'Hide Pending Work ▴'};
  $('#pendingAdd',v).onclick=async()=>{const input=$('#pendingNewTitle',v),title=input.value.trim();if(!title)return;try{await api('/admin/pending-work',{method:'POST',body:JSON.stringify({title})});input.value='';await loadPendingWork(v)}catch(e){alert(e.message)}};
  $('#pendingNewTitle',v).onkeydown=e=>{if(e.key==='Enter')$('#pendingAdd',v).click()};
- await Promise.all([loadPendingWork(v),loadDiagnosisState(v)]);
+ await Promise.all([loadPendingWork(v),loadContentProject(v),loadDiagnosisState(v)]);
 }
 function diagnosisSummaryMarkup(report){
  if(!report)return '<p class="muted">अहिलेसम्म कुनै completed report छैन।</p>';
@@ -300,6 +316,30 @@ async function showStorageDetails(v){
  try{const r=await api('/admin/storage');results.push('<div class="diag-report-row"><b>R2 Bucket · granshi-media</b><p>✓ Listing completed: '+Number(r.objects||0)+' objects · '+(Number(r.bytes||0)/1e9).toFixed(4)+' GB observed · '+Number(r.percent_of_free_tier||0)+'% of 10 GB free-tier reference</p><p>'+esc(r.note||'')+(r.complete?'':' · Partial inventory; total is a lower bound')+'</p></div>')}catch(e){results.push('<div class="diag-report-row"><b>R2 Bucket</b><p>✕ '+esc(e.message)+'</p></div>')}
  box.innerHTML='<h3>R2 + D1 Storage Status</h3>'+results.join('')+'<p class="muted">R2 observed object sizes are not the invoice GB-month metric. D1 billing/usage totals are not exposed by this Worker binding.</p>';
 }
+async function loadContentProject(v){
+ try{
+  const x=await api('/admin/content-project');
+  const total=Number(x.total||0),completed=Number(x.completed||0),target=Number(x.target||800),pct=target?Math.round(completed/target*100):0;
+  $('#cpTotal',v).textContent=target;$('#cpCompleted',v).textContent=completed;$('#cpRemaining',v).textContent=Math.max(0,target-completed);$('#cpPercent',v).textContent=pct+'%';$('#cpProgress',v).style.width=Math.min(100,pct)+'%';
+  const depts=x.departments||[];
+  $('#cpDepartments',v).innerHTML='<h4 style="margin:8px 0">Departments</h4>'+depts.map(d=>{const n=Number(d.total_topics||0),done=Number(d.completed_topics||0);return '<button class="item" style="width:100%;text-align:left;cursor:pointer" data-cp-dept="'+d.id+'"><span><b>'+esc(d.title_en)+'</b><br><small class="muted">'+esc(d.title_ne||'')+'</small></span><span class="badge '+(done===n?'published':'draft')+'">'+done+'/'+n+'</span></button>'}).join('');
+  $('#cpCategories',v).innerHTML='';$('#cpTopics',v).innerHTML='';
+  $('#cpToggle',v).onclick=()=>{const w=$('#cpWorkspace',v);w.classList.toggle('hidden');$('#cpToggle',v).textContent=w.classList.contains('hidden')?'Open Project':'Close Project';};
+  $('[data-cp-dept]',v).forEach(b=>b.onclick=async()=>{const id=b.dataset.cpDept;$('#cpTopics',v).innerHTML='';$('#cpCategories',v).innerHTML='<p class="muted">Loading categories…</p>';try{const r=await api('/admin/content-project/categories?department_id='+id);$('#cpCategories',v).innerHTML='<h4>Categories</h4>'+(r.categories||[]).map(c=>'<button class="item" style="width:100%;text-align:left;cursor:pointer" data-cp-cat="'+c.id+'"><span><b>'+esc(c.title_en)+'</b><br><small class="muted">'+esc(c.title_ne||'')+'</small></span><span class="badge '+(Number(c.completed_topics||0)===Number(c.total_topics||0)?'published':'draft')+'">'+Number(c.completed_topics||0)+'/'+Number(c.total_topics||0)+'</span></button>').join('');$('[data-cp-cat]',v).forEach(c=>c.onclick=()=>loadContentTopics(v,c.dataset.cpCat));}catch(e){$('#cpCategories',v).textContent=e.message;}});
+ }catch(e){$('#cpDepartments',v).textContent='Content project unavailable: '+e.message;}
+}
+async function loadContentTopics(v,categoryId){
+ const box=$('#cpTopics',v);box.innerHTML='<p class="muted">Loading topics…</p>';
+ try{
+  const r=await api('/admin/content-project/topics?category_id='+categoryId),topics=r.topics||[];
+  box.innerHTML='<h4>Topics ('+topics.length+')</h4><div class="box" style="background:#f8fafc"><label>New topic · English title</label><input id="cpNewEn" maxlength="240" placeholder="Enter topic title in English"><label>Nepali title (optional)</label><input id="cpNewNe" maxlength="240" placeholder="नेपाली शीर्षक"><button class="btn gold" id="cpAddTopic">+ Add Topic</button></div>'+topics.map(t=>'<div class="diag-report-row"><div class="row" style="align-items:flex-start"><input type="checkbox" style="width:20px;height:20px;margin:2px 4px 0 0" data-cp-check="'+t.id+'" '+(t.status==='completed'?'checked':'')+' aria-label="Mark topic complete"><div style="flex:1;min-width:0"><b>'+esc(t.title_en)+'</b><div class="muted">'+esc(t.title_ne||'')+'</div></div></div><div class="row" style="margin-top:8px"><span class="badge '+(t.status==='completed'?'published':'draft')+'">'+(t.status==='completed'?'COMPLETED':'PENDING')+'</span><button class="btn" data-cp-edit="'+t.id+'">Edit</button><button class="btn danger" data-cp-delete="'+t.id+'">Delete</button></div></div>').join('')||'<p class="muted">No topics in this category yet.</p>';
+  $('#cpAddTopic',v).onclick=async()=>{const en=$('#cpNewEn',v).value.trim(),ne=$('#cpNewNe',v).value.trim();if(!en){alert('English title is required.');return;}const b=$('#cpAddTopic',v);b.disabled=true;try{await api('/admin/content-project/topics',{method:'POST',body:JSON.stringify({category_id:Number(categoryId),title_en:en,title_ne:ne})});await loadContentTopics(v,categoryId);await loadContentProject(v);}catch(e){alert(e.message);b.disabled=false;}};
+  $('[data-cp-check]',v).forEach(el=>el.onchange=async()=>{el.disabled=true;const t=topics.find(x=>String(x.id)===el.dataset.cpCheck);try{await api('/admin/content-project/topics/'+el.dataset.cpCheck,{method:'PATCH',body:JSON.stringify({title_en:t.title_en,title_ne:t.title_ne,status:el.checked?'completed':'pending'})});await loadContentTopics(v,categoryId);await loadContentProject(v);}catch(e){alert(e.message);el.disabled=false;el.checked=!el.checked;}});
+  $('[data-cp-edit]',v).forEach(b=>b.onclick=async()=>{const t=topics.find(x=>String(x.id)===b.dataset.cpEdit);const en=prompt('Edit English title:',t.title_en);if(en===null)return;const ne=prompt('Edit Nepali title:',t.title_ne||'');if(ne===null)return;try{await api('/admin/content-project/topics/'+t.id,{method:'PATCH',body:JSON.stringify({title_en:en,title_ne:ne,status:t.status})});await loadContentTopics(v,categoryId);await loadContentProject(v);}catch(e){alert(e.message);}});
+  $('[data-cp-delete]',v).forEach(b=>b.onclick=async()=>{if(!confirm('Delete this topic from the project?'))return;try{await api('/admin/content-project/topics/'+b.dataset.cpDelete,{method:'DELETE'});await loadContentTopics(v,categoryId);await loadContentProject(v);}catch(e){alert(e.message);}});
+ }catch(e){box.textContent='Could not load topics: '+e.message;}
+}
+
 async function loadPendingWork(v){
  try{
   const x=await api('/admin/pending-work'),total=Number(x.total||0),success=Number(x.success||0),remaining=Number(x.remaining||0),pct=total?Math.round(success/total*100):0;
