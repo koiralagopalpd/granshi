@@ -1559,7 +1559,7 @@ export default {
       });
     }
     if (u.pathname === "/robots.txt") {
-      return new Response("User-agent: *\\nAllow: /\\nDisallow: /admin\\nDisallow: /api/\\nDisallow: /_preview/\\nSitemap: " + u.origin + "/sitemap.xml\\n", {
+      return new Response("User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nDisallow: /_preview/\nSitemap: " + u.origin + "/sitemap.xml\n", {
         headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=300" }
       });
     }
