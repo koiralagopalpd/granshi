@@ -1820,7 +1820,7 @@ async function renderAnyPage(page, env, u) {
       var header='<header id="granshi-site-header"><div class="granshi-site-nav"><a class="granshi-site-brand" href="/" aria-label="Granshi Home"><img src="/granshi-brand.webp" alt="Granshi"></a><div class="granshi-site-actions"><a class="granshi-site-lang" href="?lang='+(lang==="en"?"ne":"en")+'">'+(lang==="en"?"नेपाली":"English")+'</a><a class="granshi-site-home" href="/">← Home</a></div></div></header>';
       function install(){
         if(!document.body)return;
-        document.querySelectorAll('body>header:not(#granshi-site-header),body>nav,body>.header,body>#header,body>.navbar,body>#navbar,body>.site-header,body>#site-header,body>[role="banner"]:not(#granshi-site-header)').forEach(function(el){el.remove()});
+        document.querySelectorAll('header:not(#granshi-site-header),body>nav,.header,#header,.navbar,#navbar,.site-header,#site-header,[role="banner"]:not(#granshi-site-header)').forEach(function(el){el.remove()});
         if(!document.getElementById('granshi-site-header'))document.body.insertAdjacentHTML('afterbegin',header);
       }
       if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
