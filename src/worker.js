@@ -270,11 +270,11 @@ function searchablePageText(content) {
     if (!Array.isArray(blocks)) return "";
     return blocks.map((b) => {
       if (!b || typeof b !== "object") return "";
-      if (["heading","paragraph","quote"].includes(b.type)) return String(b.text || "") + " " + String(b.cite || "");
-      if (b.type === "columns") return (b.columns || []).map(c => c.text || "").join(" ");
-      if (b.type === "cards") return (b.cards || []).map(c => [c.title,c.text].join(" ")).join(" ");
-      if (b.type === "hero") return [b.title,b.subtitle].join(" ");
-      if (b.type === "button") return b.text || "";
+      if (["heading","paragraph","quote"].includes(b.type)) return [b.text, b.text_ne, b.cite, b.cite_ne].filter(Boolean).join(" ");
+      if (b.type === "columns") return (b.columns || []).map(c => [c.text, c.text_ne].filter(Boolean).join(" ")).join(" ");
+      if (b.type === "cards") return (b.cards || []).map(c => [c.title, c.title_ne, c.text, c.text_ne].filter(Boolean).join(" ")).join(" ");
+      if (b.type === "hero") return [b.title, b.title_ne, b.subtitle, b.subtitle_ne].filter(Boolean).join(" ");
+      if (b.type === "button") return [b.text, b.text_ne].filter(Boolean).join(" ");
       return "";
     }).join(" ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,30000);
   } catch { return ""; }
@@ -369,39 +369,47 @@ function extractQaPairsFromPage(page, searchText, rawHtml = "") {
     pushQa(`${titleNe} के हो र यसमा के छ?`, descNe || overviewAnsEn);
   }
 
-  // Extract section-level Q&A from Blocks JSON
+  // Extract section-level Q&A from Blocks JSON (EN + NE)
   if (!String(page.template || "").startsWith("zip:") && !isLink) {
     try {
       const blocks = typeof page.content === "string" ? JSON.parse(page.content) : page.content;
       if (Array.isArray(blocks)) {
-        let curHeading = "";
-        let curChunks = [];
-        const flush = () => {
-          if (curHeading && curChunks.length) {
-            const qText = /\?$|के|कसरी|किन|कहाँ|कति|What|How|Why|When|Where/i.test(curHeading)
-              ? curHeading
-              : `${curHeading} — ${title}`;
-            pushQa(qText, curChunks.join(" "));
-          }
-          curHeading = "";
-          curChunks = [];
-        };
-        for (const b of blocks) {
-          if (!b || typeof b !== "object") continue;
-          if (b.type === "heading" && b.text) {
-            flush();
-            curHeading = String(b.text).trim();
-          } else if (["paragraph", "quote"].includes(b.type) && b.text) {
-            curChunks.push(String(b.text).trim());
-          } else if (b.type === "columns" && Array.isArray(b.columns)) {
-            curChunks.push(b.columns.map((c) => c.text || "").join(" "));
-          } else if (b.type === "cards" && Array.isArray(b.cards)) {
-            for (const c of b.cards) {
-              if (c.title && c.text) pushQa(`${c.title} (${title})`, c.text);
+        const collectLangBlocks = (isNe) => {
+          let curHeading = "";
+          let curChunks = [];
+          const flush = () => {
+            if (curHeading && curChunks.length) {
+              const qText = /\?$|के|कसरी|किन|कहाँ|कति|को\s|What|How|Why|When|Where|Who/i.test(curHeading)
+                ? curHeading
+                : `${curHeading} — ${isNe && titleNe ? titleNe : title}`;
+              pushQa(qText, curChunks.join(" "));
+            }
+            curHeading = "";
+            curChunks = [];
+          };
+          for (const b of blocks) {
+            if (!b || typeof b !== "object") continue;
+            if (b.type === "heading") {
+              const hVal = isNe ? String(b.text_ne || "").trim() : String(b.text || "").trim();
+              if (hVal) { flush(); curHeading = hVal; }
+            } else if (["paragraph", "quote"].includes(b.type)) {
+              const tVal = isNe ? String(b.text_ne || "").trim() : String(b.text || "").trim();
+              if (tVal) curChunks.push(tVal);
+            } else if (b.type === "columns" && Array.isArray(b.columns)) {
+              const cVal = b.columns.map((c) => (isNe ? (c.text_ne || "") : (c.text || ""))).filter(Boolean).join(" ").trim();
+              if (cVal) curChunks.push(cVal);
+            } else if (b.type === "cards" && Array.isArray(b.cards)) {
+              for (const c of b.cards) {
+                const ct = isNe ? c.title_ne : c.title;
+                const cx = isNe ? c.text_ne : c.text;
+                if (ct && cx) pushQa(`${ct} (${isNe && titleNe ? titleNe : title})`, cx);
+              }
             }
           }
-        }
-        flush();
+          flush();
+        };
+        collectLangBlocks(false);
+        collectLangBlocks(true);
       }
     } catch {}
   }
@@ -579,42 +587,65 @@ async function allPublic(env) {
   return { settings, pages, departments: depts, menus, latest, popular };
 }
 
-function renderBlocks(content) {
+function renderBlocks(content, lang = "en") {
   let blocks = [];
   try {
     blocks = typeof content === "string" ? JSON.parse(content) : content || [];
   } catch {
     blocks = [];
   }
+  const pick = (enVal, neVal) =>
+    lang === "ne" ? (neVal || enVal || "") : (enVal || neVal || "");
+  const langUrl = (raw) => {
+    const u = String(raw || "").trim();
+    if (!u || lang !== "ne") return u;
+    if (u.startsWith("/") && !u.startsWith("//") && !u.includes("?")) {
+      const hashIdx = u.indexOf("#");
+      if (hashIdx >= 0) return u.slice(0, hashIdx) + "?lang=ne" + u.slice(hashIdx);
+      return u + "?lang=ne";
+    }
+    return u;
+  };
   return blocks
     .map((b) => {
       const t = b.type;
       if (t === "heading") {
         const level = Math.min(Math.max(Number(b.level) || 2, 1), 4);
-        return `<h${level} class="blk-h">${escapeHtml( b.text || "" )}</h${level}>`;
+        const txt = pick(b.text, b.text_ne);
+        return txt ? `<h${level} class="blk-h">${escapeHtml(txt)}</h${level}>` : "";
       }
-      if (t === "paragraph")
-        return `<p class="blk-p">${escapeHtml(b.text || "").replace( /\n/g, "<br>" )}</p>`;
-      if (t === "image" && b.url)
-        return `<figure class="blk-img"><img src="${escapeHtml( b.url )}" alt="${escapeHtml(b.alt || "")}" loading="lazy">${ b.caption ? `<figcaption>${escapeHtml(b.caption)}</figcaption>` : "" }</figure>`;
-      if (t === "button" && b.url)
-        return `<p class="blk-btn"><a class="btn" href="${escapeHtml( b.url )}">${escapeHtml(b.text || "Learn more")}</a></p>`;
-      if (t === "html") return `<div class="blk-html">${b.html || ""}</div>`;
+      if (t === "paragraph") {
+        const txt = pick(b.text, b.text_ne);
+        return txt ? `<p class="blk-p">${escapeHtml(txt).replace( /\n/g, "<br>" )}</p>` : "";
+      }
+      if (t === "image" && b.url) {
+        const alt = pick(b.alt, b.alt_ne);
+        const cap = pick(b.caption, b.caption_ne);
+        return `<figure class="blk-img"><img src="${escapeHtml( b.url )}" alt="${escapeHtml(alt)}" loading="lazy">${ cap ? `<figcaption>${escapeHtml(cap)}</figcaption>` : "" }</figure>`;
+      }
+      if (t === "button" && b.url) {
+        const txt = pick(b.text, b.text_ne) || (lang === "ne" ? "थप हेर्नुहोस्" : "Learn more");
+        return `<p class="blk-btn"><a class="btn" href="${escapeHtml(langUrl(b.url))}">${escapeHtml(txt)}</a></p>`;
+      }
+      if (t === "html") return `<div class="blk-html">${pick(b.html, b.html_ne)}</div>`;
       if (t === "spacer")
         return `<div style="height:${Number(b.height) || 32}px"></div>`;
       if (t === "divider") return `<hr class="blk-hr">`;
-      if (t === "quote")
-        return `<blockquote class="blk-quote"><p>${escapeHtml( b.text || "" )}</p>${ b.cite ? `<cite>${escapeHtml(b.cite)}</cite>` : "" }</blockquote>`;
+      if (t === "quote") {
+        const txt = pick(b.text, b.text_ne);
+        const cite = pick(b.cite, b.cite_ne);
+        return txt ? `<blockquote class="blk-quote"><p>${escapeHtml(txt)}</p>${ cite ? `<cite>${escapeHtml(cite)}</cite>` : "" }</blockquote>` : "";
+      }
       if (t === "columns") {
         const cols = Array.isArray(b.columns) ? b.columns : [];
-        return `<div class="blk-cols" style="--cols:${cols.length || 2}">${cols .map( (c) => `<div class="blk-col">${escapeHtml(c.text || "").replace( /\n/g, "<br>" )}</div>` ) .join("")}</div>`;
+        return `<div class="blk-cols" style="--cols:${cols.length || 2}">${cols .map( (c) => `<div class="blk-col">${escapeHtml(pick(c.text, c.text_ne)).replace( /\n/g, "<br>" )}</div>` ) .join("")}</div>`;
       }
       if (t === "cards") {
         const cards = Array.isArray(b.cards) ? b.cards : [];
-        return `<div class="blk-cards">${cards .map( (c) => `<article class="blk-card">${ c.icon ? `<div class="ico">${escapeHtml(c.icon)}</div>` : "" }<h3>${escapeHtml(c.title || "")}</h3><p>${escapeHtml( c.text || "" )}</p>${ c.url ? `<a href="${escapeHtml(c.url)}">${escapeHtml( c.linktext || "→" )}</a>` : "" }</article>` ) .join("")}</div>`;
+        return `<div class="blk-cards">${cards .map( (c) => `<article class="blk-card">${ c.icon ? `<div class="ico">${escapeHtml(c.icon)}</div>` : "" }<h3>${escapeHtml(pick(c.title, c.title_ne))}</h3><p>${escapeHtml(pick(c.text, c.text_ne))}</p>${ c.url ? `<a href="${escapeHtml(langUrl(c.url))}">${escapeHtml(pick(c.linktext, c.linktext_ne) || "→")}</a>` : "" }</article>` ) .join("")}</div>`;
       }
       if (t === "hero")
-        return `<section class="blk-hero" style="background-image:url('${escapeHtml( b.image || "" )}')"><div class="blk-hero-inner"><h1>${escapeHtml( b.title || "" )}</h1><p>${escapeHtml(b.subtitle || "")}</p>${ b.button_url ? `<a class="btn" href="${escapeHtml(b.button_url)}">${escapeHtml( b.button_text || "Explore" )}</a>` : "" }</div></section>`;
+        return `<section class="blk-hero" style="background-image:url('${escapeHtml( b.image || "" )}')"><div class="blk-hero-inner"><h1>${escapeHtml(pick(b.title, b.title_ne))}</h1><p>${escapeHtml(pick(b.subtitle, b.subtitle_ne))}</p>${ b.button_url ? `<a class="btn" href="${escapeHtml(langUrl(b.button_url))}">${escapeHtml(pick(b.button_text, b.button_text_ne) || (lang === "ne" ? "खोल्नुहोस्" : "Explore"))}</a>` : "" }</div></section>`;
       if (t === "video" && b.url) {
         const src = escapeHtml(b.url);
         if (
@@ -2617,7 +2648,7 @@ async function renderAnyPage(page, env, u) {
       },
     });
   }
-  const body = `<section class="page-hero"><div class="wrap"><h1>${escapeHtml( title )}</h1>${ desc ? `<p>${escapeHtml(desc)}</p>` : "" }</div></section><article class="wrap">${renderBlocks( page.content )}</article>${widget}`;
+  const body = `<section class="page-hero"><div class="wrap"><h1>${escapeHtml( title )}</h1>${ desc ? `<p>${escapeHtml(desc)}</p>` : "" }</div></section><article class="wrap">${renderBlocks( page.content, lang )}</article>${widget}`;
   return new Response(pageChrome(title, desc, body, settings, lang), {
     headers: {
       "content-type": "text/html; charset=utf-8",

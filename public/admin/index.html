@@ -896,12 +896,16 @@ function openPageEditor(page,dept,cats,restoring=false,deptMedia=[]){
     </div>
 
     <div id="zipPanel" class="editor-panel" hidden>
-      <h4 style="margin-top:0">Upload Single HTML or ZIP Package</h4>
-      <p class="muted">Mobile बाट सिधै एउटा <code>.html</code> फाइल वा पूरा <code>.zip</code> (<code>index.html</code> + assets) छान्न मिल्छ।</p>
+      <h4 style="margin-top:0">Upload Single HTML, ZIP Package, or Paste HTML</h4>
+      <p class="muted">Mobile बाट सिधै एउटा <code>.html</code> फाइल वा पूरा <code>.zip</code> छान्न, वा तल सिधै HTML कोड Paste गर्न मिल्छ।</p>
       <input type="file" id="zipFile" accept=".zip,.html,.htm,application/zip,text/html">
-      <div id="zipStatus" class="muted" style="margin-top:8px">${isZipExisting?'Existing HTML/ZIP page — upload new file to replace.':'No file selected yet.'}</div>
+      <div id="zipStatus" class="muted" style="margin-top:8px">${isZipExisting?'Existing HTML/ZIP page — upload new file or paste HTML below to replace.':'No file selected yet.'}</div>
       <ul id="zipList" class="muted" style="font-size:12px;max-height:110px;overflow:auto"></ul>
-      <button class="btn gold" type="button" id="uploadZip" style="margin-top:8px">Upload HTML / ZIP</button>
+      <button class="btn gold" type="button" id="uploadZip" style="margin-top:8px">Upload HTML / ZIP File</button>
+      <hr style="border:0;border-top:1px solid #dfe4ec;margin:14px 0">
+      <label for="zipPasteHtml" style="font-weight:700;font-size:13px">वा सिधै HTML कोड Paste गर्नुहोस् (Mobile Friendly — फाइल बनाउनु पर्दैन)</label>
+      <textarea id="zipPasteHtml" rows="6" placeholder="<!doctype html>..." style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+      <button class="btn" type="button" id="uploadPastedHtml" style="margin-top:4px">Upload Pasted HTML &amp; Save</button>
     </div>
 
     <div class="box" style="margin:10px 0">
@@ -1028,8 +1032,44 @@ function openPageEditor(page,dept,cats,restoring=false,deptMedia=[]){
     statusEl:$('#p_tr_status',ed),
     onFill:(el,val)=>{if(el.id==='p_te'&&!slugEdited&&!page)$('#p_sl').value=slugifyClient(val);}
   });
-  $('#trEnNeBtn',ed).onclick=()=>runTranslateMissing('en-ne');
-  $('#trNeEnBtn',ed).onclick=()=>runTranslateMissing('ne-en');
+  async function translateMissingBlocks(direction='en-ne'){
+    const src=direction==='ne-en'?'ne':'en';
+    const dst=direction==='ne-en'?'en':'ne';
+    const st=$('#p_tr_status',ed);
+    const pairsList=[['text','text_ne'],['cite','cite_ne'],['title','title_ne'],['subtitle','subtitle_ne'],['button_text','button_text_ne'],['alt','alt_ne'],['caption','caption_ne']];
+    let count=0;
+    for(const b of blocks){
+      if(!b||typeof b!=='object')continue;
+      for(const [enK,neK] of pairsList){
+        if(!(enK in b)&&!(neK in b))continue;
+        const fromK=src==='en'?enK:neK,toK=src==='en'?neK:enK;
+        const fv=String(b[fromK]||'').trim(),tv=String(b[toK]||'').trim();
+        if(fv&&!tv){
+          if(st)st.textContent=`Translating block (${src.toUpperCase()} → ${dst.toUpperCase()})…`;
+          const out=await autoTranslateText(fv,src,dst);
+          if(out){b[toK]=out;count++;}
+        }
+      }
+      if(b.type==='columns'&&Array.isArray(b.columns)){
+        for(const c of b.columns){
+          const fv=String(src==='en'?c.text:c.text_ne||'').trim(),tv=String(src==='en'?c.text_ne:c.text||'').trim();
+          if(fv&&!tv){const out=await autoTranslateText(fv,src,dst);if(out){if(src==='en')c.text_ne=out;else c.text=out;count++;}}
+        }
+      }
+      if(b.type==='cards'&&Array.isArray(b.cards)){
+        for(const c of b.cards){
+          for(const [enK,neK] of [['title','title_ne'],['text','text_ne'],['linktext','linktext_ne']]){
+            const fromK=src==='en'?enK:neK,toK=src==='en'?neK:enK;
+            const fv=String(c[fromK]||'').trim(),tv=String(c[toK]||'').trim();
+            if(fv&&!tv){const out=await autoTranslateText(fv,src,dst);if(out){c[toK]=out;count++;}}
+          }
+        }
+      }
+    }
+    if(count){drawBlocks();if(st)st.textContent=`Translated ${count} block field(s) ✓`;}
+  }
+  $('#trEnNeBtn',ed).onclick=async()=>{await runTranslateMissing('en-ne');await translateMissingBlocks('en-ne');};
+  $('#trNeEnBtn',ed).onclick=async()=>{await runTranslateMissing('ne-en');await translateMissingBlocks('ne-en');};
 
   function updateThumbPreview(){
     const u=$('#p_thumb').value.trim();
@@ -1175,32 +1215,99 @@ function openPageEditor(page,dept,cats,restoring=false,deptMedia=[]){
     }catch(e){st.textContent='Error: '+e.message;}
   };
 
+  $('#uploadPastedHtml').onclick=async()=>{
+    const rawHtml=$('#zipPasteHtml').value.trim();
+    const st=$('#zipStatus');
+    if(!rawHtml||rawHtml.length<20){st.textContent='Paste valid HTML code first.';return;}
+    const slug=slugifyClient($('#p_sl').value.trim()||$('#p_te').value.trim());
+    if(!slug||!$('#p_te').value.trim()){st.textContent='Set Title EN and URL Slug first.';return;}
+    $('#p_sl').value=slug;
+    const btn=$('#uploadPastedHtml');
+    btn.disabled=true;
+    try{
+      st.textContent='Uploading HTML code…';
+      entryFile='index.html';
+      fileList=['index.html'];
+      const r=await fetch('/api/admin/pages/asset',{
+        method:'POST',
+        headers:{'content-type':'text/html; charset=utf-8','x-page-slug':slug,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent('index.html')},
+        body:rawHtml
+      });
+      const d=await r.json();if(!r.ok)throw new Error(d.error||'Upload failed');
+      $('#zipList').innerHTML='<li>index.html (uploaded from pasted HTML)</li>';
+      await api('/admin/pages',{method:'POST',body:JSON.stringify({
+        slug,title_en:$('#p_te').value.trim()||slug,title_ne:$('#p_tn').value.trim(),
+        description_en:$('#p_de').value.trim(),description_ne:$('#p_dn').value.trim(),
+        department_id:dept.id,category_id:$('#p_cat').value?Number($('#p_cat').value):null,
+        published:$('#p_pub').checked,is_popular:$('#p_pop').checked,
+        thumbnail_image:$('#p_thumb').value.trim(),thumbnail_title_en:$('#p_ttitle_en').value.trim(),thumbnail_title_ne:$('#p_ttitle_ne').value.trim(),
+        thumbnail_summary_en:$('#p_tsum_en').value.trim(),thumbnail_summary_ne:$('#p_tsum_ne').value.trim(),thumbnail_alt:$('#p_talt').value.trim(),
+        thumbnail_focal_x:Number($('#p_fx').value||50),thumbnail_focal_y:Number($('#p_fy').value||50),
+        source_type:'zip',entry_file:'index.html',
+        content:{files:['index.html'],entry:'index.html'}
+      })});
+      zipReady=true;mode='zip';
+      st.textContent='OK — Pasted HTML uploaded & saved! Check Published and click Preview.';
+      $('#prevP').href='/_preview/'+encodeURIComponent(slug);
+    }catch(e){st.textContent='Error: '+e.message;}
+    finally{btn.disabled=false;}
+  };
+
   // optional blocks + SortableJS drag reorder
   const canvas=$('#canvas');
   let sortableInst=null;
+  const blkTimers=new Map();
+  const blkPairMap={text:['text','text_ne'],text_ne:['text','text_ne'],cite:['cite','cite_ne'],cite_ne:['cite','cite_ne'],title:['title','title_ne'],title_ne:['title','title_ne'],subtitle:['subtitle','subtitle_ne'],subtitle_ne:['subtitle','subtitle_ne'],button_text:['button_text','button_text_ne'],button_text_ne:['button_text','button_text_ne'],alt:['alt','alt_ne'],alt_ne:['alt','alt_ne'],caption:['caption','caption_ne'],caption_ne:['caption','caption_ne']};
+  function scheduleBlockAutoTranslate(idx,key){
+    if(!$('#p_autotr',ed)?.checked)return;
+    const pair=blkPairMap[key];
+    if(!pair)return;
+    const [enK,neK]=pair;
+    const isEnToNe=key===enK;
+    const srcK=isEnToNe?enK:neK,dstK=isEnToNe?neK:enK;
+    const timerKey=idx+':'+srcK;
+    clearTimeout(blkTimers.get(timerKey));
+    blkTimers.set(timerKey,setTimeout(async()=>{
+      const b=blocks[idx];if(!b)return;
+      const val=String(b[srcK]||'').trim();
+      if(!val||String(b[dstK]||'').trim())return;
+      const st=$('#p_tr_status',ed);
+      if(st)st.textContent=`Translating block (${isEnToNe?'EN → NE':'NE → EN'})…`;
+      const out=await autoTranslateText(val,isEnToNe?'en':'ne',isEnToNe?'ne':'en');
+      if(out&&!String(b[dstK]||'').trim()){
+        b[dstK]=out;
+        const targetEl=canvas?.querySelector(`[data-i="${idx}"][data-field="${dstK}"]`);
+        if(targetEl)targetEl.value=out;
+        if(st)st.textContent=`Block auto-translated (${isEnToNe?'EN → NE':'NE → EN'}) ✓`;
+      }
+    },700));
+  }
   function drawBlocks(){
     if(!canvas)return;
     canvas.innerHTML=blocks.map((b,i)=>{
-      const field=(key,label,val,area=false)=>'<label>'+label+'</label>'+(area?'<textarea data-field="'+key+'" data-i="'+i+'" rows="3">'+esc(val||'')+'</textarea>':'<input data-field="'+key+'" data-i="'+i+'" value="'+esc(val||'')+'">');
+      const field=(key,label,val,area=false)=>'<div><label>'+label+'</label>'+(area?'<textarea data-field="'+key+'" data-i="'+i+'" rows="3">'+esc(val||'')+'</textarea>':'<input data-field="'+key+'" data-i="'+i+'" value="'+esc(val||'')+'">')+'</div>';
+      const bi=(enKey,neKey,label,area=false)=>'<div class="grid2">'+field(enKey,label+' (EN)',b[enKey],area)+field(neKey,label+' (NE)',b[neKey],area)+'</div>';
       let fields='';
-      if(b.type==='heading')fields=field('text','Heading text',b.text)+field('level','Level (1–4)',b.level||2);
-      else if(b.type==='paragraph'||b.type==='quote')fields=field('text',b.type==='quote'?'Quote':'Paragraph',b.text,true)+(b.type==='quote'?field('cite','Citation',b.cite):'');
-      else if(b.type==='image')fields=field('url','Image URL',b.url)+field('alt','Alt text',b.alt)+field('caption','Caption',b.caption)+'<div class="row"><label class="btn" style="display:inline-block;cursor:pointer">＋ Add Image<input type="file" accept="image/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
+      if(b.type==='heading')fields=bi('text','text_ne','Heading text')+field('level','Level (1–4)',b.level||2);
+      else if(b.type==='paragraph')fields=bi('text','text_ne','Paragraph',true);
+      else if(b.type==='quote')fields=bi('text','text_ne','Quote',true)+bi('cite','cite_ne','Citation');
+      else if(b.type==='image')fields=field('url','Image URL',b.url)+bi('alt','alt_ne','Alt text')+bi('caption','caption_ne','Caption')+'<div class="row"><label class="btn" style="display:inline-block;cursor:pointer">＋ Add Image<input type="file" accept="image/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
       else if(b.type==='video')fields=field('url','Video URL or uploaded video URL',b.url)+'<div class="row"><label class="btn" style="display:inline-block;cursor:pointer">＋ Add Video<input type="file" accept="video/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
-      else if(b.type==='button')fields=field('text','Button label',b.text)+field('url','Button link',b.url);
-      else if(b.type==='hero')fields=field('title','Hero title',b.title)+field('subtitle','Hero subtitle',b.subtitle)+field('image','Background image URL',b.image)+field('button_text','Button text',b.button_text)+field('button_url','Button URL',b.button_url);
+      else if(b.type==='button')fields=bi('text','text_ne','Button label')+field('url','Button link',b.url);
+      else if(b.type==='hero')fields=bi('title','title_ne','Hero title')+bi('subtitle','subtitle_ne','Hero subtitle')+field('image','Background image URL',b.image)+bi('button_text','button_text_ne','Button text')+field('button_url','Button URL',b.button_url);
       else if(b.type==='spacer')fields=field('height','Height (px)',b.height||32);
-      else if(b.type==='columns')fields='<label>Columns (one per line, separated by ---)</label><textarea data-json-cols="'+i+'" rows="3">'+esc((b.columns||[]).map(c=>c.text||'').join('\n---\n'))+'</textarea>';
-      else if(b.type==='cards')fields='<label>Cards JSON ([{title,text,icon,url,linktext}])</label><textarea data-json-cards="'+i+'" rows="4">'+esc(JSON.stringify(b.cards||[],null,2))+'</textarea>';
-      else if(b.type==='html')fields=field('html','HTML code',b.html,true);
+      else if(b.type==='columns')fields='<div class="grid2"><div><label>Columns EN (separate by ---)</label><textarea data-json-cols-en="'+i+'" rows="3">'+esc((b.columns||[]).map(c=>c.text||'').join('\n---\n'))+'</textarea></div><div><label>Columns NE (separate by ---)</label><textarea data-json-cols-ne="'+i+'" rows="3">'+esc((b.columns||[]).map(c=>c.text_ne||'').join('\n---\n'))+'</textarea></div></div>';
+      else if(b.type==='cards')fields='<label>Cards JSON ([{title,title_ne,text,text_ne,icon,url,linktext,linktext_ne}])</label><textarea data-json-cards="'+i+'" rows="5">'+esc(JSON.stringify(b.cards||[],null,2))+'</textarea>';
+      else if(b.type==='html')fields=field('html','HTML code (EN / Default)',b.html,true)+field('html_ne','HTML code (NE optional — leave blank to reuse default HTML)',b.html_ne,true);
       else fields='<p class="muted">Divider block</p>';
       return '<div class="block" data-idx="'+i+'" style="display:block;margin:10px 0;padding:12px;border:1px solid #dce3ed;border-radius:10px;background:#fff"><div class="row" style="justify-content:space-between"><span class="row"><span class="handle" style="position:static;cursor:grab;font-size:16px" title="Drag to reorder">⠿</span><b>'+esc(b.type.toUpperCase())+'</b></span><div class="row"><button type="button" class="btn" data-up="'+i+'" '+(i===0?'disabled':'')+'>↑</button><button type="button" class="btn" data-down="'+i+'" '+(i===blocks.length-1?'disabled':'')+'>↓</button><button type="button" class="btn danger" data-rm="'+i+'">Remove</button></div></div><div style="margin-top:8px">'+fields+'</div></div>';
     }).join('')||'<p class="muted">No blocks yet. Add a block from the buttons.</p>';
     canvas.querySelectorAll('[data-rm]').forEach(btn=>btn.onclick=()=>{blocks.splice(+btn.dataset.rm,1);drawBlocks()});
     canvas.querySelectorAll('[data-up]').forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.up;if(i>0){[blocks[i-1],blocks[i]]=[blocks[i],blocks[i-1]];drawBlocks()}});
     canvas.querySelectorAll('[data-down]').forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.down;if(i<blocks.length-1){[blocks[i+1],blocks[i]]=[blocks[i],blocks[i+1]];drawBlocks()}});
-    canvas.querySelectorAll('[data-field]').forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.i],k=el.dataset.field;b[k]=k==='level'||k==='height'?Number(el.value):el.value});
-    canvas.querySelectorAll('[data-json-cols]').forEach(el=>el.oninput=()=>{blocks[+el.dataset.jsonCols].columns=el.value.split(/\n---\n/).map(text=>({text}))});
+    canvas.querySelectorAll('[data-field]').forEach(el=>el.oninput=()=>{const idx=+el.dataset.i,b=blocks[idx],k=el.dataset.field;b[k]=k==='level'||k==='height'?Number(el.value):el.value;scheduleBlockAutoTranslate(idx,k);});
+    canvas.querySelectorAll('[data-json-cols-en]').forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.jsonColsEn];const parts=el.value.split(/\n---\n/);const prev=b.columns||[];b.columns=Array.from({length:Math.max(parts.length,prev.length)},(_,k)=>({text:parts[k]??'',text_ne:prev[k]?.text_ne??''}));});
+    canvas.querySelectorAll('[data-json-cols-ne]').forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.jsonColsNe];const parts=el.value.split(/\n---\n/);const prev=b.columns||[];b.columns=Array.from({length:Math.max(parts.length,prev.length)},(_,k)=>({text:prev[k]?.text??'',text_ne:parts[k]??''}));});
     canvas.querySelectorAll('[data-json-cards]').forEach(el=>el.oninput=()=>{try{const arr=JSON.parse(el.value);if(Array.isArray(arr))blocks[+el.dataset.jsonCards].cards=arr}catch{}});
     canvas.querySelectorAll('[data-library]').forEach(btn=>btn.onclick=async()=>{
       const idx=+btn.dataset.library,block=blocks[idx];
@@ -1235,7 +1342,7 @@ function openPageEditor(page,dept,cats,restoring=false,deptMedia=[]){
   $$('[data-add]',ed).forEach(btn=>btn.onclick=()=>{
     const t=btn.dataset.add;
     selectEditorMode('blocks');
-    const defaults={heading:{type:t,text:'New heading',level:2},paragraph:{type:t,text:'Write your paragraph here.'},image:{type:t,url:'',alt:'',caption:''},video:{type:t,url:''},hero:{type:t,title:'Hero heading',subtitle:'',image:'',button_text:'Explore',button_url:'#'},columns:{type:t,columns:[{text:'Column 1'},{text:'Column 2'}]},cards:{type:t,cards:[{icon:'✦',title:'Card title',text:'Card description',url:'#',linktext:'Explore →'}]},spacer:{type:t,height:32},button:{type:t,text:'Learn more',url:'#'},quote:{type:t,text:'Quote text',cite:''},divider:{type:t},html:{type:t,html:''}};
+    const defaults={heading:{type:t,text:'New heading',text_ne:'',level:2},paragraph:{type:t,text:'Write your paragraph here.',text_ne:''},image:{type:t,url:'',alt:'',alt_ne:'',caption:'',caption_ne:''},video:{type:t,url:''},hero:{type:t,title:'Hero heading',title_ne:'',subtitle:'',subtitle_ne:'',image:'',button_text:'Explore',button_text_ne:'',button_url:'#'},columns:{type:t,columns:[{text:'Column 1',text_ne:''},{text:'Column 2',text_ne:''}]},cards:{type:t,cards:[{icon:'✦',title:'Card title',title_ne:'',text:'Card description',text_ne:'',url:'#',linktext:'Explore →',linktext_ne:'हेर्नुहोस् →'}]},spacer:{type:t,height:32},button:{type:t,text:'Learn more',text_ne:'थप हेर्नुहोस्',url:'#'},quote:{type:t,text:'Quote text',text_ne:'',cite:'',cite_ne:''},divider:{type:t},html:{type:t,html:'',html_ne:''}};
     blocks.push(defaults[t]||{type:t,text:''});
     drawBlocks();
   });
