@@ -29,7 +29,7 @@ async function hmac(secret, value) {
   );
   return b64(await crypto.subtle.sign("HMAC", k, enc.encode(value)));
 }
-async function passwordHash( password, salt = b64(crypto.getRandomValues(new Uint8Array(16))) ) {
+async function passwordHash( password, salt = b64(crypto.getRandomValues(new Uint8Array(16))), iterations = 100000 ) {
   const key = await crypto.subtle.importKey(
     "raw",
     enc.encode(password),
@@ -38,15 +38,18 @@ async function passwordHash( password, salt = b64(crypto.getRandomValues(new Uin
     ["deriveBits"]
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: unb64(salt), iterations: 10000, hash: "SHA-256" },
+    { name: "PBKDF2", salt: unb64(salt), iterations, hash: "SHA-256" },
     key,
     256
   );
-  return { salt, hash: b64(bits) };
+  const prefix = iterations === 100000 ? "v2:" : "";
+  return { salt, hash: prefix + b64(bits) };
 }
-async function verifyPassword(password, salt, hash) {
-  const x = await passwordHash(password, salt);
-  return x.hash === hash;
+async function verifyPassword(password, salt, storedHash) {
+  const isV2 = String(storedHash || "").startsWith("v2:");
+  const iterations = isV2 ? 100000 : 10000;
+  const x = await passwordHash(password, salt, iterations);
+  return x.hash === storedHash;
 }
 function cookie(req, name) {
   const c = req.headers.get("Cookie") || "";
@@ -168,7 +171,7 @@ async function allPublic(env) {
   const settings = await getSettings(env);
   let pages = await safeAll(
     env,
-    `SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.thumbnail_alt,p.thumbnail_focal_x,p.thumbnail_focal_y,p.updated_at,p.department_id,p.is_popular,p.content,d.name_en AS dept_en,d.name_ne AS dept_ne,d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT 300`
+    `SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.thumbnail_alt,p.thumbnail_focal_x,p.thumbnail_focal_y,p.updated_at,p.department_id,p.is_popular,CASE WHEN (p.thumbnail_summary_en='' OR p.thumbnail_summary_en IS NULL) AND (p.description_en='' OR p.description_en IS NULL) THEN p.content ELSE '' END AS content,d.name_en AS dept_en,d.name_ne AS dept_ne,d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT 300`
   );
   if (!pages.length) {
     pages = await safeAll(
@@ -177,19 +180,19 @@ async function allPublic(env) {
     );
   }
   pages = pages.map((pg) => {
-    if (!pg.thumbnail_summary_en && !pg.description_en) pg.thumbnail_summary_en = pageExcerpt(searchablePageText(pg.content), "");
+    if (!pg.thumbnail_summary_en && !pg.description_en && pg.content) pg.thumbnail_summary_en = pageExcerpt(searchablePageText(pg.content), "");
     if (!pg.thumbnail_summary_ne && !pg.description_ne) pg.thumbnail_summary_ne = pg.thumbnail_summary_en || "";
     delete pg.content;
     return pg;
   });
   let depts = await safeAll(
     env,
-    "SELECT id,name_en,name_ne,description_en,description_ne,url,icon,email,image,slug,sort_order FROM departments WHERE visible=1 ORDER BY sort_order"
+    "SELECT id,name_en,name_ne,description_en,description_ne,url,icon,image,slug,sort_order FROM departments WHERE visible=1 ORDER BY sort_order"
   );
   if (!depts.length) {
     depts = await safeAll(
       env,
-      "SELECT id,name_en,name_ne,description_en,description_ne,url,icon,email,image,sort_order FROM departments WHERE visible=1 ORDER BY sort_order"
+      "SELECT id,name_en,name_ne,description_en,description_ne,url,icon,image,sort_order FROM departments WHERE visible=1 ORDER BY sort_order"
     );
   }
   const menus = await safeAll(
@@ -378,7 +381,7 @@ async function importReceivedEmail(env, emailId, fallback = {}) {
     await env.MEDIA.put(key,bytes,{httpMetadata:{contentType:item.content_type||"application/octet-stream"}});
     attachmentRows.push({key,url:"/api/admin/messages/attachment?key="+encodeURIComponent(key),name:filename,content_type:item.content_type||"",size:bytes.byteLength});
   }
-  const cleanText=textBody||String(htmlBody||"").replace(/<\/(p|div|br|li|h[1-6])>/gi,"\\n").replace(/<[^>]*>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").trim()||"(No message body)";
+  const cleanText=textBody||String(htmlBody||"").replace(/<\/(p|div|br|li|h[1-6])>/gi,"\n").replace(/<[^>]*>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").trim()||"(No message body)";
   const inserted=await env.DB.prepare("INSERT INTO messages(name,email,subject,body,status,created_at,reply_text,replied_at) VALUES(?,?,?,?,?,?,?,?)")
     .bind(name,address,subject,cleanText.slice(0,30000),"new",received,JSON.stringify({inbound:true,html:htmlBody,attachments:attachmentRows}),null).run();
   await env.DB.prepare("INSERT INTO inbound_email_events(id,resend_email_id,message_id,sender,recipients,subject,body_text,body_html,headers_json,attachments_json,received_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
@@ -594,9 +597,9 @@ async function api(req, env) {
     const limit = Math.max(1,Math.min(60,Number(u.searchParams.get("limit")||24)));
     const offset = Math.max(0,Math.min(100000,Number(u.searchParams.get("offset")||0)));
     const pages = await safeAll(env,
-      "SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.thumbnail_alt,p.thumbnail_focal_x,p.thumbnail_focal_y,p.updated_at,p.department_id,p.is_popular,p.content,d.name_en AS dept_en,d.name_ne AS dept_ne,d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT ? OFFSET ?",
+      "SELECT p.slug,p.title_en,p.title_ne,p.description_en,p.description_ne,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.thumbnail_alt,p.thumbnail_focal_x,p.thumbnail_focal_y,p.updated_at,p.department_id,p.is_popular,CASE WHEN (p.thumbnail_summary_en='' OR p.thumbnail_summary_en IS NULL) AND (p.description_en='' OR p.description_en IS NULL) THEN p.content ELSE '' END AS content,d.name_en AS dept_en,d.name_ne AS dept_ne,d.slug AS dept_slug FROM pages p LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 ORDER BY p.updated_at DESC LIMIT ? OFFSET ?",
       limit,offset);
-    const enriched=pages.map((pg)=>{if(!pg.thumbnail_summary_en&&!pg.description_en)pg.thumbnail_summary_en=pageExcerpt(searchablePageText(pg.content),"");if(!pg.thumbnail_summary_ne&&!pg.description_ne)pg.thumbnail_summary_ne=pg.thumbnail_summary_en||"";delete pg.content;return pg;});
+    const enriched=pages.map((pg)=>{if(!pg.thumbnail_summary_en&&!pg.description_en&&pg.content)pg.thumbnail_summary_en=pageExcerpt(searchablePageText(pg.content),"");if(!pg.thumbnail_summary_ne&&!pg.description_ne)pg.thumbnail_summary_ne=pg.thumbnail_summary_en||"";delete pg.content;return pg;});
     return json({pages:enriched,hasMore:pages.length===limit});
   }
 
@@ -652,6 +655,13 @@ async function api(req, env) {
       return json({ error: "Name and comment required." }, 400);
     if (bodyText.length < 3) return json({ error: "Comment too short." }, 400);
     try {
+      const targetPage = await env.DB.prepare("SELECT slug FROM pages WHERE slug=? AND published=1").bind(slug).first();
+      if (!targetPage) return json({ error: "Published page not found." }, 404);
+      const recentCutoff = new Date(Date.now() - 60000).toISOString();
+      const recentCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE page_slug=? AND created_at>?").bind(slug, recentCutoff).first();
+      if (Number(recentCount?.n || 0) >= 8) return json({ error: "Too many comments submitted recently. Please wait a minute." }, 429);
+      const dup = await env.DB.prepare("SELECT id FROM comments WHERE page_slug=? AND name=? AND body=? AND created_at>? LIMIT 1").bind(slug, name, bodyText, recentCutoff).first();
+      if (dup) return json({ ok: true, message: "Thanks! Your feedback is awaiting approval." });
       await env.DB.prepare(
         "INSERT INTO comments(page_slug,name,email,body,status,created_at) VALUES(?,?,?,?,?,?)"
       )
@@ -691,13 +701,6 @@ async function api(req, env) {
       return json({ error: "Name, email and message required." }, 400);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       return json({ error: "Invalid email." }, 400);
-    let deptEmail = null;
-    if (departmentId) {
-      const d = await env.DB.prepare("SELECT email FROM departments WHERE id=?")
-        .bind(departmentId)
-        .first();
-      deptEmail = d?.email || null;
-    }
     await env.DB.prepare(
       "INSERT INTO messages(department_id,name,email,subject,body,status,created_at) VALUES(?,?,?,?,?,?,?)"
     )
@@ -773,8 +776,10 @@ async function api(req, env) {
       const stamp = new Date().toISOString();
       let alertResult = { sent: false, error: "Alert threshold not reached." };
       if (attempts === 4) {
+        const cfg = await getSettings(env);
+        const alertTo = String(cfg.security_alert_email || cfg.contact_email || a.email || "").trim();
         alertResult = await sendEmail(env, {
-          to: "koiralagopalpd@gmail.com",
+          to: alertTo,
           subject: "Granshi Admin security alert: failed login",
           html: "<p>Four failed Admin login attempts detected.</p><p>Time (UTC): "+escapeHtml(stamp)+"</p><p>IP: "+escapeHtml(ip)+"</p><p>Browser/device: "+escapeHtml(ua)+"</p><p>Failed attempts: 4 of 5. Account is not yet locked.</p><p>No password or session token is included.</p>"
         });
@@ -785,7 +790,12 @@ async function api(req, env) {
       if (attempts === 3) return json({ error: "Incorrect password. Final warning: one more failed attempt will lock the Admin account." }, 401);
       return json({ error: "Incorrect email or password." }, 401);
     }
-    await env.DB.prepare("UPDATE admins SET failed_login_attempts=0 WHERE email=?").bind(email).run();
+    if (!String(a.password_hash || "").startsWith("v2:")) {
+      const upgraded = await passwordHash(String(x.password || ""));
+      await env.DB.prepare("UPDATE admins SET failed_login_attempts=0,salt=?,password_hash=? WHERE email=?").bind(upgraded.salt, upgraded.hash, email).run();
+    } else {
+      await env.DB.prepare("UPDATE admins SET failed_login_attempts=0 WHERE email=?").bind(email).run();
+    }
     return json({ ok: true }, 200, { "set-cookie": sessionCookie(await sessionToken(env, a.email)) });
   }
   if (p === "/api/auth/logout" && method === "POST")
@@ -843,75 +853,40 @@ async function api(req, env) {
     return json({ok:true});
   }
 
-  // Private, persistent hierarchical content-development project tracker.
-  if (p === "/api/admin/content-project" && method === "GET") {
-    const project = await env.DB.prepare("SELECT * FROM content_projects WHERE id=1").first();
-    if (!project) return json({ error: "Content project is not initialized. Apply migration 0010." }, 503);
-    const departments = (await env.DB.prepare(`
-      SELECT d.id,d.code,d.title_en,d.title_ne,d.sort_order,
-        COUNT(t.id) AS total_topics,
-        SUM(CASE WHEN t.status='completed' THEN 1 ELSE 0 END) AS completed_topics
-      FROM content_plan_departments d
-      LEFT JOIN content_plan_categories c ON c.department_id=d.id
-      LEFT JOIN content_plan_topics t ON t.category_id=c.id
-      WHERE d.project_id=1
-      GROUP BY d.id ORDER BY d.sort_order,d.id
-    `).all()).results || [];
-    const totals = departments.reduce((a,d)=>({total:a.total+Number(d.total_topics||0),completed:a.completed+Number(d.completed_topics||0)}),{total:0,completed:0});
-    return json({project,departments,total:totals.total,completed:totals.completed,remaining:totals.total-totals.completed,target:800});
+  // Admin security audit log & session revocation
+  if (p === "/api/admin/security/events" && method === "GET") {
+    const events = await safeAll(env, "SELECT id,event_type,attempt_count,ip_address,user_agent,email_alert_status,email_alert_error,created_at FROM admin_security_events ORDER BY created_at DESC, id DESC LIMIT 100");
+    const adminInfo = await env.DB.prepare("SELECT email,failed_login_attempts,session_version,created_at FROM admins WHERE email=?").bind(who).first();
+    return json({ events, admin: adminInfo });
   }
-  if (p === "/api/admin/content-project/categories" && method === "GET") {
-    const departmentId=Number(u.searchParams.get("department_id")||0);
-    if(!Number.isInteger(departmentId)||departmentId<1) return json({error:"Valid department_id is required."},400);
-    const department=await env.DB.prepare("SELECT id FROM content_plan_departments WHERE id=? AND project_id=1").bind(departmentId).first();
-    if(!department) return json({error:"Department not found."},404);
-    const categories=(await env.DB.prepare(`
-      SELECT c.id,c.title_en,c.title_ne,c.sort_order,COUNT(t.id) AS total_topics,
-        SUM(CASE WHEN t.status='completed' THEN 1 ELSE 0 END) AS completed_topics
-      FROM content_plan_categories c LEFT JOIN content_plan_topics t ON t.category_id=c.id
-      WHERE c.department_id=? GROUP BY c.id ORDER BY c.sort_order,c.id
-    `).bind(departmentId).all()).results||[];
-    return json({categories});
+  if (p === "/api/admin/security/revoke-sessions" && method === "POST") {
+    await env.DB.prepare("UPDATE admins SET session_version=session_version+1 WHERE email=?").bind(who).run();
+    return json({ ok: true }, 200, { "set-cookie": clearCookie });
   }
-  if (p === "/api/admin/content-project/topics" && method === "GET") {
-    const categoryId=Number(u.searchParams.get("category_id")||0);
-    if(!Number.isInteger(categoryId)||categoryId<1) return json({error:"Valid category_id is required."},400);
-    const category=await env.DB.prepare("SELECT id FROM content_plan_categories WHERE id=?").bind(categoryId).first();
-    if(!category) return json({error:"Category not found."},404);
-    const topics=(await env.DB.prepare("SELECT id,title_en,title_ne,status,sort_order,completed_at FROM content_plan_topics WHERE category_id=? ORDER BY sort_order,id").bind(categoryId).all()).results||[];
-    return json({topics});
-  }
-  if (p === "/api/admin/content-project/topics" && method === "POST") {
-    const x=await body(req),categoryId=Number(x.category_id);
-    const titleEn=String(x.title_en||"").trim().slice(0,240),titleNe=String(x.title_ne||"").trim().slice(0,240);
-    if(!Number.isInteger(categoryId)||categoryId<1||!titleEn) return json({error:"Category and English topic title are required."},400);
-    const category=await env.DB.prepare("SELECT id FROM content_plan_categories WHERE id=?").bind(categoryId).first();
-    if(!category) return json({error:"Category not found."},404);
-    const now=new Date().toISOString();
-    const r=await env.DB.prepare("INSERT INTO content_plan_topics(category_id,title_en,title_ne,status,sort_order,created_at,updated_at) VALUES(?,?,?,'pending',COALESCE((SELECT MAX(sort_order)+1 FROM content_plan_topics WHERE category_id=?),1),?,?)")
-      .bind(categoryId,titleEn,titleNe,categoryId,now,now).run();
-    await env.DB.prepare("UPDATE content_projects SET updated_at=? WHERE id=1").bind(now).run();
-    return json({ok:true,id:r.meta?.last_row_id||null});
-  }
-  if (p.match(/^\/api\/admin\/content-project\/topics\/\d+$/) && method === "PATCH") {
-    const id=Number(p.split("/").pop()),x=await body(req);
-    const existing=await env.DB.prepare("SELECT id FROM content_plan_topics WHERE id=?").bind(id).first();
-    if(!existing) return json({error:"Topic not found."},404);
-    const titleEn=String(x.title_en||"").trim().slice(0,240),titleNe=String(x.title_ne||"").trim().slice(0,240);
-    const status=x.status==="completed"?"completed":"pending";
-    if(!titleEn) return json({error:"English topic title is required."},400);
-    const now=new Date().toISOString();
-    await env.DB.prepare("UPDATE content_plan_topics SET title_en=?,title_ne=?,status=?,updated_at=?,completed_at=? WHERE id=?")
-      .bind(titleEn,titleNe,status,now,status==="completed"?now:null,id).run();
-    await env.DB.prepare("UPDATE content_projects SET updated_at=? WHERE id=1").bind(now).run();
-    return json({ok:true});
-  }
-  if (p.match(/^\/api\/admin\/content-project\/topics\/\d+$/) && method === "DELETE") {
-    const id=Number(p.split("/").pop());
-    const r=await env.DB.prepare("DELETE FROM content_plan_topics WHERE id=?").bind(id).run();
-    if(!r.meta?.changes) return json({error:"Topic not found."},404);
-    await env.DB.prepare("UPDATE content_projects SET updated_at=? WHERE id=1").bind(new Date().toISOString()).run();
-    return json({ok:true});
+
+  // Cross-device synced email drafts (auto-creates table if migration 0011 has not yet been applied)
+  if (p.startsWith("/api/admin/email/drafts")) {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS email_drafts (id TEXT PRIMARY KEY, recipient TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL)").run();
+    if (p === "/api/admin/email/drafts" && method === "GET") {
+      const drafts = await safeAll(env, "SELECT id,recipient AS 'to',subject,body,updated_at AS saved_at FROM email_drafts ORDER BY updated_at DESC LIMIT 100");
+      return json(drafts);
+    }
+    if (p === "/api/admin/email/drafts" && method === "POST") {
+      const x = await body(req);
+      const id = String(x.id || ("draft-" + Date.now())).slice(0, 100);
+      const recipient = String(x.to || "").trim().slice(0, 180);
+      const subject = String(x.subject || "").trim().slice(0, 200);
+      const textBody = String(x.body || "").slice(0, 20000);
+      const now = new Date().toISOString();
+      await env.DB.prepare("INSERT INTO email_drafts(id,recipient,subject,body,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET recipient=excluded.recipient,subject=excluded.subject,body=excluded.body,updated_at=excluded.updated_at")
+        .bind(id, recipient, subject, textBody, now).run();
+      return json({ ok: true, id, saved_at: now });
+    }
+    if (p.startsWith("/api/admin/email/drafts/") && method === "DELETE") {
+      const id = decodeURIComponent(p.slice("/api/admin/email/drafts/".length));
+      await env.DB.prepare("DELETE FROM email_drafts WHERE id=?").bind(id).run();
+      return json({ ok: true });
+    }
   }
 
   if (p === "/api/admin/overview") {
@@ -1192,10 +1167,16 @@ async function api(req, env) {
     });
   }
   if (p.startsWith("/api/admin/pages/") && method === "DELETE") {
-    const slug = decodeURIComponent(p.split("/").pop());
+    const slug = decodeURIComponent(p.slice("/api/admin/pages/".length));
+    const mediaRows = await safeAll(env, "SELECT key FROM media WHERE page_slug=?", slug);
+    if (env.MEDIA) {
+      for (const row of mediaRows) {
+        if (row?.key) { try { await env.MEDIA.delete(row.key); } catch {} }
+      }
+    }
+    await env.DB.prepare("DELETE FROM media WHERE page_slug=?").bind(slug).run();
     await env.DB.prepare("DELETE FROM pages WHERE slug=?").bind(slug).run();
     await env.DB.prepare("DELETE FROM page_search_index WHERE page_slug=?").bind(slug).run();
-    // best-effort: list/delete R2 not available without list permission pattern — leave orphans ok
     return json({ ok: true });
   }
 
@@ -1297,7 +1278,7 @@ async function api(req, env) {
           x.label_en,
           x.label_ne || "",
           x.url || "#",
-          1,
+          x.visible === false ? 0 : 1,
           Number(x.sort_order || 0)
         )
         .run();
@@ -1386,7 +1367,8 @@ async function api(req, env) {
     return json({ ok: true, key, url });
   }
   if (p.startsWith("/api/admin/media/") && method === "DELETE") {
-    const key = decodeURIComponent(p.split("/").pop());
+    const key = decodeURIComponent(p.slice("/api/admin/media/".length));
+    if (!key || key.includes("..")) return json({ error: "Invalid media key." }, 400);
     if (env.MEDIA) await env.MEDIA.delete(key);
     await env.DB.prepare("DELETE FROM media WHERE key=?").bind(key).run();
     return json({ ok: true });
@@ -1437,7 +1419,8 @@ async function api(req, env) {
     const attachments = Array.isArray(x.attachments) ? x.attachments.slice(0,10) : [];
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({error:"Valid recipient email required."},400);
     if (!subject || !textBody) return json({error:"Subject and message are required."},400);
-    const attHtml = attachments.map(x=>'<p>Attachment: <a href="'+escapeHtml(x.url||"")+'">'+escapeHtml(x.name||"file")+'</a></p>').join("");
+    const absUrl = (rawUrl) => { const v = String(rawUrl || ""); return v.startsWith("/") ? u.origin + v : v; };
+    const attHtml = attachments.map(a=>'<p>Attachment: <a href="'+escapeHtml(absUrl(a.url))+'">'+escapeHtml(a.name||"file")+'</a></p>').join("");
     const html = '<div style="font:15px/1.7 Arial,sans-serif;white-space:pre-wrap">'+escapeHtml(textBody).replace(/\n/g,"<br>")+'</div>'+attHtml;
     const delivery = await sendEmail(env,{from:"info@gopalkoirala.com.np",to,subject,html,attachments});
     if (!delivery.sent) return json({error:"Email could not be sent.",detail:delivery.error||"Email service unavailable."},502);
@@ -1461,7 +1444,8 @@ async function api(req, env) {
     const original = await env.DB.prepare("SELECT * FROM messages WHERE id=? AND reply_text LIKE ?").bind(id,'{"inbound":true%').first();
     if (!original) return json({error:"Incoming email not found."},404);
     if (!subject || !textBody) return json({error:"Subject and message are required."},400);
-    const attHtml = attachments.map(x=>'<p>Attachment: <a href="'+escapeHtml(x.url||"")+'">'+escapeHtml(x.name||"file")+'</a></p>').join("");
+    const absUrl = (rawUrl) => { const v = String(rawUrl || ""); return v.startsWith("/") ? u.origin + v : v; };
+    const attHtml = attachments.map(a=>'<p>Attachment: <a href="'+escapeHtml(absUrl(a.url))+'">'+escapeHtml(a.name||"file")+'</a></p>').join("");
     const html = '<div style="font:15px/1.7 Arial,sans-serif;white-space:pre-wrap">'+escapeHtml(textBody).replace(/\n/g,"<br>")+'</div>'+attHtml;
     const delivery = await sendEmail(env,{from:"info@gopalkoirala.com.np",to:original.email,subject,html,attachments});
     if (!delivery.sent) return json({error:"Reply could not be sent.",detail:delivery.error||"Email service unavailable."},502);
@@ -1513,16 +1497,17 @@ async function api(req, env) {
       attachments.length > 0
         ? reply + "\n\n<!--ATTACH:" + JSON.stringify(attachments) + "-->"
         : reply;
+    const absUrl = (rawUrl) => { const v = String(rawUrl || ""); return v.startsWith("/") ? u.origin + v : v; };
     const attHtml = attachments
       .map((a) => {
-        const u = escapeHtml(a.url || "");
+        const href = escapeHtml(absUrl(a.url || ""));
         const n = escapeHtml(a.name || "file");
         const isImg =
           /\.(png|jpe?g|gif|webp)$/i.test(a.name || "") ||
           (a.content_type || "").startsWith("image/");
         if (isImg)
-          return `<p><a href="${u}"><img src="${u}" alt="${n}" style="max-width:240px;border-radius:8px"></a></p>`;
-        return `<p>Attachment: <a href="${u}">${n}</a></p>`;
+          return `<p><a href="${href}"><img src="${href}" alt="${n}" style="max-width:240px;border-radius:8px"></a></p>`;
+        return `<p>Attachment: <a href="${href}">${n}</a></p>`;
       })
       .join("");
     const contactFooter = "थप सहयोग वा जानकारी आवश्यक परे हामीलाई info@gopalkoirala.com.np मा सिधै इमेल गर्नुहोला।";
@@ -1530,6 +1515,7 @@ async function api(req, env) {
     const storedReply = attachments.length > 0 ? finalReply + "\n\n<!--ATTACH:" + JSON.stringify(attachments) + "-->" : finalReply;
     const delivery = await sendEmail(env, {
       from: "noreply@gopalkoirala.com.np",
+      replyTo: "info@gopalkoirala.com.np",
       to: msg.email,
       subject: `Re: ${msg.subject || "Your message to Granshi"}`,
       html: "<p>Hello " + escapeHtml(msg.name) + ",</p><p>" + escapeHtml(reply).replace(/\n/g, "<br>") + "</p>" + attHtml + "<p style='margin-top:22px;padding-top:14px;border-top:1px solid #ddd'>" + escapeHtml(contactFooter) + "</p><hr><p>Original: " + escapeHtml(msg.body || "") + "</p>",
@@ -1541,7 +1527,7 @@ async function api(req, env) {
   }
   if (p.startsWith("/api/admin/messages/") && method === "POST") {
     const x = await body(req);
-    if (x.status)
+    if (["new", "replied", "archived"].includes(x.status))
       await env.DB.prepare("UPDATE messages SET status=? WHERE id=?")
         .bind(x.status, p.split("/").pop())
         .run();
@@ -1782,7 +1768,18 @@ export default {
         } catch (_) {}
       }
     }
-    return env.ASSETS.fetch(req);
+    const assetRes = await env.ASSETS.fetch(req);
+    if (assetRes.status === 404 && !u.pathname.split("/").pop()?.includes(".")) {
+      const settings = await getSettings(env);
+      const lang = u.searchParams.get("lang") === "ne" ? "ne" : "en";
+      const title = lang === "ne" ? "पेज भेटिएन (404)" : "Page Not Found (404)";
+      const body404 = `<section class="page-hero"><div class="wrap"><h1>404</h1><p>${lang === "ne" ? "माफ गर्नुहोला, तपाईंले खोज्नुभएको पृष्ठ भेटिएन वा प्रकाशित गरिएको छैन।" : "Sorry, the page you requested could not be found or is not published."}</p><p style="margin-top:18px"><a class="btn" href="/${lang === "ne" ? "?lang=ne" : ""}">${lang === "ne" ? "गृहपृष्ठमा फर्कनुहोस्" : "Back to Home"}</a></p></div></section>`;
+      return new Response(pageChrome(title, "", body404, settings, lang), {
+        status: 404,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+    return assetRes;
   },
 };
 

@@ -100,7 +100,14 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
   <label>Email</label><input id="email" type="email">
   <label>Password</label><input id="password" type="password">
   <div id="setupTokenField" class="hidden"><label>Setup Token</label><input id="setupToken" type="password"></div>
-  <button class="btn gold" id="loginBtn">Log in</button>
+  <div class="row"><button class="btn gold" id="loginBtn">Log in</button><button class="btn" id="toggleRecover" type="button" style="background:#eef1f6;color:#172640">Unlock account</button></div>
+  <div id="recoverBox" class="hidden" style="margin-top:14px;padding:12px;border:1px solid #dfe4ec;border-radius:10px;background:#f8f9fc">
+    <p class="muted" style="margin-top:0">Account locked after 5 failed attempts? First authorize recovery in D1 (<code>UPDATE admins SET recovery_authorized=1 WHERE email='...'</code>), then enter your email and <code>SETUP_TOKEN</code> below.</p>
+    <label>Recovery Email</label><input id="recEmail" type="email">
+    <label>Setup Token</label><input id="recToken" type="password">
+    <button class="btn gold" id="recoverBtn" type="button">Unlock Admin</button>
+    <p class="muted" id="recoverStatus"></p>
+  </div>
   <p class="muted" id="loginStatus"></p>
 </div>
 
@@ -147,7 +154,18 @@ $('#loginBtn').onclick=async()=>{
     else
       await api('/auth/login',{method:'POST',body:JSON.stringify({email:$('#email').value.trim(),password:$('#password').value})});
     showApp($('#email').value.trim());
-  }catch(e){$('#loginStatus').textContent=e.message}
+  }catch(e){
+    $('#loginStatus').textContent=e.message;
+    if(e.status===423){$('#recoverBox').classList.remove('hidden');$('#recEmail').value=$('#email').value.trim();}
+  }
+};
+$('#toggleRecover').onclick=()=>$('#recoverBox').classList.toggle('hidden');
+$('#recoverBtn').onclick=async()=>{
+  $('#recoverStatus').textContent='Unlocking…';
+  try{
+    const res=await api('/admin/recover-lock',{method:'POST',body:JSON.stringify({email:$('#recEmail').value.trim(),setupToken:$('#recToken').value})});
+    $('#recoverStatus').textContent=res.message||'Unlocked! Now log in above.';
+  }catch(e){$('#recoverStatus').textContent=e.message;}
 };
 $('#logout').onclick=async()=>{await api('/auth/logout',{method:'POST'});location.reload()};
 $('#exitFocus').onclick=()=>{setRoute({tab:'overview',deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab('overview')};
@@ -179,13 +197,26 @@ async function tab(name){
     if(name==='usefulLinks') await renderUsefulLinks(v);
     if(name==='settings') await renderSettings(v);
     if(name==='security'){
-      v.innerHTML=`<div class="box"><h3>Change password</h3>
-        <label>Current</label><input id="oldp" type="password">
-        <label>New (12+)</label><input id="newp" type="password">
-        <button class="btn gold" id="chp">Change</button></div>`;
-      $('#chp').onclick=async()=>{try{await api('/admin/password',{method:'POST',body:JSON.stringify({currentPassword:$('#oldp').value,newPassword:$('#newp').value})});alert('Changed')}catch(e){alert(e.message)}};
+      await renderSecurity(v);
     }
   }catch(e){v.innerHTML=`<div class="box">Error: ${esc(e.message)}</div>`}
+}
+
+async function renderSecurity(v){
+  let sec={events:[],admin:null};
+  try{sec=await api('/admin/security/events')}catch{}
+  const events=sec.events||[];
+  v.innerHTML=`<div class="box"><h3>Change password</h3>
+    <label>Current</label><input id="oldp" type="password">
+    <label>New (12+)</label><input id="newp" type="password">
+    <div class="row"><button class="btn gold" id="chp">Change</button><button class="btn danger" id="revokeAll" type="button">Log out all devices</button></div>
+  </div>
+  <div class="box"><h3>Security &amp; Failed Login Log</h3>
+    <p class="muted">Active session version: <b>${Number(sec.admin?.session_version||0)}</b> · Current failed attempts: <b>${Number(sec.admin?.failed_login_attempts||0)}</b>/5</p>
+    ${events.length?events.map(ev=>`<div class="diag-report-row"><div class="row" style="justify-content:space-between"><b>${esc(ev.event_type)} (attempt #${Number(ev.attempt_count||0)})</b><span class="badge ${ev.email_alert_status==='sent'?'published':ev.email_alert_status==='failed'?'draft':'new'}">Alert: ${esc(ev.email_alert_status)}</span></div><p>${esc((ev.created_at||'').replace('T',' ').slice(0,19))} UTC · IP: ${esc(ev.ip_address||'—')}</p><p>${esc(ev.user_agent||'')}${ev.email_alert_error?' · Error: '+esc(ev.email_alert_error):''}</p></div>`).join(''):'<p class="muted">No failed login events recorded.</p>'}
+  </div>`;
+  $('#chp').onclick=async()=>{try{await api('/admin/password',{method:'POST',body:JSON.stringify({currentPassword:$('#oldp').value,newPassword:$('#newp').value})});alert('Password changed. Please log in again.');location.reload()}catch(e){alert(e.message)}};
+  $('#revokeAll').onclick=async()=>{if(!confirm('Revoke all active Admin sessions and log out everywhere?'))return;try{await api('/admin/security/revoke-sessions',{method:'POST',body:'{}'});location.reload()}catch(e){alert(e.message)}};
 }
 
 
@@ -228,7 +259,7 @@ async function renderAdminOverview(v){
  $$('[data-go]',v).forEach(x=>x.onclick=()=>tab(x.dataset.go));
  $('#previewSite',v).onclick=()=>window.open('/','_blank','noopener');
  $('#runDiagnosis',v).onclick=()=>startOrResumeDiagnosis(v);
- $('#diagOpenRun',v).onclick=()=>{$('#diagDetails',v).classList.remove('hidden');$('#diagDetails',v).innerHTML='<h3>Website Diagnosis Control</h3><p class="muted">Scan पाँचवटा जाँच प्रति चरणमा चल्छ। Refresh वा network interruption भए D1 checkpoint बाट जारी हुन्छ।</p><button class="btn gold" id="diagRunAgain">Run / Resume Diagnosis</button><div id="diagRunNote" class="muted" style="margin-top:8px"></div>';$('#diagRunAgain',v).onclick=()=>startOrResumeDiagnosis(v)};
+ $('#diagOpenRun',v).onclick=()=>{$('#diagDetails',v).classList.remove('hidden');$('#diagDetails',v).innerHTML='<h3>Website Diagnosis Control</h3><p class="muted">Scan दसवटा जाँच प्रति चरणमा चल्छ। Refresh वा network interruption भए D1 checkpoint बाट जारी हुन्छ।</p><button class="btn gold" id="diagRunAgain">Run / Resume Diagnosis</button><div id="diagRunNote" class="muted" style="margin-top:8px"></div>';$('#diagRunAgain',v).onclick=()=>startOrResumeDiagnosis(v)};
  $('#diagOpenHealth',v).onclick=()=>showDiagnosisDetails(v,'health');
  $('#diagOpenReport',v).onclick=()=>showDiagnosisDetails(v,'report');
  $('#diagOpenStorage',v).onclick=()=>showStorageDetails(v);
@@ -491,6 +522,7 @@ function openPageEditor(page,dept,cats,restoring=false){
   const isZipExisting=page && String(page.template||'').startsWith('zip:');
   let fileList=[];
   let zipReady=false;
+  if(isZipExisting){try{const parsed=typeof page.content==='string'?JSON.parse(page.content):page.content;if(Array.isArray(parsed?.files))fileList=parsed.files;}catch{}}
   ed.innerHTML=`<div class="editor-top"><h3 style="margin:0">${page?'Edit page':'New page'}</h3><button class="btn" id="editorBack" type="button">← Back to Pages</button></div>
     <div class="notice"><b>Primary:</b> Upload a ZIP of your finished page (must include <code>index.html</code>). Test offline first, then upload → Preview → Publish.</div>
     <div class="grid2">
@@ -544,11 +576,15 @@ function openPageEditor(page,dept,cats,restoring=false){
           <button type="button" data-add="paragraph">＋ Paragraph</button>
           <button type="button" data-add="image">＋ Image</button>
           <button type="button" data-add="video">＋ Video</button>
+          <button type="button" data-add="hero">＋ Hero Banner</button>
+          <button type="button" data-add="columns">＋ Columns</button>
+          <button type="button" data-add="cards">＋ Cards Grid</button>
           <button type="button" data-add="button">＋ Button / Link</button>
           <button type="button" data-add="quote">＋ Quote</button>
+          <button type="button" data-add="spacer">＋ Spacer</button>
           <button type="button" data-add="divider">＋ Divider</button>
           <button type="button" data-add="html">＋ Custom HTML</button>
-          <p class="muted">On mobile use ↑ / ↓ to reorder blocks.</p>
+          <p class="muted">Drag ⠿ handle or use ↑ / ↓ to reorder blocks.</p>
         </div>
       </div>
     </div>`;
@@ -621,12 +657,12 @@ function openPageEditor(page,dept,cats,restoring=false){
         done++;
         st.textContent=`Uploaded ${done}/${names.length}…`;
       }
-      // save page meta as draft zip
+      // preserve current published state when uploading ZIP
       await api('/admin/pages',{method:'POST',body:JSON.stringify({
         slug,title_en:$('#p_te').value.trim()||slug,title_ne:$('#p_tn').value.trim(),
         description_en:$('#p_de').value.trim(),description_ne:$('#p_dn').value.trim(),
         department_id:dept.id,category_id:$('#p_cat').value?Number($('#p_cat').value):null,
-        published:false,is_popular:$('#p_pop').checked,
+        published:$('#p_pub').checked,is_popular:$('#p_pop').checked,
         thumbnail_image:$('#p_thumb').value.trim(),thumbnail_title_en:$('#p_ttitle_en').value.trim(),thumbnail_title_ne:$('#p_ttitle_ne').value.trim(),
         thumbnail_summary_en:$('#p_tsum_en').value.trim(),thumbnail_summary_ne:$('#p_tsum_ne').value.trim(),thumbnail_alt:$('#p_talt').value.trim(),
         thumbnail_focal_x:Number($('#p_fx').value||50),thumbnail_focal_y:Number($('#p_fy').value||50),
@@ -634,13 +670,14 @@ function openPageEditor(page,dept,cats,restoring=false){
         content:{files:names,entry:entryFile}
       })});
       zipReady=true;useZip=true;
-      st.textContent=`OK — ${done} files. Now Preview, then check Published and Save.`;
+      st.textContent=`OK — ${done} files uploaded. Click Preview, or Save page.`;
       $('#prevP').href='/_preview/'+encodeURIComponent(slug);
     }catch(e){st.textContent='Error: '+e.message;alert(e.message)}
   };
 
-  // minimal optional blocks
+  // minimal optional blocks + SortableJS drag reorder
   const canvas=$('#canvas');
+  let sortableInst=null;
   function drawBlocks(){
     if(!canvas)return;
     canvas.innerHTML=blocks.map((b,i)=>{
@@ -651,14 +688,20 @@ function openPageEditor(page,dept,cats,restoring=false){
       else if(b.type==='image')fields=field('url','Image URL',b.url)+field('alt','Alt text',b.alt)+field('caption','Caption',b.caption)+'<div class="row"><label class="btn" style="display:inline-block;cursor:pointer">＋ Add Image<input type="file" accept="image/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
       else if(b.type==='video')fields=field('url','Video URL or uploaded video URL',b.url)+'<div class="row"><label class="btn" style="display:inline-block;cursor:pointer">＋ Add Video<input type="file" accept="video/*" data-upload="'+i+'" hidden></label><button type="button" class="btn" data-library="'+i+'">Media Library</button></div>';
       else if(b.type==='button')fields=field('text','Button label',b.text)+field('url','Button link',b.url);
+      else if(b.type==='hero')fields=field('title','Hero title',b.title)+field('subtitle','Hero subtitle',b.subtitle)+field('image','Background image URL',b.image)+field('button_text','Button text',b.button_text)+field('button_url','Button URL',b.button_url);
+      else if(b.type==='spacer')fields=field('height','Height (px)',b.height||32);
+      else if(b.type==='columns')fields='<label>Columns (one per line, use | for multiple)</label><textarea data-json-cols="'+i+'" rows="3">'+esc((b.columns||[]).map(c=>c.text||'').join('\n---\n'))+'</textarea>';
+      else if(b.type==='cards')fields='<label>Cards JSON ([{title,text,icon,url,linktext}])</label><textarea data-json-cards="'+i+'" rows="4">'+esc(JSON.stringify(b.cards||[],null,2))+'</textarea>';
       else if(b.type==='html')fields=field('html','HTML code',b.html,true);
       else fields='<p class="muted">Divider block</p>';
-      return '<div class="block" style="display:block;margin:10px 0;padding:12px;border:1px solid #dce3ed;border-radius:10px;background:#fff"><div class="row" style="justify-content:space-between"><b>'+esc(b.type.toUpperCase())+'</b><div class="row"><button type="button" class="btn" data-up="'+i+'" '+(i===0?'disabled':'')+'>↑</button><button type="button" class="btn" data-down="'+i+'" '+(i===blocks.length-1?'disabled':'')+'>↓</button><button type="button" class="btn danger" data-rm="'+i+'">Remove</button></div></div><div style="margin-top:8px">'+fields+'</div></div>';
+      return '<div class="block" data-idx="'+i+'" style="display:block;margin:10px 0;padding:12px;border:1px solid #dce3ed;border-radius:10px;background:#fff"><div class="row" style="justify-content:space-between"><span class="row"><span class="handle" style="position:static;cursor:grab;font-size:16px" title="Drag to reorder">⠿</span><b>'+esc(b.type.toUpperCase())+'</b></span><div class="row"><button type="button" class="btn" data-up="'+i+'" '+(i===0?'disabled':'')+'>↑</button><button type="button" class="btn" data-down="'+i+'" '+(i===blocks.length-1?'disabled':'')+'>↓</button><button type="button" class="btn danger" data-rm="'+i+'">Remove</button></div></div><div style="margin-top:8px">'+fields+'</div></div>';
     }).join('')||'<p class="muted">No blocks yet. Add a block from the buttons.</p>';
     canvas.querySelectorAll('[data-rm]').forEach(btn=>btn.onclick=()=>{blocks.splice(+btn.dataset.rm,1);drawBlocks()});
     canvas.querySelectorAll('[data-up]').forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.up;if(i>0){[blocks[i-1],blocks[i]]=[blocks[i],blocks[i-1]];drawBlocks()}});
     canvas.querySelectorAll('[data-down]').forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.down;if(i<blocks.length-1){[blocks[i+1],blocks[i]]=[blocks[i],blocks[i+1]];drawBlocks()}});
-    canvas.querySelectorAll('[data-field]').forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.i],k=el.dataset.field;b[k]=k==='level'?Number(el.value):el.value});
+    canvas.querySelectorAll('[data-field]').forEach(el=>el.oninput=()=>{const b=blocks[+el.dataset.i],k=el.dataset.field;b[k]=k==='level'||k==='height'?Number(el.value):el.value});
+    canvas.querySelectorAll('[data-json-cols]').forEach(el=>el.oninput=()=>{blocks[+el.dataset.jsonCols].columns=el.value.split(/\n---\n/).map(text=>({text}))});
+    canvas.querySelectorAll('[data-json-cards]').forEach(el=>el.oninput=()=>{try{const arr=JSON.parse(el.value);if(Array.isArray(arr))blocks[+el.dataset.jsonCards].cards=arr}catch{}});
     canvas.querySelectorAll('[data-library]').forEach(btn=>btn.onclick=async()=>{
       const idx=+btn.dataset.library,block=blocks[idx];
       try{
@@ -684,12 +727,16 @@ function openPageEditor(page,dept,cats,restoring=false){
         blocks[idx].url=d.url||('/media/pages/'+slug+'/'+rel);drawBlocks();if(st)st.textContent='Uploaded '+file.name;
       }catch(err){alert(err.message)}
     });
+    if(sortableInst){try{sortableInst.destroy()}catch{}}
+    if(window.Sortable&&blocks.length>1){
+      sortableInst=Sortable.create(canvas,{handle:'.handle',animation:150,onEnd:(evt)=>{if(evt.oldIndex===evt.newIndex)return;const moved=blocks.splice(evt.oldIndex,1)[0];blocks.splice(evt.newIndex,0,moved);drawBlocks()}});
+    }
   }
   drawBlocks();
   $$('[data-add]',ed).forEach(btn=>btn.onclick=()=>{
     const t=btn.dataset.add;
     useZip=false;
-    const defaults={heading:{type:t,text:'New heading',level:2},paragraph:{type:t,text:'Write your paragraph here.'},image:{type:t,url:'',alt:'',caption:''},video:{type:t,url:''},button:{type:t,text:'Learn more',url:'#'},quote:{type:t,text:'Quote text',cite:''},divider:{type:t},html:{type:t,html:''}};
+    const defaults={heading:{type:t,text:'New heading',level:2},paragraph:{type:t,text:'Write your paragraph here.'},image:{type:t,url:'',alt:'',caption:''},video:{type:t,url:''},hero:{type:t,title:'Hero heading',subtitle:'',image:'',button_text:'Explore',button_url:'#'},columns:{type:t,columns:[{text:'Column 1'},{text:'Column 2'}]},cards:{type:t,cards:[{icon:'✦',title:'Card title',text:'Card description',url:'#',linktext:'Explore →'}]},spacer:{type:t,height:32},button:{type:t,text:'Learn more',url:'#'},quote:{type:t,text:'Quote text',cite:''},divider:{type:t},html:{type:t,html:''}};
     blocks.push(defaults[t]||{type:t,text:''});
     drawBlocks();
   });
@@ -744,7 +791,7 @@ function renderDeptCats(sv,dept,cats){
     <div id="catEd" class="hidden"></div>`;
   $('#nc').onclick=()=>editCat(null,dept);
   $$('[data-ec]').forEach(b=>b.onclick=()=>editCat(cats.find(x=>x.id==b.dataset.ec),dept));
-  $$('[data-dc]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/categories/'+b.dataset.dc,{method:'DELETE'});openDeptHub(dept.id)});
+  $$('[data-dc]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/categories/'+b.dataset.dc,{method:'DELETE'});openDeptHub(dept.id,'categories')});
 }
 function editCat(c,dept){
   const ed=$('#catEd');ed.classList.remove('hidden');
@@ -756,7 +803,7 @@ function editCat(c,dept){
   $('#cc').onclick=()=>ed.classList.add('hidden');
   $('#sc').onclick=async()=>{
     await api('/admin/categories',{method:'POST',body:JSON.stringify({id:c?.id,department_id:dept.id,name_en:$('#c_en').value.trim(),name_ne:$('#c_ne').value.trim(),slug:$('#c_sl').value.trim(),visible:true})});
-    openDeptHub(dept.id);
+    openDeptHub(dept.id,'categories');
   };
 }
 function renderDeptMedia(sv,dept,media){
@@ -803,7 +850,7 @@ function renderDeptMedia(sv,dept,media){
   // Add file to page folder
   $$('[data-addpage]').forEach(b=>b.onclick=async()=>{
     const pg=b.dataset.addpage;
-    const inp=$('#add-'+pg);
+    const inp=document.getElementById('add-'+pg);
     const f=inp?.files?.[0];if(!f)return alert('Choose a file first');
     try{
       const rel=f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
@@ -811,7 +858,7 @@ function renderDeptMedia(sv,dept,media){
         'content-type':f.type||'application/octet-stream','x-page-slug':pg,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent(rel)
       },body:f});
       const d=await r.json();if(!r.ok)throw new Error(d.error);
-      alert('Added: '+d.url);openDeptHub(dept.id);
+      alert('Added: '+d.url);openDeptHub(dept.id,'media');
     }catch(e){alert(e.message)}
   });
   // Replace
@@ -831,13 +878,13 @@ function renderDeptMedia(sv,dept,media){
           'content-type':f.type||'application/octet-stream','x-page-slug':ps,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent(rel)
         },body:f});
         const d=await r.json();if(!r.ok)throw new Error(d.error);
-        alert('Replaced');openDeptHub(dept.id);
+        alert('Replaced');openDeptHub(dept.id,'media');
       }catch(e){alert(e.message)}
       pick.value='';
     };
     pick.click();
   });
-  $$('[data-dm]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this media file?'))return;await api('/admin/media/'+encodeURIComponent(b.dataset.dm),{method:'DELETE'});openDeptHub(dept.id)});
+  $$('[data-dm]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this media file?'))return;await api('/admin/media/'+encodeURIComponent(b.dataset.dm),{method:'DELETE'});openDeptHub(dept.id,'media')});
 }
 
 /* ---- Messages: reply opens only on click, closes after success ---- */
@@ -919,7 +966,7 @@ async function renderMessages(v){
         }catch(err){status.textContent='Upload failed: '+err.message}
       }
     };
-    $('#mailClose',modal).onclick=()=>{const d={id:id||('draft-'+Date.now()),to:$('#mailTo',modal).value.trim(),subject:$('#mailSubject',modal).value.trim(),body:$('#mailBody',modal).value,saved_at:new Date().toISOString()};if(mode!=='contact'&&mode!=='reply'&&(d.to||d.subject||d.body)){const ds=JSON.parse(localStorage.getItem('granshi_email_drafts')||'[]').filter(x=>String(x.id)!==String(d.id));ds.unshift(d);localStorage.setItem('granshi_email_drafts',JSON.stringify(ds))}modal.remove()};
+    $('#mailClose',modal).onclick=async()=>{const d={id:id||('draft-'+Date.now()),to:$('#mailTo',modal).value.trim(),subject:$('#mailSubject',modal).value.trim(),body:$('#mailBody',modal).value,saved_at:new Date().toISOString()};if(mode!=='contact'&&mode!=='reply'&&(d.to||d.subject||d.body)){try{await api('/admin/email/drafts',{method:'POST',body:JSON.stringify(d)})}catch{const ds=JSON.parse(localStorage.getItem('granshi_email_drafts')||'[]').filter(x=>String(x.id)!==String(d.id));ds.unshift(d);localStorage.setItem('granshi_email_drafts',JSON.stringify(ds))}}modal.remove();if(section==='email'&&folder==='drafts')draw()};
     $('#mailSend',modal).onclick=async()=>{
       const recipient=$('#mailTo',modal).value.trim(),sub=$('#mailSubject',modal).value.trim(),textBody=$('#mailBody',modal).value.trim(),button=$('#mailSend',modal);
       if(!recipient||!/^\S+@\S+\.\S+$/.test(recipient)){status.textContent='Valid recipient email required.';return}
@@ -929,7 +976,7 @@ async function renderMessages(v){
         if(mode==='contact')await api('/admin/messages/'+id+'/reply',{method:'POST',body:JSON.stringify({reply_text:textBody,attachments:files})});
         else if(mode==='reply')await api('/admin/email/'+id+'/reply',{method:'POST',body:JSON.stringify({subject:sub,body:textBody,attachments:files})});
         else await api('/admin/email/send',{method:'POST',body:JSON.stringify({to:recipient,subject:sub,body:textBody,attachments:files})});
-        if(mode==='draft')localStorage.setItem('granshi_email_drafts',JSON.stringify(JSON.parse(localStorage.getItem('granshi_email_drafts')||'[]').filter(x=>String(x.id)!==String(id))));
+        if(mode==='draft'){try{await api('/admin/email/drafts/'+encodeURIComponent(id),{method:'DELETE'})}catch{localStorage.setItem('granshi_email_drafts',JSON.stringify(JSON.parse(localStorage.getItem('granshi_email_drafts')||'[]').filter(x=>String(x.id)!==String(id))))}}
         status.textContent='Email sent successfully.';setTimeout(()=>{modal.remove();draw()},600);
       }catch(err){status.textContent=err.message;button.disabled=false}
     };
@@ -939,7 +986,7 @@ async function renderMessages(v){
     try{
       if(section==='messages'){
         const data=await api('/admin/messages?kind=contact'),list=Array.isArray(data)?data:[];
-        v.innerHTML='<div class="box mail-app"><div class="mail-top"><h3>Messages</h3><button class="btn" id="showEmail">✉ Email</button></div><p class="muted">Contact Us form बाट आएका सन्देशहरू। Reply गर्दा noreply@ बाट जान्छ।</p><div class="mail-list">'+(list.map(m=>'<article class="mail-row"><div class="mail-row-main"><div class="mail-sender"><b>'+esc(m.name)+'</b><span>'+esc(m.email)+'</span><small>'+date(m.created_at)+'</small></div><b class="mail-subject">'+esc(m.subject||'(no subject)')+'</b><p>'+esc(String(m.body||'').slice(0,130))+'</p></div><div class="mail-row-actions"><span class="badge '+(m.status==='replied'?'replied':'new')+'">'+esc(m.status)+'</span><button class="btn" data-open-message="'+m.id+'">Open</button><button class="btn danger" data-delete-message="'+m.id+'">Delete</button></div></article>').join('')||'<p class="muted">No contact messages yet.</p>')+'</div><div id="mailDetail"></div></div>';
+        v.innerHTML='<div class="box mail-app"><div class="mail-top"><h3>Messages</h3><button class="btn" id="showEmail">✉ Email</button></div><p class="muted">Contact Us form बाट आएका सन्देशहरू। Reply गर्दा noreply@ बाट जान्छ (Reply-To: info@)।</p><div class="mail-list">'+(list.map(m=>'<article class="mail-row '+(!Number(m.is_read)?'unread':'read')+'"><div class="mail-row-main"><div class="mail-sender"><b>'+esc(m.name)+'</b><span>'+esc(m.email)+'</span><small>'+date(m.created_at)+'</small></div><b class="mail-subject">'+esc(m.subject||'(no subject)')+'</b><p>'+esc(String(m.body||'').slice(0,130))+'</p></div><div class="mail-row-actions"><span class="badge '+(m.status==='replied'?'replied':'new')+'">'+esc(m.status)+'</span><button class="btn" data-open-message="'+m.id+'">Open</button><button class="btn danger" data-delete-message="'+m.id+'">Delete</button></div></article>').join('')||'<p class="muted">No contact messages yet.</p>')+'</div><div id="mailDetail"></div></div>';
          $('#showEmail').onclick=()=>{section='email';folder='inbox';window.__granshiInboxSynced=false;draw()};
         $$('[data-delete-message]').forEach(btn=>btn.onclick=async()=>{
           if(!confirm('यो Contact Us message स्थायी रूपमा Delete गर्ने? यो कार्य उल्ट्याउन मिल्दैन।'))return;
@@ -949,9 +996,10 @@ async function renderMessages(v){
         });
         $$('[data-open-message]').forEach(btn=>btn.onclick=async()=>{
           const m=list.find(x=>String(x.id)===btn.dataset.openMessage);if(!m)return;
-          try{await api('/admin/read/'+m.id,{method:'POST'});m.is_read=1}catch(e){console.warn('Could not save message read state',e)}
+          try{await api('/admin/read/'+m.id,{method:'POST'});m.is_read=1;btn.closest('.mail-row')?.classList.remove('unread')}catch(e){console.warn('Could not save message read state',e)}
           const pr=parseReplyDisplay(m.reply_text);
-          $('.mail-list').classList.add('hidden');$('.mail-app>p.muted').classList.add('hidden');$('#mailDetail').innerHTML='<div class="mail-detail-full"><div class="row" style="justify-content:space-between"><button class="btn" id="backMessages">← Back to list</button><button class="btn danger" id="deleteOpenMessage">🗑 Delete</button></div><h2>'+esc(m.subject||'(no subject)')+'</h2><div class="mail-meta"><b>'+esc(m.name)+'</b> &lt;'+esc(m.email)+'&gt;<small>'+date(m.created_at)+'</small></div><div class="mail-body">'+esc(m.body)+'</div>'+(pr.text?'<hr><h4>Previous reply</h4><div class="mail-body">'+esc(pr.text)+'</div>':'')+'<button class="btn gold" id="replyContact">↩ Reply</button></div>';
+          const prAtts=(pr.atts||[]).map(x=>'<p>📎 <a target="_blank" rel="noopener" href="'+esc(x.url)+'">'+esc(x.name||'Attachment')+'</a></p>').join('');
+          $('.mail-list').classList.add('hidden');$('.mail-app>p.muted').classList.add('hidden');$('#mailDetail').innerHTML='<div class="mail-detail-full"><div class="row" style="justify-content:space-between"><button class="btn" id="backMessages">← Back to list</button><button class="btn danger" id="deleteOpenMessage">🗑 Delete</button></div><h2>'+esc(m.subject||'(no subject)')+'</h2><div class="mail-meta"><b>'+esc(m.name)+'</b> &lt;'+esc(m.email)+'&gt;<small>'+date(m.created_at)+'</small></div><div class="mail-body">'+esc(m.body)+'</div>'+(pr.text?'<hr><h4>Previous reply</h4><div class="mail-body">'+esc(pr.text)+'</div>'+prAtts:'')+'<button class="btn gold" id="replyContact">↩ Reply</button></div>';
           $('#backMessages').onclick=()=>{$('.mail-list').classList.remove('hidden');$('.mail-app>p.muted').classList.remove('hidden');$('#mailDetail').innerHTML=''};
           $('#deleteOpenMessage').onclick=async()=>{
             if(!confirm('यो Contact Us message स्थायी रूपमा Delete गर्ने? यो कार्य उल्ट्याउन मिल्दैन।'))return;
@@ -963,10 +1011,13 @@ async function renderMessages(v){
         });
       }else{
         let syncStatus='';if(folder==='inbox'&&!window.__granshiInboxSynced){try{const sr=await api('/admin/messages/sync',{method:'POST',body:JSON.stringify({})});syncStatus=sr.imported+' new email(s) synced';window.__granshiInboxSynced=true}catch(e){syncStatus='Sync failed: '+e.message}}
-         const data=folder==='drafts'?JSON.parse(localStorage.getItem('granshi_email_drafts')||'[]'):await api('/admin/email?folder='+folder),list=Array.isArray(data)?data:[];
-         v.innerHTML='<div class="box mail-app"><div class="mail-top"><h3>Email</h3><button class="btn" id="showMessages">💬 Messages</button></div><div class="mail-toolbar"><div class="mail-folders"><button class="btn '+(folder==='inbox'?'gold':'')+'" data-folder="inbox">Inbox</button><button class="btn '+(folder==='sent'?'gold':'')+'" data-folder="sent">Sent</button><button class="btn '+(folder==='drafts'?'gold':'')+'" data-folder="drafts">Drafts</button></div><button class="btn gold" id="newEmail">＋ Compose</button></div><div class="muted" role="status">'+esc(syncStatus)+'</div><div class="mail-list compact">'+(list.map(m=>'<article class="mail-row '+(folder==='inbox'&&!Number(m.is_read)?'unread':'read')+'"><div class="mail-row-main" '+(folder==='drafts'?'':'data-open-email="'+m.id+'"')+'><div class="mail-sender"><b>'+esc(folder==='sent'?'To: '+m.email:folder==='drafts'?'Draft':(m.name||m.email))+'</b><span>'+esc(m.subject||'(no subject)')+'</span></div><small class="muted">'+date(m.created_at||m.saved_at||'')+'</small></div><div class="mail-row-actions">'+(folder==='drafts'?'<button class="btn" data-edit-draft="'+m.id+'">Edit</button>':'')+'<button class="btn danger" data-delete-email="'+m.id+'">Delete</button></div></article>').join('')||'<p class="muted">No emails in this folder.</p>')+'</div><div id="mailDetail"></div></div>';
+         let data=[];
+         if(folder==='drafts'){try{data=await api('/admin/email/drafts')}catch{data=JSON.parse(localStorage.getItem('granshi_email_drafts')||'[]')}}
+         else data=await api('/admin/email?folder='+folder);
+         const list=Array.isArray(data)?data:[];
+         v.innerHTML='<div class="box mail-app"><div class="mail-top"><h3>Email</h3><button class="btn" id="showMessages">💬 Messages</button></div><div class="mail-toolbar"><div class="mail-folders"><button class="btn '+(folder==='inbox'?'gold':'')+'" data-folder="inbox">Inbox</button><button class="btn '+(folder==='sent'?'gold':'')+'" data-folder="sent">Sent</button><button class="btn '+(folder==='drafts'?'gold':'')+'" data-folder="drafts">Drafts</button></div><button class="btn gold" id="newEmail">＋ Compose</button></div><div class="muted" role="status">'+esc(syncStatus)+'</div><div class="mail-list compact">'+(list.map(m=>'<article class="mail-row '+(folder==='inbox'&&!Number(m.is_read)?'unread':'read')+'"><div class="mail-row-main" '+(folder==='drafts'?'':'data-open-email="'+m.id+'"')+'><div class="mail-sender"><b>'+esc(folder==='sent'?'To: '+m.email:folder==='drafts'?(m.to?'Draft → '+m.to:'Draft'):(m.name||m.email))+'</b><span>'+esc(m.subject||'(no subject)')+'</span></div><small class="muted">'+date(m.created_at||m.saved_at||'')+'</small></div><div class="mail-row-actions">'+(folder==='drafts'?'<button class="btn" data-edit-draft="'+esc(m.id)+'">Edit</button>':'')+'<button class="btn danger" data-delete-email="'+esc(m.id)+'">Delete</button></div></article>').join('')||'<p class="muted">No emails in this folder.</p>')+'</div><div id="mailDetail"></div></div>';
          $('#showMessages').onclick=()=>{section='messages';draw()};
-         Array.from(document.querySelectorAll('[data-delete-email]')).forEach(btn=>btn.onclick=async()=>{if(!confirm('यो इमेल स्थायी रूपमा Delete गर्ने?'))return;btn.disabled=true;try{if(folder==='drafts'){localStorage.setItem('granshi_email_drafts',JSON.stringify(list.filter(x=>String(x.id)!==btn.dataset.deleteEmail)));draw()}else{await api('/admin/email/'+btn.dataset.deleteEmail,{method:'DELETE'});draw()}}catch(err){alert('Delete असफल: '+err.message);btn.disabled=false}});
+         Array.from(document.querySelectorAll('[data-delete-email]')).forEach(btn=>btn.onclick=async()=>{if(!confirm('यो इमेल स्थायी रूपमा Delete गर्ने?'))return;btn.disabled=true;try{if(folder==='drafts'){try{await api('/admin/email/drafts/'+encodeURIComponent(btn.dataset.deleteEmail),{method:'DELETE'})}catch{localStorage.setItem('granshi_email_drafts',JSON.stringify(list.filter(x=>String(x.id)!==btn.dataset.deleteEmail)))}draw()}else{await api('/admin/email/'+btn.dataset.deleteEmail,{method:'DELETE'});draw()}}catch(err){alert('Delete असफल: '+err.message);btn.disabled=false}});
          $$('[data-edit-draft]').forEach(btn=>btn.onclick=()=>{const d=list.find(x=>String(x.id)===btn.dataset.editDraft);if(d)compose('draft',d.id,d.to,d.subject,d.body)});
          Array.from(document.querySelectorAll('[data-folder]')).forEach(btn=>btn.onclick=()=>{folder=btn.dataset.folder;draw()});
          $('#newEmail').onclick=()=>compose('new',null,'','');
@@ -978,7 +1029,7 @@ async function renderMessages(v){
            $('#mailDetail').innerHTML='<div class="mail-detail-full"><div class="mail-detail-actions"><button class="btn" id="backEmail">← Back to '+(folder==='sent'?'Sent':'Inbox')+'</button><span style="flex:1"></span><button class="btn gold" id="replyEmail" '+(folder==='sent'?'disabled':'')+'>Reply</button><button class="btn" id="forwardEmail">Forward</button><button class="btn danger" id="deleteOpenEmail">Delete</button></div><h2>'+esc(m.subject||'(no subject)')+'</h2><div class="mail-meta"><b>'+esc(folder==='sent'?'Granshi':(m.name||m.email))+'</b> &lt;'+esc(m.email)+'&gt;<small>'+date(m.created_at)+'</small></div><div class="mail-body">'+esc(m.body||'')+'</div>'+atts.map(x=>'<p>📎 <a target="_blank" rel="noopener" href="'+esc(x.url)+'">'+esc(x.name||'Attachment')+'</a></p>').join('')+'</div>';
            $('#backEmail').onclick=()=>draw();
           $('#replyEmail').onclick=()=>compose('reply',m.id,m.email,/^re:/i.test(m.subject||'')?m.subject:'Re: '+(m.subject||''));$('#forwardEmail').onclick=()=>compose('new',null,'','Fwd: '+(m.subject||''));
-          $('#deleteOpenEmail').onclick=async()=>{if(!confirm('यो इमेल स्थायी रूपमा Delete गर्ने?'))return;try{if(folder==='drafts'){localStorage.setItem('granshi_email_drafts',JSON.stringify(list.filter(x=>String(x.id)!==String(m.id))))}else await api('/admin/email/'+m.id,{method:'DELETE'});draw()}catch(err){alert('Delete असफल: '+err.message)}};
+          $('#deleteOpenEmail').onclick=async()=>{if(!confirm('यो इमेल स्थायी रूपमा Delete गर्ने?'))return;try{await api('/admin/email/'+m.id,{method:'DELETE'});draw()}catch(err){alert('Delete असफल: '+err.message)}};
         });
       }
     }catch(err){v.innerHTML='<div class="box">Error: '+esc(err.message)+'</div>'}
@@ -1027,7 +1078,7 @@ async function renderComments(v){
 async function renderMenus(v){
   const list=await api('/admin/menus');
   v.innerHTML=`<div class="box"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Menus</h3><button class="btn gold" id="nm">+ Item</button></div>
-    ${list.map(m=>`<div class="item"><div><b>${esc(m.label_en)}</b><small class="muted">${esc(m.url)}</small></div>
+    ${list.map(m=>`<div class="item"><div><b>${esc(m.label_en)}</b> <span class="badge ${m.visible?'published':'draft'}">${m.visible?'Visible':'Hidden'}</span> · <small class="muted">Order: ${Number(m.sort_order||0)} · ${esc(m.url)}</small></div>
       <div class="row"><button class="btn" data-e="${m.id}">Edit</button><button class="btn danger" data-d="${m.id}">Delete</button></div></div>`).join('')}
     <div id="mEd" class="hidden"></div></div>`;
   $('#nm').onclick=()=>editMenu();
@@ -1036,12 +1087,17 @@ async function renderMenus(v){
 }
 function editMenu(m){
   const ed=$('#mEd');ed.classList.remove('hidden');
-  ed.innerHTML=`<label>Label EN</label><input id="m_en" value="${esc(m?.label_en||'')}">
-    <label>Label NE</label><input id="m_ne" value="${esc(m?.label_ne||'')}">
-    <label>URL</label><input id="m_url" value="${esc(m?.url||'#')}">
-    <div class="row"><button class="btn gold" id="sm">Save</button><button class="btn" id="cm">Cancel</button></div>`;
+  ed.innerHTML=`<div class="box" style="background:#f8f9fc"><h4>${m?'Edit':'New'} menu item</h4>
+    <div class="grid2">
+      <div><label>Label EN</label><input id="m_en" value="${esc(m?.label_en||'')}"></div>
+      <div><label>Label NE</label><input id="m_ne" value="${esc(m?.label_ne||'')}"></div>
+      <div><label>URL</label><input id="m_url" value="${esc(m?.url||'#')}"></div>
+      <div><label>Sort order</label><input id="m_sort" type="number" value="${m?.sort_order??0}"></div>
+    </div>
+    <label><input type="checkbox" id="m_vis" ${m?.visible!==0?'checked':''}> Visible</label>
+    <div class="row" style="margin-top:10px"><button class="btn gold" id="sm">Save</button><button class="btn" id="cm">Cancel</button></div></div>`;
   $('#cm').onclick=()=>ed.classList.add('hidden');
-  $('#sm').onclick=async()=>{await api('/admin/menus',{method:'POST',body:JSON.stringify({id:m?.id,label_en:$('#m_en').value.trim(),label_ne:$('#m_ne').value.trim(),url:$('#m_url').value.trim(),visible:true})});tab('menus')};
+  $('#sm').onclick=async()=>{await api('/admin/menus',{method:'POST',body:JSON.stringify({id:m?.id,label_en:$('#m_en').value.trim(),label_ne:$('#m_ne').value.trim(),url:$('#m_url').value.trim(),sort_order:Number($('#m_sort').value||0),visible:$('#m_vis').checked})});tab('menus')};
 }
 async function renderSettings(v){
   const d=await api('/admin/overview');const s=d.settings||{};
@@ -1050,6 +1106,7 @@ async function renderSettings(v){
       <div><label>Brand</label><input id="s_b" value="${esc(s.brand_name||'')}"></div>
       <div><label>Tagline</label><input id="s_t" value="${esc(s.tagline||'')}"></div>
       <div><label>Contact email</label><input id="s_m" value="${esc(s.contact_email||'')}"></div>
+      <div><label>Security alert email</label><input id="s_sec_email" type="email" value="${esc(s.security_alert_email||s.contact_email||'')}" placeholder="Email for failed login alerts"></div>
       <div><label>Hero image URL</label><input id="s_h" value="${esc(s.hero_image||'')}"></div>
       <div><label>Hero title EN</label><input id="s_hte" value="${esc(s.hero_title_en||'')}"></div>
       <div><label>Hero title NE</label><input id="s_htn" value="${esc(s.hero_title_ne||'')}"></div>
@@ -1062,10 +1119,11 @@ async function renderSettings(v){
     <label>About NE</label><textarea id="s_an">${esc(s.about_ne||'')}</textarea>
     <label>Footer</label><input id="s_f" value="${esc(s.footer_text||'')}">
     <label style="display:block;margin-top:12px"><input type="checkbox" id="s_comments" ${s.comments_enabled==='0'?'':'checked'}> Enable page comments / feedback</label>
-<div class="box"><h3>Public information &amp; policies</h3><p class="muted">यी सामग्री वेबसाइटको Footer मा देखिने सार्वजनिक पेजमा प्रकाशित हुन्छन्।</p><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>About Granshi / ग्रान्शीको बारेमा</b></summary><label>English</label><textarea id="legal_about_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_about_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Contact / सम्पर्क</b></summary><label>English</label><textarea id="legal_contact_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_contact_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Privacy Policy / गोपनीयता नीति</b></summary><label>English</label><textarea id="legal_privacy_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_privacy_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Terms & Conditions / प्रयोगका सर्तहरू</b></summary><label>English</label><textarea id="legal_terms_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_terms_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Disclaimer / अस्वीकरण</b></summary><label>English</label><textarea id="legal_disclaimer_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_disclaimer_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Cookie Policy / कुकी नीति</b></summary><label>English</label><textarea id="legal_cookies_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_cookies_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Copyright Policy / प्रतिलिपि अधिकार नीति</b></summary><label>English</label><textarea id="legal_copyright_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_copyright_ne" rows="5"></textarea></details><button class="btn gold" id="saveLegal">Save public pages</button><span class="muted" id="legalStatus"></span></div><div class="box"><h3>Email branding</h3><p>Outgoing emails use a short Granshi footer with the About Granshi link.</p></div><div class="box"><h3>Advertising readiness</h3><p>Ads remain off until AdSense approval and applicable consent configuration are complete.</p><label>AdSense Publisher ID</label><input id="adsPublisher" placeholder="ca-pub-..."><button class="btn" id="saveAds">Save Publisher ID</button><span id="adsStatus" class="muted"></span></div><div class="box"><h3>Launch checklist</h3><ul><li>Check contact inbox regularly.</li><li>Keep policy text consistent with actual services.</li><li>Before ads, complete publisher approval and Google-certified consent setup for applicable EEA/UK/Swiss visitors.</li></ul></div>    <button class="btn gold" id="ss" style="margin-top:10px">Save</button></div>`;
+    <button class="btn gold" id="ss" style="margin-top:10px">Save site settings</button></div>
+    <div class="box"><h3>Public information &amp; policies</h3><p class="muted">यी सामग्री वेबसाइटको Footer मा देखिने सार्वजनिक पेजमा प्रकाशित हुन्छन्।</p><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>About Granshi / ग्रान्शीको बारेमा</b></summary><label>English</label><textarea id="legal_about_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_about_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Contact / सम्पर्क</b></summary><label>English</label><textarea id="legal_contact_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_contact_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Privacy Policy / गोपनीयता नीति</b></summary><label>English</label><textarea id="legal_privacy_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_privacy_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Terms & Conditions / प्रयोगका सर्तहरू</b></summary><label>English</label><textarea id="legal_terms_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_terms_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Disclaimer / अस्वीकरण</b></summary><label>English</label><textarea id="legal_disclaimer_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_disclaimer_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Cookie Policy / कुकी नीति</b></summary><label>English</label><textarea id="legal_cookies_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_cookies_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Copyright Policy / प्रतिलिपि अधिकार नीति</b></summary><label>English</label><textarea id="legal_copyright_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_copyright_ne" rows="5"></textarea></details><button class="btn gold" id="saveLegal">Save public pages</button><span class="muted" id="legalStatus"></span></div><div class="box"><h3>Email branding</h3><p>Outgoing emails use a short Granshi footer with the About Granshi link.</p></div><div class="box"><h3>Advertising readiness</h3><p>Ads remain off until AdSense approval and applicable consent configuration are complete.</p><label>AdSense Publisher ID</label><input id="adsPublisher" value="${esc(s.adsense_publisher_id||'')}" placeholder="ca-pub-..."><button class="btn" id="saveAds">Save Publisher ID</button><span id="adsStatus" class="muted"></span></div><div class="box"><h3>Launch checklist</h3><ul><li>Check contact inbox regularly.</li><li>Keep policy text consistent with actual services.</li><li>Before ads, complete publisher approval and Google-certified consent setup for applicable EEA/UK/Swiss visitors.</li></ul></div>`;
   $('#ss').onclick=async()=>{
     await api('/admin/settings',{method:'POST',body:JSON.stringify({
-      brand_name:$('#s_b').value,tagline:$('#s_t').value,contact_email:$('#s_m').value,hero_image:$('#s_h').value,
+      brand_name:$('#s_b').value,tagline:$('#s_t').value,contact_email:$('#s_m').value,security_alert_email:$('#s_sec_email').value.trim(),hero_image:$('#s_h').value,
       hero_title_en:$('#s_hte').value,hero_title_ne:$('#s_htn').value,hero_desc_en:$('#s_hde').value,hero_desc_ne:$('#s_hdn').value,
       primary_color:$('#s_p').value,accent_color:$('#s_a').value,about_en:$('#s_ae').value,about_ne:$('#s_an').value,footer_text:$('#s_f').value,
       comments_enabled:$('#s_comments').checked?'1':'0'

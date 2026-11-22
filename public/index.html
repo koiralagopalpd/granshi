@@ -204,7 +204,7 @@ footer:before{background:linear-gradient(180deg,#05275fe8 0%,#062b70f0 48%,#041b
         <p class="footer-about"><b id="aboutHeadLabel">About us</b></p>
         <p id="aboutText" class="footer-about"></p>
         <p id="footerTag" style="margin:12px 0 0;opacity:.85"></p>
-        <button type="button" class="contact-btn" id="openContact">Contact us</button>
+        <div id="contact"><button type="button" class="contact-btn" id="openContact">Contact us</button></div>
         <div class="contact-panel" id="contactPanel">
           <form id="contactForm">
             <label>Your name</label>
@@ -236,25 +236,31 @@ footer:before{background:linear-gradient(180deg,#05275fe8 0%,#062b70f0 48%,#041b
 
 <script>
 let lang="en",settings={},menus=[],departments=[],latest=[],popular=[],allPages=[],pageCursor=0,pagesHasMore=false,pagesLoading=false;
+try{var qp=new URLSearchParams(location.search).get("lang");if(qp==="ne"||qp==="en"){lang=qp;localStorage.setItem("granshi_lang",lang);}else{var savedLang=localStorage.getItem("granshi_lang");if(savedLang==="ne"||savedLang==="en")lang=savedLang;}}catch(_){}
 function t(en,ne){return lang==="ne"&&ne?ne:en}
 function closeMobileNav(){document.getElementById("nav").classList.remove("open")}
 function deptUrl(d){
-  if(d.slug)return "/dept/"+d.slug;
-  if(d.url&&d.url!=="#"&&d.url.indexOf("#")!==0)return d.url;
-  return "/dept/"+d.id;
+  var base="/dept/"+d.id;
+  if(d.slug)base="/dept/"+d.slug;
+  else if(d.url&&d.url!=="#"&&d.url.indexOf("#")!==0)base=d.url;
+  return lang==="ne"&&base.indexOf("?")<0?base+"?lang=ne":base;
 }
 function renderNav(){
-  var items=menus.length?menus:[{label_en:"Home",label_ne:"गृहपृष्ठ",url:"/"},{label_en:"Explore",label_ne:"अन्वेषण",url:"#departments"},{label_en:"About",label_ne:"हाम्रोबारे",url:"/legal/about"}];
+  var items=menus.length?menus:[{label_en:"Home",label_ne:"गृहपृष्ठ",url:"/"},{label_en:"Explore",label_ne:"अन्वेषण",url:"#departments"},{label_en:"About",label_ne:"हाम्रोबारे",url:"/legal/about"},{label_en:"Contact",label_ne:"सम्पर्क",url:"#contact"}];
   document.getElementById("nav").innerHTML=items.map(function(m){
     var label=t(m.label_en,m.label_ne);
     var u=(m.url||"").toLowerCase();
     if(u==="#explore"||u==="#departments"||u==="/explore"||label.toLowerCase().indexOf("explore")>=0||label.indexOf("अन्वेषण")>=0) return '<a href="#departments" data-section="departments">'+label+"</a>";
-    if(u==="#about"||label.toLowerCase().indexOf("about")>=0||label.indexOf("हाम्रो")>=0) return '<a href="/legal/about">'+label+"</a>";
+    if(u==="#about"||label.toLowerCase().indexOf("about")>=0||label.indexOf("हाम्रो")>=0) return '<a href="/legal/about'+(lang==="ne"?"?lang=ne":"")+'">'+label+"</a>";
+    if(u==="#contact") return '<a href="#contact" data-section="contact">'+label+"</a>";
     return '<a href="'+(m.url||"/")+'">'+label+"</a>";
   }).join("");
   document.querySelectorAll("#nav a").forEach(function(a){
     a.addEventListener("click",function(e){
-      if(a.getAttribute("data-section")){e.preventDefault();document.getElementById("departments").scrollIntoView({behavior:"smooth",block:"start"});}closeMobileNav();
+      var sec=a.getAttribute("data-section");
+      if(sec==="departments"){e.preventDefault();document.getElementById("departments").scrollIntoView({behavior:"smooth",block:"start"});}
+      else if(sec==="contact"){e.preventDefault();document.getElementById("contactPanel").classList.add("open");document.getElementById("contact").scrollIntoView({behavior:"smooth",block:"center"});}
+      closeMobileNav();
     });
   });
 }
@@ -289,6 +295,8 @@ function renderArticles(){
     '<p style="color:var(--muted)">'+t("No articles yet.","अहिले लेख छैन।")+"</p>";
   document.getElementById("popularList").innerHTML=popular.length?popular.map(articleCard).join(""):
     '<p style="color:var(--muted)">'+t("Mark pages as Popular in Admin.","Admin मा Popular चिन्ह लगाउनुहोस्।")+"</p>";
+  var allSec=document.getElementById("allpages");
+  if(allSec)allSec.style.display=allPages.length>8?"block":"none";
   renderAllPages(true);
 }
 function renderAllPages(reset){
@@ -419,7 +427,7 @@ document.getElementById("contactForm").onsubmit=function(e){
     setTimeout(function(){document.getElementById("contactPanel").classList.remove("open");msg.textContent=""},1800);
   }).catch(function(err){msg.className="err";msg.textContent=err.message||"Error"}).finally(function(){btn.disabled=false});
 };
-document.getElementById("lang").onclick=function(){lang=lang==="en"?"ne":"en";applyTexts()};
+document.getElementById("lang").onclick=function(){lang=lang==="en"?"ne":"en";try{localStorage.setItem("granshi_lang",lang);}catch(_){}applyTexts()};
 document.getElementById("hamb").onclick=function(){document.getElementById("nav").classList.toggle("open")};
  
 document.getElementById("loadMorePages").onclick=loadMorePages;
