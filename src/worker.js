@@ -167,6 +167,236 @@ function pageExcerpt(text, query) {
   return (start ? "…" : "") + clean.slice(start,start+360) + (start+360<clean.length ? "…" : "");
 }
 
+async function ensureQaTable(env) {
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS site_qa_index (id INTEGER PRIMARY KEY AUTOINCREMENT, page_slug TEXT NOT NULL, question TEXT NOT NULL, answer TEXT NOT NULL, keywords TEXT NOT NULL DEFAULT '', title TEXT NOT NULL DEFAULT '', url TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL)"
+  ).run();
+}
+
+function decodeBasicEntities(s) {
+  return String(s || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractQaPairsFromPage(page, searchText, rawHtml = "") {
+  const pairs = [];
+  const seenQ = new Set();
+  const slug = String(page.slug || "");
+  const titleEn = String(page.title_en || slug).trim();
+  const titleNe = String(page.title_ne || "").trim();
+  const descEn = String(page.description_en || page.thumbnail_summary_en || "").trim();
+  const descNe = String(page.description_ne || page.thumbnail_summary_ne || "").trim();
+  const bodyClean = String(searchText || "").replace(/\s+/g, " ").trim();
+  const title = titleEn || titleNe || slug;
+  const pageUrl = "/" + encodeURIComponent(slug);
+  const kwList = [...new Set((title + " " + titleNe + " " + descEn + " " + bodyClean.slice(0, 1200))
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length > 2))].slice(0, 45).join(" ");
+
+  const pushQa = (q, a) => {
+    const cleanQ = String(q || "").replace(/\s+/g, " ").trim().slice(0, 220);
+    const cleanA = String(a || "").replace(/\s+/g, " ").trim().slice(0, 750);
+    if (cleanQ.length < 4 || cleanA.length < 12) return;
+    const key = cleanQ.toLowerCase();
+    if (seenQ.has(key)) return;
+    seenQ.add(key);
+    pairs.push({ page_slug: slug, question: cleanQ, answer: cleanA, keywords: kwList, title, url: pageUrl });
+  };
+
+  const isLink = String(page.template || "").startsWith("link:");
+  const overviewAnsEn = [descEn, bodyClean.slice(0, 380)].filter(Boolean).join(" ").trim();
+  if (titleEn && overviewAnsEn) {
+    pushQa(isLink ? `What is ${titleEn} app and how does it work?` : `What is ${titleEn}?`, overviewAnsEn);
+    if (isLink) {
+      pushQa(`Where can I access or open ${titleEn}?`, `${overviewAnsEn} You can open it directly from the ${titleEn} page on this site.`);
+    }
+  }
+  if (titleNe && (descNe || overviewAnsEn)) {
+    pushQa(`${titleNe} के हो र यसमा के छ?`, descNe || overviewAnsEn);
+  }
+
+  // Extract section-level Q&A from Blocks JSON
+  if (!String(page.template || "").startsWith("zip:") && !isLink) {
+    try {
+      const blocks = typeof page.content === "string" ? JSON.parse(page.content) : page.content;
+      if (Array.isArray(blocks)) {
+        let curHeading = "";
+        let curChunks = [];
+        const flush = () => {
+          if (curHeading && curChunks.length) {
+            const qText = /\?$|के|कसरी|किन|कहाँ|कति|What|How|Why|When|Where/i.test(curHeading)
+              ? curHeading
+              : `${curHeading} — ${title}`;
+            pushQa(qText, curChunks.join(" "));
+          }
+          curHeading = "";
+          curChunks = [];
+        };
+        for (const b of blocks) {
+          if (!b || typeof b !== "object") continue;
+          if (b.type === "heading" && b.text) {
+            flush();
+            curHeading = String(b.text).trim();
+          } else if (["paragraph", "quote"].includes(b.type) && b.text) {
+            curChunks.push(String(b.text).trim());
+          } else if (b.type === "columns" && Array.isArray(b.columns)) {
+            curChunks.push(b.columns.map((c) => c.text || "").join(" "));
+          } else if (b.type === "cards" && Array.isArray(b.cards)) {
+            for (const c of b.cards) {
+              if (c.title && c.text) pushQa(`${c.title} (${title})`, c.text);
+            }
+          }
+        }
+        flush();
+      }
+    } catch {}
+  }
+
+  // Extract heading + paragraph pairs from uploaded HTML (ZIP/single HTML)
+  if (rawHtml) {
+    const cleanHtml = String(rawHtml)
+      .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[\s\S]*?<\/style>/gi, " ");
+    const secRe = /<h([1-4])\b[^>]*>([\s\S]*?)<\/h\1>([\s\S]*?)(?=<h[1-4]\b|<footer\b|<\/body>|$)/gi;
+    let match;
+    let count = 0;
+    while ((match = secRe.exec(cleanHtml)) !== null && count < 12) {
+      const h = decodeBasicEntities(match[2]);
+      const secBody = decodeBasicEntities(match[3]).slice(0, 520);
+      if (h.length >= 3 && secBody.length >= 20) {
+        const qText = /\?$|के|कसरी|किन|What|How|Why|Which|When|Where/i.test(h) ? h : `${h} (${title})`;
+        pushQa(qText, secBody);
+        count++;
+      }
+    }
+  }
+
+  return pairs.slice(0, 16);
+}
+
+async function syncPageQa(env, page, searchText = "", rawHtml = "") {
+  try {
+    await ensureQaTable(env);
+    await env.DB.prepare("DELETE FROM site_qa_index WHERE page_slug=?").bind(page.slug).run();
+    if (!page.published) return;
+    const pairs = extractQaPairsFromPage(page, searchText, rawHtml);
+    const now = new Date().toISOString();
+    for (const item of pairs) {
+      await env.DB.prepare(
+        "INSERT INTO site_qa_index(page_slug,question,answer,keywords,title,url,updated_at) VALUES(?,?,?,?,?,?,?)"
+      ).bind(item.page_slug, item.question, item.answer, item.keywords, item.title, item.url, now).run();
+    }
+  } catch {}
+}
+
+async function syncSiteProfileQa(env, settings) {
+  try {
+    await ensureQaTable(env);
+    await env.DB.prepare("DELETE FROM site_qa_index WHERE page_slug=?").bind("_site_profile").run();
+    const brand = String(settings.brand_name || "Granshi").split("—")[0].trim() || "Granshi";
+    const aboutEn = String(settings.about_en || settings.hero_desc_en || "").trim();
+    const aboutNe = String(settings.about_ne || settings.hero_desc_ne || "").trim();
+    const now = new Date().toISOString();
+    const profilePairs = [
+      {
+        q: `Who is the owner of ${brand} website?`,
+        a: `${brand} is the personal website owned and operated by Gopal Prasad Koirala (gopalkoirala.com.np). ${aboutEn}`.trim(),
+        kw: `owner gopal prasad koirala ${brand.toLowerCase()} personal website about contact`
+      },
+      {
+        q: `यो वेबसाइट (${brand}) कसको हो र यहाँ के पाइन्छ?`,
+        a: `यो वेबसाइट गोपाल प्रसाद कोइराला (Gopal Prasad Koirala) को व्यक्तिगत वेबसाइट हो, जसको ब्रान्ड नाम ${brand} हो। ${aboutNe || aboutEn}`.trim(),
+        kw: `gopal prasad koirala गोपाल प्रसाद कोइराला व्यक्तिगत वेबसाइट परिचय ${brand.toLowerCase()}`
+      }
+    ];
+    for (const item of profilePairs) {
+      await env.DB.prepare(
+        "INSERT INTO site_qa_index(page_slug,question,answer,keywords,title,url,updated_at) VALUES(?,?,?,?,?,?,?)"
+      ).bind("_site_profile", item.q, item.a, item.kw, `${brand} — Gopal Prasad Koirala`, "/legal/about", now).run();
+    }
+  } catch {}
+}
+
+async function rebuildAllQa(env) {
+  await ensureQaTable(env);
+  const settings = await getSettings(env);
+  await env.DB.prepare("DELETE FROM site_qa_index").run();
+  await syncSiteProfileQa(env, settings);
+  const pages = await safeAll(env, "SELECT * FROM pages WHERE published=1 ORDER BY updated_at DESC LIMIT 500");
+  let indexedPages = 0;
+  for (const pg of pages) {
+    let rawHtml = "";
+    let text = searchablePageText(pg.content);
+    const tmpl = String(pg.template || "");
+    if (tmpl.startsWith("zip:") && env.MEDIA) {
+      const entry = tmpl.slice(4) || "index.html";
+      const obj = await env.MEDIA.get(`pages/${pg.slug}/${entry}`);
+      if (obj) {
+        rawHtml = await obj.text();
+        text = htmlToSearchText(rawHtml);
+      }
+    } else if (tmpl.startsWith("link:")) {
+      text = [pg.description_en, pg.description_ne, pg.thumbnail_summary_en, pg.thumbnail_summary_ne].filter(Boolean).join(" ");
+    }
+    await syncPageQa(env, pg, text, rawHtml);
+    indexedPages++;
+  }
+  const cnt = await env.DB.prepare("SELECT COUNT(*) AS n FROM site_qa_index").first();
+  return { pages: indexedPages, questions: Number(cnt?.n || 0) };
+}
+
+async function ensureQaPopulated(env) {
+  try {
+    await ensureQaTable(env);
+    const cnt = await env.DB.prepare("SELECT COUNT(*) AS n FROM site_qa_index").first();
+    if (Number(cnt?.n || 0) === 0) {
+      await rebuildAllQa(env);
+    }
+  } catch {}
+}
+
+function isDisallowedHost(hostname) {
+  const h = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
+  if (!h || h === "localhost" || h.endsWith(".local") || h.endsWith(".internal") || h === "::1") return true;
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(h)) {
+    const [a, b] = h.split(".").map(Number);
+    if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return true;
+  }
+  if (/^(fc|fd|fe80)/i.test(h)) return true;
+  return false;
+}
+
+function makeLinkThumbnailSvg(title, domain) {
+  const cleanTitle = escapeHtml(String(title || domain || "Web App").slice(0, 46));
+  const cleanDomain = escapeHtml(String(domain || "gopalkoirala.com.np").slice(0, 42));
+  const initial = escapeHtml(String(title || domain || "A").trim().slice(0, 1).toUpperCase());
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e3a5f"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)"/>
+  <circle cx="700" cy="95" r="140" fill="#d8b46a" fill-opacity="0.10"/>
+  <rect x="64" y="64" width="68" height="68" rx="16" fill="#d8b46a"/>
+  <text x="98" y="112" text-anchor="middle" font-family="Georgia,serif" font-size="36" font-weight="700" fill="#0f172a">${initial}</text>
+  <text x="64" y="218" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="600" fill="#f5e4ba">${cleanDomain}</text>
+  <text x="64" y="278" font-family="Georgia,serif" font-size="38" font-weight="700" fill="#ffffff">${cleanTitle}</text>
+  <line x1="64" y1="350" x2="736" y2="350" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1"/>
+  <text x="64" y="405" font-family="system-ui,sans-serif" font-size="20" fill="#cbd5e1">Interactive App &amp; Curated Resource · Granshi</text>
+</svg>`;
+}
+
 async function allPublic(env) {
   const settings = await getSettings(env);
   let pages = await safeAll(
@@ -613,26 +843,97 @@ async function api(req, env) {
     return json({pages:enriched,hasMore:pages.length===limit});
   }
 
+  if (p === "/api/qa/suggest" && method === "GET") {
+    const q = String(u.searchParams.get("q") || "").trim().slice(0, 120);
+    await ensureQaPopulated(env);
+    if (q.length < 2) {
+      const top = await safeAll(env, "SELECT question,page_slug,title,url FROM site_qa_index ORDER BY id ASC LIMIT 6");
+      return json({ suggestions: top });
+    }
+    const words = [...new Set(q.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1))].slice(0, 6);
+    if (!words.length) return json({ suggestions: [] });
+    const where = words.map(() => "(LOWER(question) LIKE ? OR LOWER(keywords) LIKE ? OR LOWER(title) LIKE ?)").join(" OR ");
+    const binds = words.flatMap((w) => { const pat = "%" + w + "%"; return [pat, pat, pat]; });
+    const rows = await safeAll(
+      env,
+      "SELECT DISTINCT question,page_slug,title,url FROM site_qa_index WHERE " + where + " LIMIT 20",
+      ...binds
+    );
+    const scored = rows.map((r) => {
+      const hay = (r.question + " " + r.title).toLowerCase();
+      let score = hay.includes(q.toLowerCase()) ? 10 : 0;
+      for (const w of words) if (hay.includes(w)) score += 3;
+      return { ...r, score };
+    }).sort((a, b) => b.score - a.score);
+    return json({ suggestions: scored.slice(0, 6).map(({ question, page_slug, title, url }) => ({ question, page_slug, title, url })) });
+  }
+
   if (p === "/api/search" && method === "POST") {
     const x = await body(req);
-    const query = String(x.query || "").trim().slice(0,240);
-    if (query.length < 2) return json({ answer:"", results:[], message:"Type at least two characters." },400);
-    const words = [...new Set(query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w=>w.length>1))].slice(0,8);
-    if (!words.length) return json({ answer:"", results:[] });
-    const where = words.map(()=>"(i.title LIKE ? OR i.description LIKE ? OR i.body_text LIKE ?)").join(" OR ");
-    const binds = words.flatMap(w=>{const q="%"+w+"%";return [q,q,q]});
+    const query = String(x.query || "").trim().slice(0, 240);
+    const lang = x.lang === "ne" ? "ne" : "en";
+    if (query.length < 2) return json({ answer: "", results: [], message: "Type at least two characters." }, 400);
+    await ensureQaPopulated(env);
+    const words = [...new Set(query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1))].slice(0, 8);
+    if (!words.length) return json({ answer: "", results: [], matched_questions: [], grounded: false });
+
+    const qaWhere = words.map(() => "(LOWER(question) LIKE ? OR LOWER(answer) LIKE ? OR LOWER(keywords) LIKE ? OR LOWER(title) LIKE ?)").join(" OR ");
+    const qaBinds = words.flatMap((w) => { const q = "%" + w + "%"; return [q, q, q, q]; });
+    const qaRows = await safeAll(
+      env,
+      "SELECT page_slug,question,answer,keywords,title,url FROM site_qa_index WHERE " + qaWhere + " LIMIT 24",
+      ...qaBinds
+    );
+    const rankedQa = qaRows.map((row) => {
+      const ql = row.question.toLowerCase();
+      const al = row.answer.toLowerCase();
+      let score = ql.includes(query.toLowerCase()) ? 15 : 0;
+      for (const w of words) {
+        if (ql.includes(w)) score += 4;
+        if (row.title.toLowerCase().includes(w)) score += 3;
+        if (al.includes(w)) score += 2;
+      }
+      return { ...row, score };
+    }).sort((a, b) => b.score - a.score);
+
+    const where = words.map(() => "(LOWER(i.title) LIKE ? OR LOWER(i.description) LIKE ? OR LOWER(i.body_text) LIKE ?)").join(" OR ");
+    const binds = words.flatMap((w) => { const q = "%" + w + "%"; return [q, q, q]; });
     const rows = await safeAll(env,
-      "SELECT i.page_slug,i.title,i.description,i.body_text,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.department_id,d.name_en AS dept_en,d.name_ne AS dept_ne FROM page_search_index i JOIN pages p ON p.slug=i.page_slug LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 AND ("+where+") ORDER BY p.updated_at DESC LIMIT 8",
+      "SELECT i.page_slug,i.title,i.description,i.body_text,p.thumbnail_image,p.thumbnail_title_en,p.thumbnail_title_ne,p.thumbnail_summary_en,p.thumbnail_summary_ne,p.department_id,d.name_en AS dept_en,d.name_ne AS dept_ne FROM page_search_index i JOIN pages p ON p.slug=i.page_slug LEFT JOIN departments d ON d.id=p.department_id WHERE p.published=1 AND (" + where + ") ORDER BY p.updated_at DESC LIMIT 8",
       ...binds);
-    const results = rows.map(r=>({
-      slug:r.page_slug,title:r.thumbnail_title_en||r.title,title_ne:r.thumbnail_title_ne||"",
-      summary:r.thumbnail_summary_en||r.description||pageExcerpt(r.body_text,query),
-      summary_ne:r.thumbnail_summary_ne||"",image:r.thumbnail_image||"",department:r.dept_en||"",
-      excerpt:pageExcerpt(r.body_text,query),url:"/"+encodeURIComponent(r.page_slug)
+    const results = rows.map((r) => ({
+      slug: r.page_slug,
+      title: r.thumbnail_title_en || r.title,
+      title_ne: r.thumbnail_title_ne || "",
+      summary: r.thumbnail_summary_en || r.description || pageExcerpt(r.body_text, query),
+      summary_ne: r.thumbnail_summary_ne || "",
+      image: r.thumbnail_image || "",
+      department: r.dept_en || "",
+      excerpt: pageExcerpt(r.body_text, query),
+      url: "/" + encodeURIComponent(r.page_slug)
     }));
-    const answer = results.slice(0,3).map(r=>r.excerpt||r.summary).filter(Boolean).join(" ");
-    return json({ query, answer, results, grounded:results.length>0,
-      message:results.length ? "" : "Granshi मा यस प्रश्नको पर्याप्त प्रकाशित जानकारी भेटिएन।" });
+
+    const qaAnswer = rankedQa.slice(0, 2).map((item) => item.answer).filter(Boolean).join("\n\n");
+    const pageAnswer = results.slice(0, 2).map((r) => r.excerpt || r.summary).filter(Boolean).join(" ");
+    const answer = qaAnswer || pageAnswer;
+    const grounded = Boolean(answer);
+    const disclaimer = lang === "ne"
+      ? "नोट: यो उत्तर गोपाल प्रसाद कोइरालाको Granshi वेबसाइटमा प्रकाशित सामग्रीबाट तयार गरिएको सामान्य जानकारी मात्र हो, आधिकारिक वा कानुनी सल्लाह होइन।"
+      : "Note: This response is compiled from content published on Gopal Prasad Koirala's Granshi website for general information only—not official or legal advice.";
+
+    return json({
+      query,
+      answer,
+      grounded,
+      disclaimer,
+      matched_questions: rankedQa.slice(0, 4).map(({ question, answer: ans, page_slug, title, url }) => ({ question, answer: ans, page_slug, title, url })),
+      results,
+      external_ai_url: "https://www.google.com/search?udm=50&q=" + encodeURIComponent(query),
+      external_gemini_url: "https://gemini.google.com/app",
+      message: grounded ? "" : (lang === "ne"
+        ? "यस विषयमा वेबसाइटमा पर्याप्त प्रकाशित जानकारी भेटिएन। तलको बटन थिची यही प्रश्नसहित बाह्य AI मा सोध्न सक्नुहुन्छ।"
+        : "Not enough matching content was found on this site. You can continue with your exact question on an external AI below.")
+    });
   }
 
 
@@ -899,15 +1200,84 @@ async function api(req, env) {
     }
   }
 
+  // Admin: Knowledge Q&A store & external link inspector
+  if (p === "/api/admin/qa/stats" && method === "GET") {
+    await ensureQaPopulated(env);
+    const qCnt = await env.DB.prepare("SELECT COUNT(*) AS n FROM site_qa_index").first();
+    const pCnt = await env.DB.prepare("SELECT COUNT(DISTINCT page_slug) AS n FROM site_qa_index WHERE page_slug<>'_site_profile'").first();
+    return json({ questions: Number(qCnt?.n || 0), pages: Number(pCnt?.n || 0) });
+  }
+  if (p === "/api/admin/qa/rebuild" && method === "POST") {
+    const result = await rebuildAllQa(env);
+    return json({ ok: true, ...result });
+  }
+  if (p === "/api/admin/links/inspect" && method === "POST") {
+    const x = await body(req);
+    const rawUrl = String(x.url || "").trim();
+    let parsed;
+    try { parsed = new URL(rawUrl); } catch { return json({ error: "Enter a valid http:// or https:// URL." }, 400); }
+    if (!["http:", "https:"].includes(parsed.protocol) || isDisallowedHost(parsed.hostname)) {
+      return json({ error: "Only public http/https website URLs are allowed." }, 400);
+    }
+    let title = parsed.hostname.replace(/^www\./, "");
+    let description = "";
+    let ogImage = "";
+    try {
+      const resp = await fetch(parsed.toString(), {
+        headers: { "user-agent": "GranshiBot/1.0 (+https://gopalkoirala.com.np)", accept: "text/html,application/xhtml+xml" },
+        redirect: "follow",
+        signal: AbortSignal.timeout(6000)
+      });
+      if (resp.ok && (resp.headers.get("content-type") || "").includes("text/html")) {
+        const html = (await resp.text()).slice(0, 400000);
+        const tMatch = html.match(/<meta[^>]+(?:property|name)=["'](?:og:title|twitter:title)["'][^>]+content=["']([^"']+)/i)
+          || html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        const dMatch = html.match(/<meta[^>]+(?:property|name)=["'](?:og:description|description|twitter:description)["'][^>]+content=["']([^"']+)/i);
+        const iMatch = html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)/i);
+        if (tMatch?.[1]) title = decodeBasicEntities(tMatch[1]).slice(0, 120);
+        if (dMatch?.[1]) description = decodeBasicEntities(dMatch[1]).slice(0, 320);
+        if (iMatch?.[1]) {
+          try {
+            const absImg = new URL(iMatch[1], parsed.origin);
+            if (["http:", "https:"].includes(absImg.protocol) && !isDisallowedHost(absImg.hostname)) {
+              ogImage = absImg.toString();
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
+    let generatedThumb = "";
+    const thumbSlug = slugify(x.slug || title || parsed.hostname) || ("app-" + Date.now());
+    if (env.MEDIA) {
+      const svg = makeLinkThumbnailSvg(title, parsed.hostname);
+      const key = `thumbs/${thumbSlug}.svg`;
+      await env.MEDIA.put(key, svg, { httpMetadata: { contentType: "image/svg+xml; charset=utf-8" } });
+      generatedThumb = `/media/${key}`;
+    }
+    return json({
+      ok: true,
+      url: parsed.toString(),
+      domain: parsed.hostname,
+      title,
+      description,
+      og_image: ogImage,
+      generated_thumb: generatedThumb,
+      recommended_thumb: ogImage || generatedThumb
+    });
+  }
+
   if (p === "/api/admin/overview") {
     const pub = await allPublic(env);
+    await ensureQaPopulated(env);
+    const qaCnt = await env.DB.prepare("SELECT COUNT(*) AS n FROM site_qa_index").first().catch(() => ({ n: 0 }));
     const contactUnread = await env.DB.prepare(
       "SELECT COUNT(*) AS n FROM messages m LEFT JOIN admin_message_reads r ON r.message_id=m.id AND r.admin_email=? WHERE r.message_id IS NULL AND (m.reply_text IS NULL OR (m.reply_text NOT LIKE ? AND m.reply_text NOT LIKE ?))"
     ).bind(who,'{"inbound":true%','{"outbound":true%').first();
     const emailUnread = await env.DB.prepare(
       "SELECT COUNT(*) AS n FROM messages m JOIN inbound_email_events e ON e.message_id=m.id LEFT JOIN admin_message_reads r ON r.message_id=m.id AND r.admin_email=? WHERE r.message_id IS NULL AND m.reply_text LIKE ? AND m.subject NOT LIKE '[Granshi]%'"
     ).bind(who,'{"inbound":true%').first();
-    return json({ email: who, new_messages: contactUnread?.n || 0, unread_emails: emailUnread?.n || 0, ...pub });
+    return json({ email: who, new_messages: contactUnread?.n || 0, unread_emails: emailUnread?.n || 0, qa_count: Number(qaCnt?.n || 0), ...pub });
   }
 
   // Mark either a Contact Us message or an inbound mailbox email as read for this admin.
@@ -1087,15 +1457,24 @@ async function api(req, env) {
     const slug = slugify(x.slug || x.title_en);
     if (!slug || !x.title_en)
       return json({ error: "Title and slug required." }, 400);
-    const sourceType = x.source_type === "zip" ? "zip" : "blocks";
+    const sourceType = x.source_type === "zip" ? "zip" : x.source_type === "link" ? "link" : "blocks";
     const entryFile = String(x.entry_file || "index.html").replace(/^\/+/, "");
-    // content for zip pages stores file list JSON; for blocks stores blocks
+    let externalUrl = "";
+    if (sourceType === "link") {
+      const rawUrl = String(x.external_url || "").trim();
+      let parsedUrl;
+      try { parsedUrl = new URL(rawUrl); } catch { return json({ error: "Valid https:// external app URL required." }, 400); }
+      if (!["http:", "https:"].includes(parsedUrl.protocol) || isDisallowedHost(parsedUrl.hostname)) {
+        return json({ error: "Only public http/https URLs are allowed." }, 400);
+      }
+      externalUrl = parsedUrl.toString();
+    }
     const contentStr =
       typeof x.content === "string"
         ? x.content
-        : JSON.stringify(x.content || []);
+        : JSON.stringify(x.content || (sourceType === "link" ? { url: externalUrl } : []));
     const updatedAt = new Date().toISOString();
-    let thumbnailImage = String(x.thumbnail_image || "").trim().slice(0,1000);
+    let thumbnailImage = String(x.thumbnail_image || "").trim().slice(0, 1000);
     if (!thumbnailImage && sourceType === "blocks") {
       try { const blocks=JSON.parse(contentStr); const first=blocks.find(b=>b&&((b.type==="image"&&b.url)||(b.type==="hero"&&b.image))); if(first) thumbnailImage=String(first.url||first.image||"").slice(0,1000); } catch {}
     }
@@ -1103,32 +1482,57 @@ async function api(req, env) {
       const media = await env.DB.prepare("SELECT url FROM media WHERE page_slug=? AND content_type LIKE 'image/%' ORDER BY created_at LIMIT 1").bind(slug).first();
       if (media) thumbnailImage = media.url;
     }
-    let searchText = searchablePageText(contentStr);
+    if (!thumbnailImage && sourceType === "link" && env.MEDIA) {
+      let hostLabel = "app";
+      try { hostLabel = new URL(externalUrl).hostname; } catch {}
+      const svg = makeLinkThumbnailSvg(x.title_en, hostLabel);
+      const key = `thumbs/${slug}.svg`;
+      await env.MEDIA.put(key, svg, { httpMetadata: { contentType: "image/svg+xml; charset=utf-8" } });
+      thumbnailImage = `/media/${key}`;
+    }
+    let searchText = sourceType === "link"
+      ? [x.title_en, x.title_ne, x.description_en, x.description_ne, x.thumbnail_summary_en, x.thumbnail_summary_ne, externalUrl].filter(Boolean).join(" ")
+      : searchablePageText(contentStr);
+    let rawHtml = "";
     if (sourceType === "zip" && env.MEDIA) {
       const entryObject = await env.MEDIA.get(`pages/${slug}/${entryFile}`);
       if (entryObject) {
-        const html = await entryObject.text();
-        searchText = htmlToSearchText(html);
-        const extractedCover = zipCoverFromHtml(html,slug);
+        rawHtml = await entryObject.text();
+        searchText = htmlToSearchText(rawHtml);
+        const extractedCover = zipCoverFromHtml(rawHtml, slug);
         if (!x.thumbnail_image && extractedCover) thumbnailImage = extractedCover;
       }
     }
+    const templateValue = sourceType === "zip" ? `zip:${entryFile}` : sourceType === "link" ? `link:${externalUrl}` : (x.template || "default");
     await env.DB.prepare(
       `INSERT INTO pages(slug,title_en,title_ne,description_en,description_ne,content,template,department_id,category_id,is_popular,published,sort_order,updated_at,thumbnail_image,thumbnail_title_en,thumbnail_title_ne,thumbnail_summary_en,thumbnail_summary_ne,thumbnail_alt,thumbnail_focal_x,thumbnail_focal_y)
        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(slug) DO UPDATE SET title_en=excluded.title_en,title_ne=excluded.title_ne,description_en=excluded.description_en,description_ne=excluded.description_ne,content=excluded.content,template=excluded.template,department_id=excluded.department_id,category_id=excluded.category_id,is_popular=excluded.is_popular,published=excluded.published,sort_order=excluded.sort_order,updated_at=excluded.updated_at,thumbnail_image=excluded.thumbnail_image,thumbnail_title_en=excluded.thumbnail_title_en,thumbnail_title_ne=excluded.thumbnail_title_ne,thumbnail_summary_en=excluded.thumbnail_summary_en,thumbnail_summary_ne=excluded.thumbnail_summary_ne,thumbnail_alt=excluded.thumbnail_alt,thumbnail_focal_x=excluded.thumbnail_focal_x,thumbnail_focal_y=excluded.thumbnail_focal_y`
-    ).bind(slug,x.title_en,x.title_ne||"",x.description_en||"",x.description_ne||"",contentStr,sourceType==="zip"?`zip:${entryFile}`:x.template||"default",x.department_id||null,x.category_id||null,x.is_popular?1:0,x.published?1:0,Number(x.sort_order||0),updatedAt,thumbnailImage,String(x.thumbnail_title_en||"").slice(0,180),String(x.thumbnail_title_ne||"").slice(0,180),String(x.thumbnail_summary_en||x.description_en||searchText.slice(0,260)).slice(0,400),String(x.thumbnail_summary_ne||x.description_ne||searchText.slice(0,260)).slice(0,400),String(x.thumbnail_alt||"").slice(0,250),Math.max(0,Math.min(100,Number(x.thumbnail_focal_x??50))),Math.max(0,Math.min(100,Number(x.thumbnail_focal_y??50)))).run();
+    ).bind(slug,x.title_en,x.title_ne||"",x.description_en||"",x.description_ne||"",contentStr,templateValue,x.department_id||null,x.category_id||null,x.is_popular?1:0,x.published?1:0,Number(x.sort_order||0),updatedAt,thumbnailImage,String(x.thumbnail_title_en||"").slice(0,180),String(x.thumbnail_title_ne||"").slice(0,180),String(x.thumbnail_summary_en||x.description_en||searchText.slice(0,260)).slice(0,400),String(x.thumbnail_summary_ne||x.description_ne||searchText.slice(0,260)).slice(0,400),String(x.thumbnail_alt||"").slice(0,250),Math.max(0,Math.min(100,Number(x.thumbnail_focal_x??50))),Math.max(0,Math.min(100,Number(x.thumbnail_focal_y??50)))).run();
     if (x.published) {
       await env.DB.prepare("INSERT INTO page_search_index(page_slug,title,description,body_text,department_id,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(page_slug) DO UPDATE SET title=excluded.title,description=excluded.description,body_text=excluded.body_text,department_id=excluded.department_id,updated_at=excluded.updated_at")
         .bind(slug,[x.title_en,x.title_ne].join(" "),[x.description_en,x.description_ne].join(" "),searchText,x.department_id||null,updatedAt).run();
     } else {
       await env.DB.prepare("DELETE FROM page_search_index WHERE page_slug=?").bind(slug).run();
     }
+    await syncPageQa(env, {
+      slug,
+      title_en: x.title_en,
+      title_ne: x.title_ne || "",
+      description_en: x.description_en || "",
+      description_ne: x.description_ne || "",
+      thumbnail_summary_en: x.thumbnail_summary_en || "",
+      thumbnail_summary_ne: x.thumbnail_summary_ne || "",
+      template: templateValue,
+      content: contentStr,
+      published: !!x.published
+    }, searchText, rawHtml);
     return json({
       ok: true,
       slug,
       source_type: sourceType,
       entry_file: entryFile,
+      thumbnail_image: thumbnailImage,
       preview: `/_preview/${slug}`,
     });
   }
@@ -1183,10 +1587,12 @@ async function api(req, env) {
       for (const row of mediaRows) {
         if (row?.key) { try { await env.MEDIA.delete(row.key); } catch {} }
       }
+      try { await env.MEDIA.delete(`thumbs/${slug}.svg`); } catch {}
     }
     await env.DB.prepare("DELETE FROM media WHERE page_slug=?").bind(slug).run();
     await env.DB.prepare("DELETE FROM pages WHERE slug=?").bind(slug).run();
     await env.DB.prepare("DELETE FROM page_search_index WHERE page_slug=?").bind(slug).run();
+    try { await env.DB.prepare("DELETE FROM site_qa_index WHERE page_slug=?").bind(slug).run(); } catch {}
     return json({ ok: true });
   }
 
@@ -1309,6 +1715,7 @@ async function api(req, env) {
         .bind(k, String(v))
         .run();
     }
+    await syncSiteProfileQa(env, await getSettings(env));
     return json({ ok: true });
   }
 
@@ -1901,6 +2308,22 @@ async function renderAnyPage(page, env, u) {
       headers: {
         "content-type": "text/html; charset=utf-8",
         "cache-control": "public, max-age=30",
+      },
+    });
+  }
+  const isLink = String(page.template || "").startsWith("link:");
+  if (isLink) {
+    const targetUrl = String(page.template).slice(5).trim();
+    const safeThumb = page.thumbnail_image
+      ? `<div style="margin:0 0 24px;border-radius:14px;overflow:hidden;border:1px solid var(--line)"><img src="${escapeHtml(page.thumbnail_image)}" alt="${escapeHtml(page.thumbnail_alt || title)}" style="width:100%;max-height:380px;object-fit:cover;display:block"></div>`
+      : "";
+    const launchLabel = lang === "ne" ? "एप / लिंक खोल्नुहोस् ↗" : "Launch App / Open Link ↗";
+    const domainLabel = (() => { try { return new URL(targetUrl).hostname; } catch { return targetUrl; } })();
+    const body = `<section class="page-hero"><div class="wrap"><span style="display:block;font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--gold);margin-bottom:8px">${lang === "ne" ? "बाह्य एप तथा लिंक" : "App &amp; Curated Link"} · ${escapeHtml(domainLabel)}</span><h1>${escapeHtml(title)}</h1>${desc ? `<p>${escapeHtml(desc)}</p>` : ""}<p style="margin-top:20px"><a class="btn" href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer">${launchLabel}</a></p></div></section><article class="wrap">${safeThumb}${page.thumbnail_summary_en || page.thumbnail_summary_ne ? `<p class="blk-p">${escapeHtml(lang === "ne" ? (page.thumbnail_summary_ne || page.thumbnail_summary_en) : (page.thumbnail_summary_en || desc))}</p>` : ""}<p><a class="btn" href="${escapeHtml(targetUrl)}" target="_blank" rel="noopener noreferrer">${launchLabel}</a></p></article>${widget}`;
+    return new Response(pageChrome(title, desc, body, settings, lang), {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "public, max-age=60",
       },
     });
   }

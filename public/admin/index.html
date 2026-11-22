@@ -70,12 +70,19 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 #exitFocus{display:none;margin:0 0 12px}
 #app.focus-mode #exitFocus{display:none!important}
 #deptHub.workspace-active,#deptEd.workspace-active,#pageEd.workspace-active{position:fixed!important;inset:66px 0 0!important;z-index:40!important;display:block!important;overflow:auto!important;background:#f0f2f7!important;padding:16px!important;margin:0!important;border-radius:0!important}
-#pageEd .editor-mode-tabs{display:flex;gap:10px;margin:12px 0}
-#pageEd .editor-mode-tabs button{flex:1;min-height:46px;font-size:15px}
-#pageEd .editor-mode-tabs button.on{outline:3px solid #d8b46a;outline-offset:1px}
+#pageEd .editor-mode-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+#pageEd .editor-mode-tabs button{min-height:44px;font-size:13px;background:#eef1f6;color:#172640}
+#pageEd .editor-mode-tabs button.on{background:#172640;color:#fff;outline:2px solid #d8b46a;outline-offset:1px}
 #pageEd .editor-panel{background:#fff;border:1px solid #e4e8ef;border-radius:14px;padding:14px;margin:10px 0}
 #pageEd .editor-panel[hidden]{display:none!important}
 #pageEd .editor-top{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:-14px;background:#f0f2f7;padding:8px 0;z-index:5}
+.thumb-preview-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.thumb-preview-box{width:110px;height:76px;border-radius:10px;border:1px solid #dce3ed;background:#e9eef5;overflow:hidden;display:grid;place-items:center;flex-shrink:0;font-size:11px;color:#68758a}
+.thumb-preview-box img{width:100%;height:100%;object-fit:cover;display:block}
+.media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}
+.media-card{border:1px solid #e5e9ef;border-radius:10px;padding:8px;background:#fff;display:flex;flex-direction:column;gap:6px}
+.media-card-thumb{width:100%;height:100px;object-fit:cover;border-radius:7px;background:#eef1f6;display:grid;place-items:center;font-size:12px;color:#525d70;overflow:hidden}
+@media(max-width:600px){#pageEd .editor-mode-tabs{grid-template-columns:1fr}}
 @media(max-width:900px){.side{min-height:54px;gap:4px;padding:6px 8px}.side h2{display:block;font-size:12px;padding-right:6px;margin-right:2px}.side button{padding:8px 9px;font-size:11px}.main{padding:12px}.builder{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
 @media(max-width:430px){.side h2{font-size:10px;letter-spacing:1px}.side button{padding:7px 8px;font-size:10px}.main{padding:10px}}
 .admin-dept-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}
@@ -240,9 +247,9 @@ async function renderAdminOverview(v){
  </div>
  <div id="diagDetails" class="box hidden"></div>
  <div class="grid2">
-  <div class="box"><h3>Content Overview</h3>Published pages: <b>${pages.length}</b><br>Departments: <b>${depts.length}</b></div>
+  <div class="box"><h3>Content Overview</h3><div>Published pages: <b>${pages.length}</b></div><div>Departments: <b>${depts.length}</b></div><div>Knowledge Q&amp;As: <b id="qaCountVal">${Number(d.qa_count||0)}</b></div><div class="row" style="margin-top:10px"><button class="btn" id="rebuildQa" type="button">↻ Rebuild Q&amp;A Index</button><span id="qaRebuildStatus" class="muted"></span></div></div>
   <div class="box"><h3>New Messages & Email</h3><div>Messages: <b>${newMessages}</b></div><div>Unread Email: <b>${newEmails}</b></div><p>Total New: <b>${totalNew}</b></p><button class="btn" data-go="messages">Open Inbox</button></div>
-  <div class="box"><h3>Quick Actions</h3><div class="row"><button class="btn" data-go="departments">Manage Content</button><button class="btn" data-go="comments">Comments</button><button class="btn" data-go="menus">Menus</button><button class="btn" data-go="settings">Settings</button><button class="btn" id="previewSite">Website Preview</button></div></div>
+  <div class="box"><h3>Quick Actions</h3><div class="row"><button class="btn" data-go="departments">Manage Content</button><button class="btn" data-go="comments">Comments</button><button class="btn" data-go="menus">Menus</button><button class="btn" data-go="settings">Settings</button><a class="btn" href="/" target="_blank" rel="noopener">Website Preview ↗</a></div></div>
   <div class="box">
    <div class="row" style="justify-content:space-between;align-items:center"><div><h3 style="margin:0">Pending Work</h3><p class="muted" style="margin:5px 0">Saved in D1 · available across devices</p></div><button class="btn gold" id="togglePending">Open Pending Work ▾</button></div>
    <div class="pending-stats"><span>Total <b id="pwTotal">—</b></span><span>Success <b id="pwSuccess">—</b></span><span>Remaining <b id="pwRemaining">—</b></span><span>Complete <b id="pwPercent">—</b></span></div>
@@ -253,11 +260,17 @@ async function renderAdminOverview(v){
       <div class="row" style="margin-top:8px"><input id="pendingNewTitle" placeholder="Add a separate future task…" style="flex:1;min-width:180px;margin:0"><button class="btn" id="pendingAdd">+ Add</button></div>
       <div id="pendingItems" style="margin-top:10px"></div>
     </div>
-  </div>
+   </div>
   </div>
  </div>`;
  $$('[data-go]',v).forEach(x=>x.onclick=()=>tab(x.dataset.go));
- $('#previewSite',v).onclick=()=>window.open('/','_blank','noopener');
+ $('#rebuildQa',v).onclick=async()=>{
+   const btn=$('#rebuildQa',v),st=$('#qaRebuildStatus',v);
+   btn.disabled=true;st.textContent='Rebuilding…';
+   try{const res=await api('/admin/qa/rebuild',{method:'POST',body:'{}'});$('#qaCountVal',v).textContent=res.total_qa||0;st.textContent='Indexed '+(res.total_qa||0)+' Q&As from '+(res.pages||0)+' pages.';}
+   catch(e){st.textContent=e.message;}
+   finally{btn.disabled=false;}
+ };
  $('#runDiagnosis',v).onclick=()=>startOrResumeDiagnosis(v);
  $('#diagOpenRun',v).onclick=()=>{$('#diagDetails',v).classList.remove('hidden');$('#diagDetails',v).innerHTML='<h3>Website Diagnosis Control</h3><p class="muted">Scan दसवटा जाँच प्रति चरणमा चल्छ। Refresh वा network interruption भए D1 checkpoint बाट जारी हुन्छ।</p><button class="btn gold" id="diagRunAgain">Run / Resume Diagnosis</button><div id="diagRunNote" class="muted" style="margin-top:8px"></div>';$('#diagRunAgain',v).onclick=()=>startOrResumeDiagnosis(v)};
  $('#diagOpenHealth',v).onclick=()=>showDiagnosisDetails(v,'health');
@@ -431,11 +444,23 @@ function editDept(d){
       <div><label>Contact email</label><input id="d_email" value="${esc(d?.email||'')}"></div>
       <div><label>Sort</label><input id="d_sort" type="number" value="${d?.sort_order??0}"></div>
     </div>
-    <label>Department background image URL (optional)</label><input id="d_image" type="url" value="${esc(d?.image||'')}" placeholder="https://… or uploaded media URL">
-    <label>Description EN</label><textarea id="d_den">${esc(d?.description_en||'')}</textarea>
+    <label>Department background image URL (optional)</label>
+    <div class="row" style="align-items:center"><input id="d_image" type="url" value="${esc(d?.image||'')}" placeholder="https://… or uploaded media URL" style="flex:1;margin:0"><label class="btn" style="cursor:pointer;white-space:nowrap">Upload Photo<input type="file" id="d_image_file" accept="image/*" hidden></label></div>
+    <span id="d_img_status" class="muted"></span>
+    <label style="margin-top:10px;display:block">Description EN</label><textarea id="d_den">${esc(d?.description_en||'')}</textarea>
     <label>Description NE</label><textarea id="d_dne">${esc(d?.description_ne||'')}</textarea>
     <label><input type="checkbox" id="d_vis" ${d?.visible!==0?'checked':''}> Visible</label>
     <div class="row" style="margin-top:10px"><button class="btn gold" id="saveD">Save</button><button class="btn" id="canD">Cancel</button></div>`;
+  $('#d_image_file').onchange=async(ev)=>{
+    const file=ev.target.files?.[0];if(!file)return;
+    const st=$('#d_img_status');st.textContent='Uploading…';
+    try{
+      const r=await fetch('/api/admin/media/upload',{method:'POST',headers:{'content-type':file.type||'image/png','x-file-name':encodeURIComponent(file.name),...(d?.id?{'x-department-id':String(d.id)}:{})},body:file});
+      const res=await r.json();if(!r.ok)throw new Error(res.error||'Upload failed');
+      $('#d_image').value=res.url;st.textContent='Uploaded ✓';
+    }catch(e){st.textContent=e.message;}
+    ev.target.value='';
+  };
   $('#canD').onclick=()=>{ed.classList.add('hidden');ed.classList.remove('workspace-active');$('#deptList').classList.remove('hidden')};
   $('#saveD').onclick=async()=>{
     await api('/admin/departments',{method:'POST',body:JSON.stringify({
@@ -451,7 +476,8 @@ async function openDeptHub(id,initialSub='pages',restoreSlug=null,restoreNew=fal
   if(listEl)listEl.classList.add('hidden');
   if(ed){ed.classList.add('hidden');ed.classList.remove('workspace-active')}
   hub.classList.remove('hidden');hub.classList.add('workspace-active');
-  setRoute({tab:'departments',deptId:Number(id),deptSub:initialSub,editorSlug:restoreSlug,editorNew:restoreNew});
+  const normSub=initialSub==='media'?'media':'pages';
+  setRoute({tab:'departments',deptId:Number(id),deptSub:normSub,editorSlug:restoreSlug,editorNew:restoreNew});
   hub.innerHTML='<p class="muted">Loading…</p>';
   try{
     const data=await api('/admin/departments/'+id+'/bundle');
@@ -464,7 +490,7 @@ async function openDeptHub(id,initialSub='pages',restoreSlug=null,restoreNew=fal
       throw new Error('Department GET response is incomplete. Missing/invalid: '+missing.join(', '));
     }
     const dept=data.department;
-    let sub=initialSub||'pages';
+    let sub=normSub;
     function draw(){
       hub.innerHTML=`<div>
         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -472,9 +498,8 @@ async function openDeptHub(id,initialSub='pages',restoreSlug=null,restoreNew=fal
           <button class="btn" id="closeHub" style="padding:5px 10px;font-size:12px">← Back</button>
         </div>
         <div class="tabs">
-          <button class="${sub==='pages'?'on':''}" data-s="pages">Pages</button>
-          <button class="${sub==='categories'?'on':''}" data-s="categories">Categories</button>
-          <button class="${sub==='media'?'on':''}" data-s="media">Media</button>
+          <button class="${sub==='pages'?'on':''}" data-s="pages">Pages (${(data.pages||[]).length})</button>
+          <button class="${sub==='media'?'on':''}" data-s="media">Media (${(data.media||[]).length})</button>
         </div>
         <div id="subView"></div>
       </div>`;
@@ -482,10 +507,9 @@ async function openDeptHub(id,initialSub='pages',restoreSlug=null,restoreNew=fal
       $$('[data-s]').forEach(b=>b.onclick=()=>{sub=b.dataset.s;setRoute({deptSub:sub,editorSlug:null,editorNew:false});draw()});
       const sv=$('#subView');
       if(sub==='pages'){
-        renderDeptPages(sv,dept,data.pages||[],data.categories||[]);
+        renderDeptPages(sv,dept,data.pages||[],data.categories||[],data.media||[]);
         if(restoreSlug||restoreNew){const p=(data.pages||[]).find(x=>x.slug===restoreSlug);if(p||restoreNew)openPageEditor(p||null,dept,data.categories||[],true);restoreSlug=null;restoreNew=false;}
       }
-      if(sub==='categories') renderDeptCats(sv,dept,data.categories||[]);
       if(sub==='media') renderDeptMedia(sv,dept,data.media||[]);
     }
     draw();
@@ -497,77 +521,130 @@ async function openDeptHub(id,initialSub='pages',restoreSlug=null,restoreNew=fal
     $('#closeHub').onclick=()=>{hub.classList.add('hidden');hub.classList.remove('workspace-active');$('#deptList').classList.remove('hidden')};
   }
 }
-function renderDeptPages(sv,dept,pages,cats){
-  sv.innerHTML=`<div class="row" style="justify-content:space-between"><b>Pages in this department</b><button class="btn gold" id="np">+ Page (ZIP)</button></div>
-    <p class="notice">मुख्य नियम: बाहिर page ZIP बनाउनुहोस् → यहाँ upload → Preview → Publish। Block editor optional मात्र।</p>
+function renderDeptPages(sv,dept,pages,cats,media){
+  sv.innerHTML=`<div class="row" style="justify-content:space-between;align-items:center">
+      <b>Pages &amp; Apps in ${esc(dept.name_en)}</b>
+      <div class="row">
+        <button class="btn" id="toggleCatsBtn" type="button">Categories (${(cats||[]).length})</button>
+        <button class="btn gold" id="np">+ New Page / App</button>
+      </div>
+    </div>
+    <div id="inlineCatsPanel" class="box hidden" style="background:#f8f9fc;margin-bottom:10px"></div>
+    <p class="muted" style="margin:8px 0">External App/Link, HTML/ZIP package, वा Block PageMaker मध्ये कुनै पनि तरिकाले पेज थप्न सकिन्छ।</p>
     ${pages.map(p=>{
-      const isZip=String(p.template||'').startsWith('zip:');
+      const tpl=String(p.template||'');
+      const kind=tpl.startsWith('link:')?'External App/Link':tpl.startsWith('zip:')?'HTML / ZIP':'Blocks';
       return `<div class="item"><div><b>${esc(p.title_en)}</b>
-      <small class="muted">/${esc(p.slug)} · ${isZip?'ZIP package':'Blocks'} · <span class="badge ${p.published?'published':'draft'}">${p.published?'Published':'Draft'}</span>
-      ${p.is_popular?' · Popular':''}</small></div>
+      <small class="muted">/${esc(p.slug)} · ${kind} · <span class="badge ${p.published?'published':'draft'}">${p.published?'Published':'Draft'}</span>
+      ${p.is_popular?' · Featured':''}</small></div>
       <div class="row">
         <a class="btn" href="/_preview/${esc(p.slug)}" target="_blank" rel="noopener">Preview</a>
         <button class="btn" data-ep="${esc(p.slug)}">Edit</button>
         <button class="btn danger" data-dp="${esc(p.slug)}">Delete</button>
       </div></div>`;
-    }).join('')||'<p class="muted">No pages yet</p>'}
+    }).join('')||'<p class="muted">No pages yet. Tap + New Page / App to add your first one.</p>'}
     <div id="pageEd" class="hidden"></div>`;
-  $('#np').onclick=()=>openPageEditor(null,dept,cats);
-  $$('[data-ep]').forEach(b=>b.onclick=()=>openPageEditor(pages.find(x=>x.slug===b.dataset.ep),dept,cats));
-  $$('[data-dp]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete page?'))return;await api('/admin/pages/'+encodeURIComponent(b.dataset.dp),{method:'DELETE'});openDeptHub(dept.id)});
+  $('#toggleCatsBtn').onclick=()=>{
+    const box=$('#inlineCatsPanel');
+    box.classList.toggle('hidden');
+    if(!box.classList.contains('hidden')) renderDeptCats(box,dept,cats);
+  };
+  $('#np').onclick=()=>openPageEditor(null,dept,cats,false,media);
+  $$('[data-ep]').forEach(b=>b.onclick=()=>openPageEditor(pages.find(x=>x.slug===b.dataset.ep),dept,cats,false,media));
+  $$('[data-dp]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete page /'+b.dataset.dp+'?'))return;await api('/admin/pages/'+encodeURIComponent(b.dataset.dp),{method:'DELETE'});openDeptHub(dept.id,'pages')});
 }
-function openPageEditor(page,dept,cats,restoring=false){
+function openPageEditor(page,dept,cats,restoring=false,deptMedia=[]){
   const ed=$('#pageEd');ed.classList.remove('hidden');ed.classList.add('workspace-active');
   setRoute({tab:'departments',deptId:Number(dept.id),deptSub:'pages',editorSlug:page?.slug||null,editorNew:!page});
-  const isZipExisting=page && String(page.template||'').startsWith('zip:');
+  const tpl=String(page?.template||'');
+  const isLinkExisting=tpl.startsWith('link:');
+  const isZipExisting=tpl.startsWith('zip:');
+  const existingLinkUrl=isLinkExisting?tpl.slice(5):'';
   let fileList=[];
   let zipReady=false;
   if(isZipExisting){try{const parsed=typeof page.content==='string'?JSON.parse(page.content):page.content;if(Array.isArray(parsed?.files))fileList=parsed.files;}catch{}}
-  ed.innerHTML=`<div class="editor-top"><h3 style="margin:0">${page?'Edit page':'New page'}</h3><button class="btn" id="editorBack" type="button">← Back to Pages</button></div>
-    <div class="notice"><b>Primary:</b> Upload a ZIP of your finished page (must include <code>index.html</code>). Test offline first, then upload → Preview → Publish.</div>
-    <div class="grid2">
-      <div><label>Title EN *</label><input id="p_te" value="${esc(page?.title_en||'')}"></div>
-      <div><label>Title NE</label><input id="p_tn" value="${esc(page?.title_ne||'')}"></div>
-      <div><label>Slug * (URL)</label><input id="p_sl" value="${esc(page?.slug||'')}" ${page?'readonly':''} placeholder="my-article"></div>
-      <div><label>Category</label><select id="p_cat"><option value="">—</option>${(cats||[]).map(c=>`<option value="${c.id}" ${page?.category_id==c.id?'selected':''}>${esc(c.name_en)}</option>`).join('')}</select></div>
-    </div>
-    <label>Description EN</label><textarea id="p_de" rows="2">${esc(page?.description_en||'')}</textarea>
-    <label>Description NE</label><textarea id="p_dn" rows="2">${esc(page?.description_ne||'')}</textarea>
-    <div class="box" style="background:#f7f8fb;margin:12px 0">
-      <h4 style="margin:0 0 8px">Thumbnail / Homepage & Department Card</h4>
-      <p class="muted">खाली छोड्दा system ले page भित्रको पहिलो उपयुक्त image छान्छ। चाहनु भए यहाँ आफैँ image र छोटो teaser राख्न सक्नुहुन्छ।</p>
-      <label>Thumbnail image URL (optional override)</label><input id="p_thumb" value="${esc(page?.thumbnail_image||'')}" placeholder="/media/... or /_p/...">
-      <div class="grid2">
-        <div><label>Card title EN</label><input id="p_ttitle_en" value="${esc(page?.thumbnail_title_en||'')}"></div>
-        <div><label>Card title NE</label><input id="p_ttitle_ne" value="${esc(page?.thumbnail_title_ne||'')}"></div>
-        <div><label>Short summary EN</label><textarea id="p_tsum_en" rows="2">${esc(page?.thumbnail_summary_en||'')}</textarea></div>
-        <div><label>Short summary NE</label><textarea id="p_tsum_ne" rows="2">${esc(page?.thumbnail_summary_ne||'')}</textarea></div>
-      </div>
-      <label>Image alt text</label><input id="p_talt" value="${esc(page?.thumbnail_alt||'')}">
-      <div class="grid2"><div><label>Image focus X (0–100)</label><input id="p_fx" type="number" min="0" max="100" value="${Number(page?.thumbnail_focal_x??50)}"></div><div><label>Image focus Y (0–100)</label><input id="p_fy" type="number" min="0" max="100" value="${Number(page?.thumbnail_focal_y??50)}"></div></div>
-    </div>
-    <label><input type="checkbox" id="p_pub" ${page?.published?'checked':''}> Published (live)</label>
-    <label><input type="checkbox" id="p_pop" ${page?.is_popular?'checked':''}> Popular on homepage</label>
+  const initialMode=isLinkExisting?'link':isZipExisting?'zip':page?'blocks':'link';
 
+  ed.innerHTML=`<div class="editor-top"><h3 style="margin:0">${page?'Edit: '+esc(page.title_en||page.slug):'New Page / App'}</h3><button class="btn" id="editorBack" type="button">← Back</button></div>
     <div class="editor-mode-tabs">
-      <button type="button" id="modeZip" class="btn">ZIP Upload</button>
-      <button type="button" id="modeBlocks" class="btn">Block PageMaker</button>
+      <button type="button" id="modeLink" class="btn">🔗 App / Link</button>
+      <button type="button" id="modeZip" class="btn">📦 HTML / ZIP</button>
+      <button type="button" id="modeBlocks" class="btn">🧱 Block PageMaker</button>
     </div>
-    <div id="zipPanel" class="editor-panel">
-      <h4 style="margin-top:0">ZIP package upload</h4>
-      <p class="muted">ZIP भित्र index.html + CSS/JS/images राख्नुहोस्। Mobile बाट पनि छान्न मिल्छ।</p>
-      <input type="file" id="zipFile" accept=".zip,application/zip">
-      <div id="zipStatus" class="muted" style="margin-top:8px">${isZipExisting?'Existing ZIP page — upload new ZIP to replace files.':'No ZIP selected yet.'}</div>
-      <ul id="zipList" class="muted" style="font-size:12px;max-height:120px;overflow:auto"></ul>
-      <button class="btn gold" type="button" id="uploadZip" style="margin-top:8px">Upload ZIP to server</button>
+
+    <div id="linkPanel" class="editor-panel" hidden>
+      <h4 style="margin-top:0">Add External App or Tool Link</h4>
+      <p class="muted">AI Studio, Vercel, वा अन्यत्र बनेको web app को URL राख्नुहोस्। Inspect थिच्दा title, विवरण र स्वतः branded thumbnail बन्छ।</p>
+      <div class="row" style="align-items:center">
+        <input id="p_ext_url" type="url" value="${esc(existingLinkUrl)}" placeholder="https://your-app.example.com" style="flex:1;margin:0">
+        <button class="btn gold" type="button" id="inspectLinkBtn">Inspect &amp; Auto-Thumb</button>
+      </div>
+      <div id="linkInspectStatus" class="muted" style="margin-top:6px"></div>
     </div>
-    <div class="row" style="margin-top:14px">
-      <button class="btn gold" id="saveP">Save page</button>
-      <a class="btn" id="prevP" href="#" target="_blank" rel="noopener">Preview</a>
-      <button class="btn" id="canP">Cancel</button>
+
+    <div id="zipPanel" class="editor-panel" hidden>
+      <h4 style="margin-top:0">Upload Single HTML or ZIP Package</h4>
+      <p class="muted">Mobile बाट सिधै एउटा <code>.html</code> फाइल वा पूरा <code>.zip</code> (<code>index.html</code> + assets) छान्न मिल्छ।</p>
+      <input type="file" id="zipFile" accept=".zip,.html,.htm,application/zip,text/html">
+      <div id="zipStatus" class="muted" style="margin-top:8px">${isZipExisting?'Existing HTML/ZIP page — upload new file to replace.':'No file selected yet.'}</div>
+      <ul id="zipList" class="muted" style="font-size:12px;max-height:110px;overflow:auto"></ul>
+      <button class="btn gold" type="button" id="uploadZip" style="margin-top:8px">Upload HTML / ZIP</button>
     </div>
+
+    <div class="box" style="margin:10px 0">
+      <div class="grid2">
+        <div><label>Title EN *</label><input id="p_te" value="${esc(page?.title_en||'')}" placeholder="My App or Article Title"></div>
+        <div><label>Title NE</label><input id="p_tn" value="${esc(page?.title_ne||'')}"></div>
+        <div><label>URL Slug *</label><input id="p_sl" value="${esc(page?.slug||'')}" ${page?'readonly':''} placeholder="auto-from-title"></div>
+        <div>
+          <label>Category (optional)</label>
+          <div class="row" style="align-items:center;gap:6px">
+            <select id="p_cat" style="flex:1;margin:0"><option value="">— None —</option>${(cats||[]).map(c=>`<option value="${c.id}" ${page?.category_id==c.id?'selected':''}>${esc(c.name_en)}</option>`).join('')}</select>
+            <button type="button" class="btn" id="quickAddCatBtn" style="white-space:nowrap">+ New</button>
+          </div>
+          <div id="quickCatBox" class="row hidden" style="margin-top:6px;gap:6px">
+            <input id="quickCatName" placeholder="New category name" style="flex:1;margin:0">
+            <button type="button" class="btn gold" id="quickCatSave">Add</button>
+          </div>
+        </div>
+      </div>
+      <label>Description EN</label><textarea id="p_de" rows="2">${esc(page?.description_en||'')}</textarea>
+      <label>Description NE</label><textarea id="p_dn" rows="2">${esc(page?.description_ne||'')}</textarea>
+      <div class="row" style="margin-top:6px;gap:18px">
+        <label><input type="checkbox" id="p_pub" ${page?.published?'checked':''} style="width:auto;margin-right:6px">Published (live)</label>
+        <label><input type="checkbox" id="p_pop" ${page?.is_popular?'checked':''} style="width:auto;margin-right:6px">Featured on homepage</label>
+      </div>
+    </div>
+
+    <details class="box" style="background:#f8f9fc;margin:10px 0" ${page?.thumbnail_image?'open':''}>
+      <summary style="cursor:pointer"><b>Thumbnail &amp; Card Options</b> <span class="muted">(auto-picked if empty)</span></summary>
+      <div class="thumb-preview-row">
+        <div class="thumb-preview-box" id="thumbPrevBox">${page?.thumbnail_image?`<img src="${esc(page.thumbnail_image)}" alt="">`:'No thumb'}</div>
+        <div style="flex:1;min-width:200px">
+          <label style="margin-top:0">Thumbnail URL</label>
+          <input id="p_thumb" value="${esc(page?.thumbnail_image||'')}" placeholder="/media/... or https://...">
+          <div class="row">
+            <label class="btn" style="cursor:pointer">Upload Thumbnail<input type="file" id="p_thumb_file" accept="image/*" hidden></label>
+            <button type="button" class="btn" id="pickThumbMedia">Pick from Media</button>
+            <span id="p_thumb_status" class="muted"></span>
+          </div>
+          <div id="thumbMediaPicker" class="hidden" style="margin-top:8px"></div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div><label>Card title EN (optional)</label><input id="p_ttitle_en" value="${esc(page?.thumbnail_title_en||'')}"></div>
+        <div><label>Card title NE (optional)</label><input id="p_ttitle_ne" value="${esc(page?.thumbnail_title_ne||'')}"></div>
+        <div><label>Card summary EN</label><textarea id="p_tsum_en" rows="2">${esc(page?.thumbnail_summary_en||'')}</textarea></div>
+        <div><label>Card summary NE</label><textarea id="p_tsum_ne" rows="2">${esc(page?.thumbnail_summary_ne||'')}</textarea></div>
+      </div>
+      <div class="grid2">
+        <div><label>Image alt text</label><input id="p_talt" value="${esc(page?.thumbnail_alt||'')}"></div>
+        <div class="grid2"><div><label>Focus X (0–100)</label><input id="p_fx" type="number" min="0" max="100" value="${Number(page?.thumbnail_focal_x??50)}"></div><div><label>Focus Y (0–100)</label><input id="p_fy" type="number" min="0" max="100" value="${Number(page?.thumbnail_focal_y??50)}"></div></div>
+      </div>
+    </details>
+
     <div id="blocksWrap" class="editor-panel" hidden>
-      <p class="muted">Optional only — if you are not using ZIP.</p>
+      <p class="muted" style="margin-top:0">Build blocks visually — ideal for structured articles, guides, and rich pages.</p>
       <div class="builder">
         <div><div class="canvas" id="canvas"></div></div>
         <div class="palette">
@@ -587,77 +664,166 @@ function openPageEditor(page,dept,cats,restoring=false){
           <p class="muted">Drag ⠿ handle or use ↑ / ↓ to reorder blocks.</p>
         </div>
       </div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button class="btn gold" id="saveP">Save Page</button>
+      <a class="btn" id="prevP" href="#" target="_blank" rel="noopener">Preview</a>
+      <button class="btn" id="canP">Cancel</button>
+      <span id="savePageStatus" class="muted"></span>
     </div>`;
 
   let blocks=[];
-  try{if(page&&!isZipExisting)blocks=typeof page.content==='string'?JSON.parse(page.content):page.content||[]}catch{blocks=[]}
-  let useZip=isZipExisting || !page;
+  try{if(page&&!isZipExisting&&!isLinkExisting)blocks=typeof page.content==='string'?JSON.parse(page.content):page.content||[]}catch{blocks=[]}
+  let mode=initialMode;
   let entryFile='index.html';
-  if(isZipExisting) entryFile=String(page.template).slice(4)||'index.html';
-  function selectEditorMode(mode){
-    useZip=mode==='zip';$('#zipPanel').hidden=!useZip;$('#blocksWrap').hidden=useZip;
-    $('#modeZip').classList.toggle('on',useZip);$('#modeBlocks').classList.toggle('on',!useZip);
+  if(isZipExisting) entryFile=tpl.slice(4)||'index.html';
+  let slugEdited=Boolean(page);
+
+  function selectEditorMode(nextMode){
+    mode=nextMode;
+    $('#linkPanel').hidden=mode!=='link';
+    $('#zipPanel').hidden=mode!=='zip';
+    $('#blocksWrap').hidden=mode!=='blocks';
+    $('#modeLink').classList.toggle('on',mode==='link');
+    $('#modeZip').classList.toggle('on',mode==='zip');
+    $('#modeBlocks').classList.toggle('on',mode==='blocks');
   }
+  $('#modeLink').onclick=()=>selectEditorMode('link');
   $('#modeZip').onclick=()=>selectEditorMode('zip');
   $('#modeBlocks').onclick=()=>selectEditorMode('blocks');
-  selectEditorMode(isZipExisting||!page?'zip':'blocks');
+  selectEditorMode(initialMode);
+
+  $('#p_te').addEventListener('input',()=>{if(!slugEdited&&!page)$('#p_sl').value=slugifyClient($('#p_te').value)});
+  $('#p_sl').addEventListener('input',()=>{slugEdited=true});
+
+  function updateThumbPreview(){
+    const u=$('#p_thumb').value.trim();
+    $('#thumbPrevBox').innerHTML=u?`<img src="${esc(u)}" alt="">`:'No thumb';
+  }
+  $('#p_thumb').addEventListener('input',updateThumbPreview);
+
+  $('#p_thumb_file').onchange=async(ev)=>{
+    const file=ev.target.files?.[0];if(!file)return;
+    const st=$('#p_thumb_status');st.textContent='Uploading…';
+    try{
+      const r=await fetch('/api/admin/media/upload',{method:'POST',headers:{'content-type':file.type||'image/png','x-file-name':encodeURIComponent(file.name),'x-department-id':String(dept.id)},body:file});
+      const d=await r.json();if(!r.ok)throw new Error(d.error||'Upload failed');
+      $('#p_thumb').value=d.url;updateThumbPreview();st.textContent='Uploaded ✓';
+    }catch(e){st.textContent=e.message;}
+    ev.target.value='';
+  };
+
+  $('#pickThumbMedia').onclick=()=>{
+    const box=$('#thumbMediaPicker');
+    box.classList.toggle('hidden');
+    if(box.classList.contains('hidden'))return;
+    const imgs=(deptMedia||[]).filter(m=>/\.(png|jpe?g|gif|webp|svg)$/i.test(m.name||'')||(m.content_type||'').startsWith('image/'));
+    if(!imgs.length){box.innerHTML='<span class="muted">No images in department media yet.</span>';return;}
+    box.innerHTML=`<select id="thumbPickSel"><option value="">Choose an image…</option>${imgs.map(m=>`<option value="${esc(m.url)}">${esc(m.name)}</option>`).join('')}</select>`;
+    $('#thumbPickSel').onchange=()=>{const v=$('#thumbPickSel').value;if(v){$('#p_thumb').value=v;updateThumbPreview();box.classList.add('hidden');}};
+  };
+
+  $('#quickAddCatBtn').onclick=()=>$('#quickCatBox').classList.toggle('hidden');
+  $('#quickCatSave').onclick=async()=>{
+    const name=$('#quickCatName').value.trim();if(!name)return;
+    $('#quickCatSave').disabled=true;
+    try{
+      const res=await api('/admin/categories',{method:'POST',body:JSON.stringify({department_id:dept.id,name_en:name,name_ne:'',visible:true})});
+      const sel=$('#p_cat');
+      const opt=document.createElement('option');
+      opt.value=res.id;opt.textContent=name;opt.selected=true;
+      sel.appendChild(opt);
+      cats.push({id:res.id,name_en:name,slug:res.slug});
+      $('#quickCatName').value='';$('#quickCatBox').classList.add('hidden');
+    }catch(e){$('#savePageStatus').textContent=e.message;}
+    finally{$('#quickCatSave').disabled=false;}
+  };
+
+  $('#inspectLinkBtn').onclick=async()=>{
+    const rawUrl=$('#p_ext_url').value.trim(),st=$('#linkInspectStatus'),btn=$('#inspectLinkBtn');
+    if(!rawUrl){st.textContent='Enter a valid https:// URL first.';return;}
+    btn.disabled=true;st.textContent='Inspecting URL & generating thumbnail…';
+    try{
+      const slug=slugifyClient($('#p_sl').value.trim()||$('#p_te').value.trim()||'app');
+      const d=await api('/admin/links/inspect',{method:'POST',body:JSON.stringify({url:rawUrl,slug})});
+      if(!$('#p_te').value.trim()&&d.title)$('#p_te').value=d.title;
+      if(!page&&!$('#p_sl').value.trim())$('#p_sl').value=slugifyClient($('#p_te').value.trim()||d.domain||'app');
+      if(!$('#p_de').value.trim()&&d.description)$('#p_de').value=d.description;
+      if(!$('#p_tsum_en').value.trim()&&d.description)$('#p_tsum_en').value=d.description.slice(0,220);
+      if(d.recommended_thumb&&!$('#p_thumb').value.trim()){
+        $('#p_thumb').value=d.recommended_thumb;
+        updateThumbPreview();
+      }
+      st.textContent='Ready — title, summary & thumbnail populated.';
+    }catch(e){st.textContent=e.message;}
+    finally{btn.disabled=false;}
+  };
+
   $('#editorBack').onclick=()=>{ed.classList.add('hidden');ed.classList.remove('workspace-active');setRoute({editorSlug:null,editorNew:false})};
   $('#canP').onclick=()=>{ed.classList.add('hidden');ed.classList.remove('workspace-active');setRoute({editorSlug:null,editorNew:false})};
-  if(restoring)setTimeout(restoreDraft,60);
+  if(restoring)setTimeout(()=>{restoreDraft();updateThumbPreview();},60);
   $('#prevP').onclick=(e)=>{
-    const slug=$('#p_sl').value.trim()||$('#p_te').value.trim();
-    if(!slug){e.preventDefault();alert('Save slug first');return}
-    $('#prevP').href='/_preview/'+encodeURIComponent(slugifyClient(slug));
+    const slug=slugifyClient($('#p_sl').value.trim()||$('#p_te').value.trim());
+    if(!slug){e.preventDefault();$('#savePageStatus').textContent='Set title/slug first.';return}
+    $('#prevP').href='/_preview/'+encodeURIComponent(slug);
   };
 
   $('#uploadZip').onclick=async()=>{
     const f=$('#zipFile').files[0];
-    if(!f)return alert('Choose a .zip file');
-    const slug=slugifyClient($('#p_sl').value.trim()||$('#p_te').value.trim());
-    if(!slug)return alert('Set Title or slug first');
-    $('#p_sl').value=slug;
     const st=$('#zipStatus');
-    st.textContent='Reading ZIP…';
+    if(!f){st.textContent='Choose a .zip or .html file first.';return;}
+    const slug=slugifyClient($('#p_sl').value.trim()||$('#p_te').value.trim()||f.name.replace(/\.(zip|html?)$/i,''));
+    if(!slug){st.textContent='Set Title or slug first.';return;}
+    $('#p_sl').value=slug;
+    if(!$('#p_te').value.trim())$('#p_te').value=f.name.replace(/\.(zip|html?)$/i,'').replace(/[-_]+/g,' ');
     try{
-      const zip=await JSZip.loadAsync(f);
-      const names=[];
-      zip.forEach((path,entry)=>{if(!entry.dir)names.push(path.replace(/\\/g,'/'))});
-      // prefer root index.html
-      let indexPath=names.find(n=>n==='index.html')||names.find(n=>n.endsWith('/index.html'))||names.find(n=>/\.html?$/i.test(n));
-      if(!indexPath)throw new Error('ZIP must contain index.html');
-      entryFile=indexPath.includes('/')?indexPath.split('/').pop():indexPath;
-      // if files in a single top folder, strip that prefix for R2 keys relative to entry folder
-      let prefix='';
-      const parts=indexPath.split('/');
-      if(parts.length>1){prefix=parts.slice(0,-1).join('/')+'/';entryFile=parts[parts.length-1]}
-      fileList=names;
-      $('#zipList').innerHTML=names.slice(0,40).map(n=>`<li>${esc(n)}</li>`).join('')+(names.length>40?'<li>…</li>':'');
-      st.textContent=`Uploading ${names.length} files…`;
-      let done=0;
-      for(const path of names){
-        const entry=zip.file(path);
-        if(!entry)continue;
-        let rel=path.replace(/\\/g,'/');
-        if(prefix&&rel.startsWith(prefix))rel=rel.slice(prefix.length);
-        if(!rel||rel.includes('..'))continue;
-        const buf=await entry.async('arraybuffer');
-        const ct=guessType(rel);
+      if(/\.html?$/i.test(f.name)){
+        st.textContent='Uploading single HTML file…';
+        entryFile='index.html';
+        fileList=['index.html'];
+        const buf=await f.arrayBuffer();
         const r=await fetch('/api/admin/pages/asset',{
           method:'POST',
-          headers:{
-            'content-type':ct,
-            'x-page-slug':slug,
-            'x-department-id':String(dept.id),
-            'x-rel-path':encodeURIComponent(rel)
-          },
+          headers:{'content-type':'text/html; charset=utf-8','x-page-slug':slug,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent('index.html')},
           body:buf
         });
-        const d=await r.json();
-        if(!r.ok)throw new Error(d.error||'Upload failed: '+rel);
-        done++;
-        st.textContent=`Uploaded ${done}/${names.length}…`;
+        const d=await r.json();if(!r.ok)throw new Error(d.error||'Upload failed');
+        $('#zipList').innerHTML='<li>index.html (ready)</li>';
+      }else{
+        st.textContent='Reading ZIP…';
+        const zip=await JSZip.loadAsync(f);
+        const names=[];
+        zip.forEach((path,entry)=>{if(!entry.dir)names.push(path.replace(/\\/g,'/'))});
+        let indexPath=names.find(n=>n==='index.html')||names.find(n=>n.endsWith('/index.html'))||names.find(n=>/\.html?$/i.test(n));
+        if(!indexPath)throw new Error('ZIP must contain index.html');
+        entryFile=indexPath.includes('/')?indexPath.split('/').pop():indexPath;
+        let prefix='';
+        const parts=indexPath.split('/');
+        if(parts.length>1){prefix=parts.slice(0,-1).join('/')+'/';entryFile=parts[parts.length-1]}
+        fileList=names;
+        $('#zipList').innerHTML=names.slice(0,40).map(n=>`<li>${esc(n)}</li>`).join('')+(names.length>40?'<li>…</li>':'');
+        st.textContent=`Uploading ${names.length} files…`;
+        let done=0;
+        for(const path of names){
+          const entry=zip.file(path);
+          if(!entry)continue;
+          let rel=path.replace(/\\/g,'/');
+          if(prefix&&rel.startsWith(prefix))rel=rel.slice(prefix.length);
+          if(!rel||rel.includes('..'))continue;
+          const buf=await entry.async('arraybuffer');
+          const ct=guessType(rel);
+          const r=await fetch('/api/admin/pages/asset',{
+            method:'POST',
+            headers:{'content-type':ct,'x-page-slug':slug,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent(rel)},
+            body:buf
+          });
+          const d=await r.json();
+          if(!r.ok)throw new Error(d.error||'Upload failed: '+rel);
+          done++;
+          st.textContent=`Uploaded ${done}/${names.length}…`;
+        }
       }
-      // preserve current published state when uploading ZIP
       await api('/admin/pages',{method:'POST',body:JSON.stringify({
         slug,title_en:$('#p_te').value.trim()||slug,title_ne:$('#p_tn').value.trim(),
         description_en:$('#p_de').value.trim(),description_ne:$('#p_dn').value.trim(),
@@ -667,15 +833,15 @@ function openPageEditor(page,dept,cats,restoring=false){
         thumbnail_summary_en:$('#p_tsum_en').value.trim(),thumbnail_summary_ne:$('#p_tsum_ne').value.trim(),thumbnail_alt:$('#p_talt').value.trim(),
         thumbnail_focal_x:Number($('#p_fx').value||50),thumbnail_focal_y:Number($('#p_fy').value||50),
         source_type:'zip',entry_file:entryFile,
-        content:{files:names,entry:entryFile}
+        content:{files:fileList,entry:entryFile}
       })});
-      zipReady=true;useZip=true;
-      st.textContent=`OK — ${done} files uploaded. Click Preview, or Save page.`;
+      zipReady=true;mode='zip';
+      st.textContent='OK — uploaded & saved. Click Preview or Publish.';
       $('#prevP').href='/_preview/'+encodeURIComponent(slug);
-    }catch(e){st.textContent='Error: '+e.message;alert(e.message)}
+    }catch(e){st.textContent='Error: '+e.message;}
   };
 
-  // minimal optional blocks + SortableJS drag reorder
+  // optional blocks + SortableJS drag reorder
   const canvas=$('#canvas');
   let sortableInst=null;
   function drawBlocks(){
@@ -690,7 +856,7 @@ function openPageEditor(page,dept,cats,restoring=false){
       else if(b.type==='button')fields=field('text','Button label',b.text)+field('url','Button link',b.url);
       else if(b.type==='hero')fields=field('title','Hero title',b.title)+field('subtitle','Hero subtitle',b.subtitle)+field('image','Background image URL',b.image)+field('button_text','Button text',b.button_text)+field('button_url','Button URL',b.button_url);
       else if(b.type==='spacer')fields=field('height','Height (px)',b.height||32);
-      else if(b.type==='columns')fields='<label>Columns (one per line, use | for multiple)</label><textarea data-json-cols="'+i+'" rows="3">'+esc((b.columns||[]).map(c=>c.text||'').join('\n---\n'))+'</textarea>';
+      else if(b.type==='columns')fields='<label>Columns (one per line, separated by ---)</label><textarea data-json-cols="'+i+'" rows="3">'+esc((b.columns||[]).map(c=>c.text||'').join('\n---\n'))+'</textarea>';
       else if(b.type==='cards')fields='<label>Cards JSON ([{title,text,icon,url,linktext}])</label><textarea data-json-cards="'+i+'" rows="4">'+esc(JSON.stringify(b.cards||[],null,2))+'</textarea>';
       else if(b.type==='html')fields=field('html','HTML code',b.html,true);
       else fields='<p class="muted">Divider block</p>';
@@ -707,25 +873,24 @@ function openPageEditor(page,dept,cats,restoring=false){
       try{
         const all=await api('/admin/media?department_id='+encodeURIComponent(dept.id));
         const allowed=all.filter(m=>block.type==='image'?(m.content_type||'').startsWith('image/'):(m.content_type||'').startsWith('video/'));
-        if(!allowed.length){alert('No matching uploads in Media Library yet. Upload a file first.');return}
+        if(!allowed.length){$('#savePageStatus').textContent='No matching uploads in Media Library yet.';return}
         const card=btn.closest('.block'),select=document.createElement('select');
         select.style.marginTop='8px';select.innerHTML='<option value="">Choose an uploaded '+block.type+'…</option>'+allowed.map(m=>'<option value="'+esc(m.url)+'">'+esc(m.name)+' · '+Math.ceil((m.size||0)/1024)+' KB</option>').join('');
         const previous=card.querySelector('[data-library-select]');if(previous)previous.remove();
         select.setAttribute('data-library-select','');card.appendChild(select);
         select.onchange=()=>{if(select.value){block.url=select.value;drawBlocks()}};
-      }catch(e){alert(e.message)}
+      }catch(e){$('#savePageStatus').textContent=e.message}
     });
     canvas.querySelectorAll('[data-upload]').forEach(el=>el.onchange=async()=>{
       const file=el.files&&el.files[0];if(!file)return;
-      const idx=+el.dataset.upload,st=$('#zipStatus');if(st)st.textContent='Uploading '+file.name+'…';
+      const idx=+el.dataset.upload,st=$('#savePageStatus');if(st)st.textContent='Uploading '+file.name+'…';
       try{
-        const slug=slugifyClient($('#p_sl').value.trim()||$('#p_te').value.trim());
-        if(!slug)throw new Error('Set page title/slug first.');
+        const slug=slugifyClient($('#p_sl').value.trim()||$('#p_te').value.trim()||'page');
         const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_'),rel='builder/'+Date.now()+'-'+safe;
         const r=await fetch('/api/admin/pages/asset',{method:'POST',headers:{'content-type':file.type||'application/octet-stream','x-page-slug':slug,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent(rel)},body:file});
         const d=await r.json();if(!r.ok)throw new Error(d.error||'Upload failed');
         blocks[idx].url=d.url||('/media/pages/'+slug+'/'+rel);drawBlocks();if(st)st.textContent='Uploaded '+file.name;
-      }catch(err){alert(err.message)}
+      }catch(err){if(st)st.textContent=err.message}
     });
     if(sortableInst){try{sortableInst.destroy()}catch{}}
     if(window.Sortable&&blocks.length>1){
@@ -735,18 +900,23 @@ function openPageEditor(page,dept,cats,restoring=false){
   drawBlocks();
   $$('[data-add]',ed).forEach(btn=>btn.onclick=()=>{
     const t=btn.dataset.add;
-    useZip=false;
+    selectEditorMode('blocks');
     const defaults={heading:{type:t,text:'New heading',level:2},paragraph:{type:t,text:'Write your paragraph here.'},image:{type:t,url:'',alt:'',caption:''},video:{type:t,url:''},hero:{type:t,title:'Hero heading',subtitle:'',image:'',button_text:'Explore',button_url:'#'},columns:{type:t,columns:[{text:'Column 1'},{text:'Column 2'}]},cards:{type:t,cards:[{icon:'✦',title:'Card title',text:'Card description',url:'#',linktext:'Explore →'}]},spacer:{type:t,height:32},button:{type:t,text:'Learn more',url:'#'},quote:{type:t,text:'Quote text',cite:''},divider:{type:t},html:{type:t,html:''}};
     blocks.push(defaults[t]||{type:t,text:''});
     drawBlocks();
   });
 
   $('#saveP').onclick=async()=>{
-    const slug=slugifyClient($('#p_sl').value.trim()||$('#p_te').value.trim());
-    if(!$('#p_te').value.trim())return alert('Title required');
+    const st=$('#savePageStatus');
+    const titleEn=$('#p_te').value.trim();
+    const slug=slugifyClient($('#p_sl').value.trim()||titleEn);
+    if(!titleEn){st.textContent='Title EN is required.';return;}
+    if(!slug){st.textContent='Valid slug is required.';return;}
+    if(mode==='link'&&!$('#p_ext_url').value.trim()){st.textContent='External URL is required for App/Link mode.';return;}
+    $('#saveP').disabled=true;st.textContent='Saving & indexing Q&As…';
     try{
       const payload={
-        slug,title_en:$('#p_te').value.trim(),title_ne:$('#p_tn').value.trim(),
+        slug,title_en:titleEn,title_ne:$('#p_tn').value.trim(),
         description_en:$('#p_de').value.trim(),description_ne:$('#p_dn').value.trim(),
         department_id:dept.id,category_id:$('#p_cat').value?Number($('#p_cat').value):null,
         published:$('#p_pub').checked,is_popular:$('#p_pop').checked,
@@ -754,7 +924,10 @@ function openPageEditor(page,dept,cats,restoring=false){
         thumbnail_summary_en:$('#p_tsum_en').value.trim(),thumbnail_summary_ne:$('#p_tsum_ne').value.trim(),thumbnail_alt:$('#p_talt').value.trim(),
         thumbnail_focal_x:Number($('#p_fx').value||50),thumbnail_focal_y:Number($('#p_fy').value||50)
       };
-      if(useZip||zipReady||isZipExisting){
+      if(mode==='link'){
+        payload.source_type='link';
+        payload.external_url=$('#p_ext_url').value.trim();
+      }else if(mode==='zip'||zipReady){
         payload.source_type='zip';
         payload.entry_file=entryFile||'index.html';
         payload.content={files:fileList,entry:entryFile};
@@ -763,9 +936,10 @@ function openPageEditor(page,dept,cats,restoring=false){
         payload.content=blocks;
       }
       const r=await api('/admin/pages',{method:'POST',body:JSON.stringify(payload)});
-      alert('Saved /'+r.slug+(payload.published?' (Published)':' (Draft — use Preview)'));
+      st.textContent='Saved /'+r.slug;
       setRoute({editorSlug:null,editorNew:false,deptSub:'pages'});openDeptHub(dept.id,'pages');
-    }catch(e){alert(e.message)}
+    }catch(e){st.textContent=e.message;}
+    finally{$('#saveP').disabled=false;}
   };
 }
 function slugifyClient(s){return String(s||'').toLowerCase().trim().replace(/[^a-z0-9-]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'')}
@@ -785,106 +959,124 @@ function guessType(name){
   return 'application/octet-stream';
 }
 function renderDeptCats(sv,dept,cats){
-  sv.innerHTML=`<div class="row" style="justify-content:space-between"><b>Categories (this department only)</b><button class="btn gold" id="nc">+ Category</button></div>
-    ${cats.map(c=>`<div class="item"><div><b>${esc(c.name_en)}</b><small class="muted">${esc(c.slug)}</small></div>
-      <div class="row"><button class="btn" data-ec="${c.id}">Edit</button><button class="btn danger" data-dc="${c.id}">Delete</button></div></div>`).join('')||'<p class="muted">No categories — optional</p>'}
+  sv.innerHTML=`<div class="row" style="justify-content:space-between"><b>Categories (${esc(dept.name_en)})</b><button class="btn gold" id="nc" type="button">+ Category</button></div>
+    <div style="margin-top:8px">${cats.map(c=>`<div class="item"><div><b>${esc(c.name_en)}</b> <small class="muted">${esc(c.slug)}</small></div>
+      <div class="row"><button class="btn" data-ec="${c.id}" type="button">Edit</button><button class="btn danger" data-dc="${c.id}" type="button">Delete</button></div></div>`).join('')||'<p class="muted">No categories yet — optional</p>'}</div>
     <div id="catEd" class="hidden"></div>`;
-  $('#nc').onclick=()=>editCat(null,dept);
-  $$('[data-ec]').forEach(b=>b.onclick=()=>editCat(cats.find(x=>x.id==b.dataset.ec),dept));
-  $$('[data-dc]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete?'))return;await api('/admin/categories/'+b.dataset.dc,{method:'DELETE'});openDeptHub(dept.id,'categories')});
+  $('#nc').onclick=()=>editCat(null,dept,sv);
+  $$('[data-ec]',sv).forEach(b=>b.onclick=()=>editCat(cats.find(x=>x.id==b.dataset.ec),dept,sv));
+  $$('[data-dc]',sv).forEach(b=>b.onclick=async()=>{if(!confirm('Delete category?'))return;await api('/admin/categories/'+b.dataset.dc,{method:'DELETE'});openDeptHub(dept.id,'pages')});
 }
-function editCat(c,dept){
-  const ed=$('#catEd');ed.classList.remove('hidden');
+function editCat(c,dept,sv){
+  const ed=$('#catEd',sv);ed.classList.remove('hidden');
   ed.innerHTML=`<h4>${c?'Edit':'New'} category</h4>
-    <label>Name EN *</label><input id="c_en" value="${esc(c?.name_en||'')}">
-    <label>Name NE</label><input id="c_ne" value="${esc(c?.name_ne||'')}">
-    <label>Slug</label><input id="c_sl" value="${esc(c?.slug||'')}">
-    <div class="row"><button class="btn gold" id="sc">Save</button><button class="btn" id="cc">Cancel</button></div>`;
-  $('#cc').onclick=()=>ed.classList.add('hidden');
-  $('#sc').onclick=async()=>{
-    await api('/admin/categories',{method:'POST',body:JSON.stringify({id:c?.id,department_id:dept.id,name_en:$('#c_en').value.trim(),name_ne:$('#c_ne').value.trim(),slug:$('#c_sl').value.trim(),visible:true})});
-    openDeptHub(dept.id,'categories');
+    <div class="grid2">
+      <div><label>Name EN *</label><input id="c_en" value="${esc(c?.name_en||'')}"></div>
+      <div><label>Name NE</label><input id="c_ne" value="${esc(c?.name_ne||'')}"></div>
+    </div>
+    <label>Slug</label><input id="c_sl" value="${esc(c?.slug||'')}" placeholder="auto from name">
+    <div class="row"><button class="btn gold" id="sc" type="button">Save</button><button class="btn" id="cc" type="button">Cancel</button></div>`;
+  $('#cc',ed).onclick=()=>ed.classList.add('hidden');
+  $('#sc',ed).onclick=async()=>{
+    await api('/admin/categories',{method:'POST',body:JSON.stringify({id:c?.id,department_id:dept.id,name_en:$('#c_en',ed).value.trim(),name_ne:$('#c_ne',ed).value.trim(),slug:$('#c_sl',ed).value.trim(),visible:true})});
+    openDeptHub(dept.id,'pages');
   };
 }
+function formatBytes(b){const n=Number(b||0);if(n<1024)return n+' B';if(n<1024*1024)return Math.ceil(n/1024)+' KB';return (n/1024/1024).toFixed(1)+' MB';}
 function renderDeptMedia(sv,dept,media){
-  // Group by page_slug — gallery of files used in each page
-  const groups={};
-  (media||[]).forEach(m=>{
-    const g=m.page_slug||'_other';
-    if(!groups[g])groups[g]=[];
-    groups[g].push(m);
-  });
-  const keys=Object.keys(groups).sort((a,b)=>a==='_other'?1:b==='_other'?-1:a.localeCompare(b));
-  sv.innerHTML=`<b>Media gallery — ${esc(dept.name_en)}</b>
-    <p class="notice">Page ZIP upload बाट आएका फोटो/भिडियो यहाँ page अनुसार देखिन्छ। यहीँबाट <b>Replace / Delete / Add</b> गर्न मिल्छ। Page मा path उही रहन्छ।</p>
-    ${keys.length?keys.map(pg=>`
-      <div class="box" style="margin-top:12px">
+  let filter='visuals';
+  function isVisual(m){
+    const n=m.name||'',ct=m.content_type||'';
+    return /\.(png|jpe?g|gif|webp|svg|mp4|webm|mov|pdf)$/i.test(n)||ct.startsWith('image/')||ct.startsWith('video/')||ct==='application/pdf';
+  }
+  function cardMarkup(m){
+    const isImg=/\.(png|jpe?g|gif|webp|svg)$/i.test(m.name||'')||(m.content_type||'').startsWith('image/');
+    const isVid=/\.(mp4|webm|mov)$/i.test(m.name||'')||(m.content_type||'').startsWith('video/');
+    const thumb=isImg?`<img src="${esc(m.url)}" alt="" class="media-card-thumb" loading="lazy">`
+      :isVid?`<div class="media-card-thumb" style="background:#172640;color:#fff">VIDEO</div>`
+      :`<div class="media-card-thumb">${esc((m.name||'FILE').split('.').pop().toUpperCase().slice(0,5))}</div>`;
+    return `<div class="media-card">
+      ${thumb}
+      <div style="font-size:11.5px;font-weight:600;word-break:break-all">${esc(m.name)}</div>
+      <div class="muted" style="font-size:11px">${formatBytes(m.size)}${m.page_slug?' · /'+esc(m.page_slug):''}</div>
+      <div class="row" style="gap:4px;margin-top:auto">
+        <button class="btn" style="padding:4px 6px;font-size:11px" data-copy-url="${esc(m.url)}" type="button">Copy URL</button>
+        <a class="btn" style="padding:4px 6px;font-size:11px" href="${esc(m.url)}" target="_blank" rel="noopener">Open</a>
+        ${m.page_slug?`<button class="btn" style="padding:4px 6px;font-size:11px" data-rep="${esc(m.key)}" data-ps="${esc(m.page_slug)}" data-name="${esc(m.name)}" type="button">Replace</button>`:''}
+        <button class="btn danger" style="padding:4px 6px;font-size:11px" data-dm="${esc(m.key)}" type="button">Del</button>
+      </div>
+    </div>`;
+  }
+  function drawMedia(){
+    const filtered=filter==='visuals'?(media||[]).filter(isVisual):(media||[]);
+    let content='';
+    if(!filtered.length){
+      content='<p class="muted">No matching media files yet. Upload a photo, video, or PDF above.</p>';
+    }else if(filter==='bypage'){
+      const groups={};
+      filtered.forEach(m=>{const g=m.page_slug||'_other';if(!groups[g])groups[g]=[];groups[g].push(m);});
+      const keys=Object.keys(groups).sort((a,b)=>a==='_other'?1:b==='_other'?-1:a.localeCompare(b));
+      content=keys.map(pg=>`<div class="box" style="margin-top:10px">
         <div class="row" style="justify-content:space-between;align-items:center">
-          <b>${pg==='_other'?'Other / unassigned':('Page: /'+esc(pg))}</b>
-          ${pg!=='_other'?`<span class="row">
-            <input type="file" id="add-${esc(pg)}" style="max-width:180px">
-            <button class="btn gold" data-addpage="${esc(pg)}">Add file</button>
-          </span>`:''}
+          <b>${pg==='_other'?'Department Uploads':('Page: /'+esc(pg))} (${groups[pg].length})</b>
         </div>
-        <div class="row" style="flex-wrap:wrap;gap:12px;margin-top:10px">
-          ${groups[pg].map(m=>{
-            const isImg=/\.(png|jpe?g|gif|webp|svg)$/i.test(m.name||'')||(m.content_type||'').startsWith('image/');
-            const isVid=/\.(mp4|webm|mov)$/i.test(m.name||'')||(m.content_type||'').startsWith('video/');
-            const thumb=isImg?`<img src="${esc(m.url)}" alt="" style="width:100%;height:100px;object-fit:cover;border-radius:8px;background:#eee">`
-              :isVid?`<div style="height:100px;display:grid;place-items:center;background:#172640;color:#fff;border-radius:8px;font-size:12px">VIDEO</div>`
-              :`<div style="height:100px;display:grid;place-items:center;background:#eef1f6;border-radius:8px;font-size:12px">FILE</div>`;
-            return `<div style="width:140px;border:1px solid #e5e9ef;border-radius:10px;padding:8px;background:#fff">
-              ${thumb}
-              <div style="font-size:11px;margin-top:6px;word-break:break-all">${esc(m.name)}</div>
-              <div class="row" style="margin-top:6px">
-                <button class="btn" style="padding:4px 6px;font-size:11px" data-rep="${esc(m.key)}" data-ps="${esc(m.page_slug||'')}" data-name="${esc(m.name)}">Replace</button>
-                <button class="btn danger" style="padding:4px 6px;font-size:11px" data-dm="${esc(m.key)}">Del</button>
-              </div>
-              <input type="file" class="hidden" id="rep-${esc(m.key).replace(/[^a-zA-Z0-9]/g,'_')}">
-            </div>`;
-          }).join('')}
+        <div class="media-grid">${groups[pg].map(cardMarkup).join('')}</div>
+      </div>`).join('');
+    }else{
+      content=`<div class="media-grid">${filtered.map(cardMarkup).join('')}</div>`;
+    }
+    sv.innerHTML=`<div class="box" style="background:#f8f9fc;margin-top:0">
+        <div class="row" style="justify-content:space-between;align-items:center;gap:10px">
+          <div><b>Upload Photo, Video, or PDF to ${esc(dept.name_en)}</b><div class="muted" id="deptMediaUpStatus">Uploaded files stay neatly organized and ready to copy or embed.</div></div>
+          <label class="btn gold" style="cursor:pointer;white-space:nowrap">＋ Upload Media<input type="file" id="deptDirectFile" accept="image/*,video/*,.pdf" hidden></label>
         </div>
-      </div>`).join('')
-    :'<p class="muted">अहिले खाली — page ZIP upload गर्दा media यहाँ आउँछ।</p>'}
-    <input type="file" id="repPick" class="hidden">`;
-  // Add file to page folder
-  $$('[data-addpage]').forEach(b=>b.onclick=async()=>{
-    const pg=b.dataset.addpage;
-    const inp=document.getElementById('add-'+pg);
-    const f=inp?.files?.[0];if(!f)return alert('Choose a file first');
-    try{
-      const rel=f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-      const r=await fetch('/api/admin/pages/asset',{method:'POST',headers:{
-        'content-type':f.type||'application/octet-stream','x-page-slug':pg,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent(rel)
-      },body:f});
-      const d=await r.json();if(!r.ok)throw new Error(d.error);
-      alert('Added: '+d.url);openDeptHub(dept.id,'media');
-    }catch(e){alert(e.message)}
-  });
-  // Replace
-  $$('[data-rep]').forEach(b=>b.onclick=()=>{
-    const pick=$('#repPick');
-    pick.onchange=async()=>{
-      const f=pick.files[0];if(!f)return;
-      const key=b.dataset.rep;
-      const ps=b.dataset.ps;
-      const name=b.dataset.name||f.name;
-      if(!ps){alert('This file is not linked to a page path');return}
-      // rel path from key pages/{slug}/rel
-      const prefix='pages/'+ps+'/';
-      const rel=key.startsWith(prefix)?key.slice(prefix.length):name;
+      </div>
+      <div class="tabs" style="margin-top:10px">
+        <button type="button" class="${filter==='visuals'?'on':''}" data-mf="visuals">Images, Videos &amp; PDFs</button>
+        <button type="button" class="${filter==='all'?'on':''}" data-mf="all">All Files (${(media||[]).length})</button>
+        <button type="button" class="${filter==='bypage'?'on':''}" data-mf="bypage">Grouped by Page</button>
+      </div>
+      ${content}
+      <input type="file" id="repPick" class="hidden">`;
+    $$('[data-mf]',sv).forEach(b=>b.onclick=()=>{filter=b.dataset.mf;drawMedia()});
+    $('#deptDirectFile',sv).onchange=async(ev)=>{
+      const file=ev.target.files?.[0];if(!file)return;
+      const st=$('#deptMediaUpStatus',sv);st.textContent='Uploading '+file.name+'…';
       try{
-        const r=await fetch('/api/admin/pages/asset',{method:'POST',headers:{
-          'content-type':f.type||'application/octet-stream','x-page-slug':ps,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent(rel)
-        },body:f});
-        const d=await r.json();if(!r.ok)throw new Error(d.error);
-        alert('Replaced');openDeptHub(dept.id,'media');
-      }catch(e){alert(e.message)}
-      pick.value='';
+        const r=await fetch('/api/admin/media/upload',{method:'POST',headers:{'content-type':file.type||'application/octet-stream','x-file-name':encodeURIComponent(file.name),'x-department-id':String(dept.id)},body:file});
+        const d=await r.json();if(!r.ok)throw new Error(d.error||'Upload failed');
+        openDeptHub(dept.id,'media');
+      }catch(e){st.textContent=e.message;}
+      ev.target.value='';
     };
-    pick.click();
-  });
-  $$('[data-dm]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this media file?'))return;await api('/admin/media/'+encodeURIComponent(b.dataset.dm),{method:'DELETE'});openDeptHub(dept.id,'media')});
+    $$('[data-copy-url]',sv).forEach(b=>b.onclick=()=>{
+      const u=location.origin+b.dataset.copyUrl;
+      if(navigator.clipboard?.writeText){
+        navigator.clipboard.writeText(b.dataset.copyUrl).then(()=>{b.textContent='Copied ✓';setTimeout(()=>b.textContent='Copy URL',1400);}).catch(()=>{b.textContent=b.dataset.copyUrl;});
+      }else{
+        b.textContent=u.slice(0,22)+'…';
+      }
+    });
+    $$('[data-rep]',sv).forEach(b=>b.onclick=()=>{
+      const pick=$('#repPick',sv);
+      pick.onchange=async()=>{
+        const f=pick.files[0];if(!f)return;
+        const key=b.dataset.rep,ps=b.dataset.ps,name=b.dataset.name||f.name;
+        const prefix='pages/'+ps+'/';
+        const rel=key.startsWith(prefix)?key.slice(prefix.length):name;
+        const st=$('#deptMediaUpStatus',sv);st.textContent='Replacing '+name+'…';
+        try{
+          const r=await fetch('/api/admin/pages/asset',{method:'POST',headers:{'content-type':f.type||'application/octet-stream','x-page-slug':ps,'x-department-id':String(dept.id),'x-rel-path':encodeURIComponent(rel)},body:f});
+          const d=await r.json();if(!r.ok)throw new Error(d.error);
+          openDeptHub(dept.id,'media');
+        }catch(e){st.textContent=e.message;}
+        pick.value='';
+      };
+      pick.click();
+    });
+    $$('[data-dm]',sv).forEach(b=>b.onclick=async()=>{if(!confirm('Delete this media file?'))return;await api('/admin/media/'+encodeURIComponent(b.dataset.dm),{method:'DELETE'});openDeptHub(dept.id,'media')});
+  }
+  drawMedia();
 }
 
 /* ---- Messages: reply opens only on click, closes after success ---- */
@@ -1107,7 +1299,7 @@ async function renderSettings(v){
       <div><label>Tagline</label><input id="s_t" value="${esc(s.tagline||'')}"></div>
       <div><label>Contact email</label><input id="s_m" value="${esc(s.contact_email||'')}"></div>
       <div><label>Security alert email</label><input id="s_sec_email" type="email" value="${esc(s.security_alert_email||s.contact_email||'')}" placeholder="Email for failed login alerts"></div>
-      <div><label>Hero image URL</label><input id="s_h" value="${esc(s.hero_image||'')}"></div>
+      <div><label>Hero image URL</label><div class="row" style="align-items:center"><input id="s_h" value="${esc(s.hero_image||'')}" style="flex:1;margin:0"><label class="btn" style="cursor:pointer;white-space:nowrap">Upload<input type="file" id="s_h_file" accept="image/*" hidden></label></div><span id="s_h_st" class="muted"></span></div>
       <div><label>Hero title EN</label><input id="s_hte" value="${esc(s.hero_title_en||'')}"></div>
       <div><label>Hero title NE</label><input id="s_htn" value="${esc(s.hero_title_ne||'')}"></div>
       <div><label>Primary color</label><input id="s_p" value="${esc(s.primary_color||'#101a2c')}"></div>
@@ -1119,16 +1311,27 @@ async function renderSettings(v){
     <label>About NE</label><textarea id="s_an">${esc(s.about_ne||'')}</textarea>
     <label>Footer</label><input id="s_f" value="${esc(s.footer_text||'')}">
     <label style="display:block;margin-top:12px"><input type="checkbox" id="s_comments" ${s.comments_enabled==='0'?'':'checked'}> Enable page comments / feedback</label>
-    <button class="btn gold" id="ss" style="margin-top:10px">Save site settings</button></div>
+    <div class="row" style="margin-top:10px"><button class="btn gold" id="ss">Save site settings</button><span id="ssStatus" class="muted"></span></div></div>
     <div class="box"><h3>Public information &amp; policies</h3><p class="muted">यी सामग्री वेबसाइटको Footer मा देखिने सार्वजनिक पेजमा प्रकाशित हुन्छन्।</p><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>About Granshi / ग्रान्शीको बारेमा</b></summary><label>English</label><textarea id="legal_about_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_about_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Contact / सम्पर्क</b></summary><label>English</label><textarea id="legal_contact_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_contact_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Privacy Policy / गोपनीयता नीति</b></summary><label>English</label><textarea id="legal_privacy_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_privacy_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Terms & Conditions / प्रयोगका सर्तहरू</b></summary><label>English</label><textarea id="legal_terms_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_terms_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Disclaimer / अस्वीकरण</b></summary><label>English</label><textarea id="legal_disclaimer_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_disclaimer_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Cookie Policy / कुकी नीति</b></summary><label>English</label><textarea id="legal_cookies_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_cookies_ne" rows="5"></textarea></details><details style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:10px"><summary><b>Copyright Policy / प्रतिलिपि अधिकार नीति</b></summary><label>English</label><textarea id="legal_copyright_en" rows="5"></textarea><label>नेपाली</label><textarea id="legal_copyright_ne" rows="5"></textarea></details><button class="btn gold" id="saveLegal">Save public pages</button><span class="muted" id="legalStatus"></span></div><div class="box"><h3>Email branding</h3><p>Outgoing emails use a short Granshi footer with the About Granshi link.</p></div><div class="box"><h3>Advertising readiness</h3><p>Ads remain off until AdSense approval and applicable consent configuration are complete.</p><label>AdSense Publisher ID</label><input id="adsPublisher" value="${esc(s.adsense_publisher_id||'')}" placeholder="ca-pub-..."><button class="btn" id="saveAds">Save Publisher ID</button><span id="adsStatus" class="muted"></span></div><div class="box"><h3>Launch checklist</h3><ul><li>Check contact inbox regularly.</li><li>Keep policy text consistent with actual services.</li><li>Before ads, complete publisher approval and Google-certified consent setup for applicable EEA/UK/Swiss visitors.</li></ul></div>`;
+  $('#s_h_file').onchange=async(ev)=>{
+    const file=ev.target.files?.[0];if(!file)return;
+    const st=$('#s_h_st');st.textContent='Uploading…';
+    try{
+      const r=await fetch('/api/admin/media/upload',{method:'POST',headers:{'content-type':file.type||'image/png','x-file-name':encodeURIComponent(file.name)},body:file});
+      const res=await r.json();if(!r.ok)throw new Error(res.error||'Upload failed');
+      $('#s_h').value=res.url;st.textContent='Uploaded ✓';
+    }catch(e){st.textContent=e.message;}
+    ev.target.value='';
+  };
   $('#ss').onclick=async()=>{
+    const st=$('#ssStatus');st.textContent='Saving…';
     await api('/admin/settings',{method:'POST',body:JSON.stringify({
       brand_name:$('#s_b').value,tagline:$('#s_t').value,contact_email:$('#s_m').value,security_alert_email:$('#s_sec_email').value.trim(),hero_image:$('#s_h').value,
       hero_title_en:$('#s_hte').value,hero_title_ne:$('#s_htn').value,hero_desc_en:$('#s_hde').value,hero_desc_ne:$('#s_hdn').value,
       primary_color:$('#s_p').value,accent_color:$('#s_a').value,about_en:$('#s_ae').value,about_ne:$('#s_an').value,footer_text:$('#s_f').value,
       comments_enabled:$('#s_comments').checked?'1':'0'
     })});
-    alert('Saved');
+    st.textContent='Saved ✓';
   };
   const policyDefaults={"about":{"en":"About Granshi\n\nGranshi is an independently operated personal website created to share knowledge, practical skills, learning resources, useful information, creative ideas and entertainment. It is a place to learn from one another, exchange experiences and explore topics from everyday knowledge to more advanced subjects.\n\nGranshi is not a government website, public authority, school, university or formal professional institution, and it is not affiliated with any of them. The website is maintained as a personal project.\n\nOur aim is to publish original, useful and clearly presented material. We do not claim that every page is perfect or that every view represents a universally accepted opinion. We welcome thoughtful feedback, corrections and suggestions. When an error is brought to our attention, we will review it and make a reasonable correction or update.\n\nWe do not knowingly publish material intended to insult, threaten, harass, mislead or deliberately harm a person, group or organisation. If any content unintentionally resembles or affects someone, we sincerely apologise. Please contact us with the page link and details so we can review the concern and take appropriate action.\n\nThank you for visiting, learning with us and helping Granshi improve.","ne":"ग्रान्शीको बारेमा\n\nGranshi व्यक्तिगत प्रयासमा सञ्चालन गरिएको स्वतन्त्र वेबसाइट हो। यसको उद्देश्य ज्ञान, सीप, सिकाइका सामग्री, उपयोगी जानकारी, सिर्जनात्मक विचार र मनोरञ्जनात्मक सामग्री साझा गर्नु हो। दैनिक जीवनका सामान्य ज्ञानदेखि उन्नत विषयसम्म एकअर्काबाट सिक्ने, अनुभव साटासाट गर्ने र नयाँ कुरा खोज्ने साझा स्थानका रूपमा Granshi विकास गर्ने हाम्रो चाहना हो।\n\nGranshi कुनै सरकारी वेबसाइट, सार्वजनिक निकाय, विद्यालय, विश्वविद्यालय वा औपचारिक व्यावसायिक संस्थाको वेबसाइट होइन र त्यस्ता निकायसँग यसको सम्बन्ध वा आबद्धता छैन। यो व्यक्तिगत परियोजनाका रूपमा सञ्चालन हुन्छ।\n\nहाम्रो उद्देश्य मौलिक, उपयोगी र बुझ्न सजिलो सामग्री प्रस्तुत गर्नु हो। यहाँका सबै सामग्री पूर्ण छन् वा सबै विचार सबैले स्वीकार गर्नैपर्छ भन्ने हाम्रो दाबी छैन। तपाईंका सुझाव, प्रश्न, आलोचना र सुधारका कुरा स्वागतयोग्य छन्। कुनै त्रुटि औँल्याइएमा हामी समीक्षा गरी आवश्यक सुधार वा अद्यावधिक गर्नेछौँ।\n\nकुनै व्यक्ति, समूह वा संस्थालाई अपमान, धम्की, दुर्व्यवहार, भ्रम वा जानाजानी हानि पुर्‍याउने उद्देश्यले सामग्री प्रकाशित गर्ने हाम्रो मनसाय छैन। कुनै सामग्री संयोगवश कसैसँग मेल खान गएमा वा कसैलाई असर परेको महसुस भएमा हामी हृदयदेखि क्षमाप्रार्थी छौँ। कृपया सम्बन्धित पेजको लिंक र विवरणसहित जानकारी दिनुहोस्, हामी उचित समीक्षा र आवश्यक कदम चाल्नेछौँ।\n\nGranshi मा आउनुभएको, सिक्नुभएको र यसलाई अझ राम्रो बनाउन सहयोग गर्नुभएकोमा धन्यवाद।"},"contact":{"en":"We welcome questions, suggestions, corrections, collaboration ideas and reports about content.\n\nEmail: info@gopalkoirala.com.np\n\nYou can also use the contact form available on the website. When reporting a problem, please include the page link and explain what should be reviewed. We will make a reasonable effort to read and respond to genuine messages.\n\nPlease do not send passwords, financial details or other sensitive personal information.","ne":"तपाईंका प्रश्न, सुझाव, सुधारका प्रस्ताव, सहकार्यका विचार तथा सामग्रीसम्बन्धी गुनासो हामीलाई स्वागत छ।\n\nइमेल: info@gopalkoirala.com.np\n\nवेबसाइटमा उपलब्ध Contact Form बाट पनि सन्देश पठाउन सक्नुहुन्छ। कुनै सामग्री सच्याउन वा समीक्षा गराउन चाहनुहुन्छ भने सम्बन्धित पेजको लिंक र स्पष्ट विवरण दिनुहोस्। हामी वास्तविक र उपयोगी सन्देश पढ्ने तथा सम्भव भएसम्म जवाफ दिने प्रयास गर्नेछौँ।\n\nकृपया पासवर्ड, बैंक विवरण वा अन्य संवेदनशील व्यक्तिगत जानकारी सामान्य फारम वा इमेलमार्फत नपठाउनुहोस्।"},"privacy":{"en":"Granshi is a personally operated website. We aim to collect only information that is reasonably needed to operate the website and respond to visitors.\n\nIf you contact us, submit a form or post feedback, we may receive details such as your name, email address and message. These details are used to respond, review suggestions, moderate feedback and maintain the website. Basic technical information may also be processed by our hosting and security providers to deliver and protect the service.\n\nWe do not sell visitors' personal information. We do not ask visitors to send sensitive personal information through ordinary forms or email.\n\nSome services used to host, protect, deliver email or operate website features may process technical information on our behalf. If analytics or advertising services are added in the future, their relevant cookies or similar technologies and data practices will be explained here and through any required consent choices before those optional technologies are enabled.\n\nYou may contact us at info@gopalkoirala.com.np with a privacy question or a request concerning information you have submitted. We may need to retain limited records where reasonably necessary for security, administration or legitimate operational purposes.\n\nThis page should be updated whenever the website's actual features, providers or data practices materially change.","ne":"Granshi व्यक्तिगत रूपमा सञ्चालन हुने वेबसाइट हो। वेबसाइट चलाउन र आगन्तुकका सन्देशको जवाफ दिन आवश्यक पर्ने सीमित जानकारी मात्र प्रयोग गर्ने हाम्रो प्रयास हुन्छ।\n\nतपाईंले Contact Form, इमेल वा टिप्पणीमार्फत सम्पर्क गर्दा नाम, इमेल ठेगाना र सन्देशजस्ता विवरण हामीकहाँ आउन सक्छन्। ती विवरण जवाफ दिन, सुझाव समीक्षा गर्न, टिप्पणी व्यवस्थापन गर्न र वेबसाइट सञ्चालन गर्न प्रयोग गरिन्छन्। वेबसाइट उपलब्ध गराउन र सुरक्षित राख्न होस्टिङ तथा सुरक्षा सेवा प्रदायकले सामान्य प्राविधिक जानकारी पनि प्रशोधन गर्न सक्छन्।\n\nहामी आगन्तुकका व्यक्तिगत विवरण बिक्री गर्दैनौँ। सामान्य फारम वा इमेलमार्फत संवेदनशील व्यक्तिगत जानकारी माग्ने हाम्रो उद्देश्य छैन।\n\nवेबसाइट होस्ट गर्ने, सुरक्षा दिने, इमेल पठाउने वा अन्य सुविधा सञ्चालन गर्ने सेवा प्रदायकले सेवा दिन आवश्यक प्राविधिक जानकारी प्रशोधन गर्न सक्छन्। भविष्यमा Analytics वा विज्ञापन सेवा थपिएमा तिनका सम्बन्धित Cookies वा यस्तै प्रविधि तथा डेटा प्रयोगबारे यहाँ र आवश्यक सहमति सूचनामा स्पष्ट जानकारी दिइनेछ। आवश्यक पर्ने अवस्थामा आगन्तुकको छनोट नलिई वैकल्पिक प्रविधि सक्रिय गरिने छैन।\n\nतपाईंले पठाउनुभएको जानकारीबारे प्रश्न वा अनुरोध भए info@gopalkoirala.com.np मा सम्पर्क गर्न सक्नुहुन्छ। सुरक्षा, प्रशासन वा वेबसाइट सञ्चालनका उचित कारणले केही सीमित अभिलेख राख्नुपर्ने हुन सक्छ।\n\nवेबसाइटका सुविधा, सेवा प्रदायक वा जानकारी प्रशोधन गर्ने तरिकामा महत्त्वपूर्ण परिवर्तन भएमा यो पृष्ठ पनि अद्यावधिक गरिनेछ।"},"terms":{"en":"By using Granshi, you agree to use the website respectfully and lawfully.\n\nGranshi provides general knowledge, learning material, creative content, tools and entertainment. Please do not misuse the website, attempt to disrupt or damage its services, bypass security, impersonate another person, submit unlawful or abusive material, or knowingly infringe another person's rights.\n\nYou remain responsible for material you submit, including comments and messages. Do not share private, confidential or sensitive information in public comments or ordinary contact forms.\n\nWe make reasonable efforts to present useful and accurate information, but content may contain mistakes, become outdated or be incomplete. We may correct, update, move or remove content and may change website features when needed.\n\nSome pages may refer to external websites or services. Those are operated by third parties, and Granshi does not control their content or practices.\n\nGranshi is an independently operated personal website, not a government service or formal educational institution. Please read the Disclaimer for more information about the nature of the content.","ne":"Granshi प्रयोग गर्दा वेबसाइटलाई सम्मानजनक र कानुनसम्मत तरिकाले प्रयोग गर्न सहमत भएको मानिन्छ।\n\nGranshi मा सामान्य ज्ञान, सिकाइ सामग्री, सिर्जनात्मक सामग्री, उपयोगी उपकरण र मनोरञ्जन उपलब्ध गराइन्छ। कृपया वेबसाइटको दुरुपयोग नगर्नुहोस्, सेवा अवरुद्ध वा क्षति पुर्‍याउने प्रयास नगर्नुहोस्, सुरक्षा छल्ने काम नगर्नुहोस्, अरूको पहिचान नक्कल नगर्नुहोस्, गैरकानुनी वा अपमानजनक सामग्री नपठाउनुहोस् र अरूको अधिकार उल्लङ्घन नगर्नुहोस्।\n\nतपाईंले पठाउने टिप्पणी, सन्देश वा अन्य सामग्रीको जिम्मेवारी तपाईं स्वयंको हुनेछ। सार्वजनिक टिप्पणी वा सामान्य सम्पर्क फारममा निजी, गोप्य वा संवेदनशील जानकारी नराख्नुहोस्।\n\nहामी उपयोगी र सही जानकारी दिने प्रयास गर्छौँ, तर सामग्रीमा त्रुटि हुन, पुरानो हुन वा अपूर्ण रहन सक्छ। आवश्यकताअनुसार सामग्री सच्याउन, अद्यावधिक गर्न, सार्न वा हटाउन तथा वेबसाइटका सुविधा परिवर्तन गर्न सकिन्छ।\n\nकेही पेजमा बाह्य वेबसाइट वा सेवाका लिंक हुन सक्छन्। ती सम्बन्धित तेस्रो पक्षले सञ्चालन गर्ने भएकाले तिनको सामग्री वा कार्यशैलीमाथि Granshi को नियन्त्रण हुँदैन।\n\nGranshi स्वतन्त्र व्यक्तिगत वेबसाइट हो, सरकारी सेवा वा औपचारिक शैक्षिक संस्था होइन। सामग्रीको प्रकृतिबारे थप जानकारीका लागि Disclaimer पृष्ठ पनि पढ्नुहोस्।"},"disclaimer":{"en":"Content on Granshi is shared in good faith for general information, learning, creativity and entertainment. It is not a substitute for advice from a qualified professional. In particular, articles and examples should not be treated as medical, legal, financial or other professional advice.\n\nWe try to check information and keep it useful, but we cannot promise that every item is complete, current, suitable for every situation or free from error. Please verify important matters with reliable and appropriate sources before acting on them.\n\nTools, calculators, games, demonstrations and examples are provided for general use and enjoyment. Results may be approximate and should not be relied on for important decisions.\n\nWe do not knowingly intend to publish content that harms or targets anyone. If something unintentionally causes concern or appears inaccurate, please contact us. We are willing to review it, apologise where appropriate and make corrections.","ne":"Granshi मा प्रकाशित सामग्री सद्भावपूर्वक सामान्य जानकारी, सिकाइ, सिर्जनात्मकता र मनोरञ्जनका लागि साझा गरिन्छ। यो योग्य विशेषज्ञबाट लिनुपर्ने सल्लाहको विकल्प होइन। विशेषगरी लेख तथा उदाहरणलाई स्वास्थ्य, कानुनी, आर्थिक वा अन्य व्यावसायिक सल्लाहका रूपमा लिनु हुँदैन।\n\nहामी जानकारी जाँच्ने र उपयोगी बनाउने प्रयास गर्छौँ, तर सबै सामग्री पूर्ण, अद्यावधिक, हरेक परिस्थितिमा उपयुक्त वा त्रुटिरहित हुने प्रत्याभूति दिन सक्दैनौँ। कुनै महत्त्वपूर्ण निर्णय गर्नुअघि सम्बन्धित विश्वसनीय र आधिकारिक स्रोतबाट पुष्टि गर्नुहोस्।\n\nTools, Calculator, Games, प्रदर्शन तथा उदाहरणहरू सामान्य प्रयोग र मनोरञ्जनका लागि हुन्। तिनबाट प्राप्त नतिजा अनुमानित हुन सक्छन् र महत्त्वपूर्ण निर्णयको एकमात्र आधार बनाउनु हुँदैन।\n\nकसैलाई लक्षित गरी वा जानाजानी हानि पुर्‍याउने उद्देश्यले सामग्री प्रकाशित गरिँदैन। कुनै सामग्रीले अनपेक्षित रूपमा समस्या पारेको वा गलत जानकारी दिएको लागेमा हामीलाई जानकारी दिनुहोस्। हामी समीक्षा गर्ने, आवश्यक परे क्षमा माग्ने र सुधार गर्नेछौँ।"},"cookies":{"en":"A cookie is a small file or similar piece of storage that a website may use to remember settings or support features.\n\nGranshi may use essential browser storage or similar technologies where needed for basic website functions, security or preferences. If optional analytics or advertising services are introduced, they may use cookies or similar identifiers to measure visits or provide advertisements.\n\nWhere visitor consent is required, optional analytics and advertising technologies should remain disabled until the visitor has been given a clear choice. Visitors can also manage or clear cookies through their browser settings.\n\nThe actual cookies and providers may change as website features change. This page will be updated to describe the technologies actually in use. Until optional services are configured, do not assume that analytics or advertising cookies are active.","ne":"Cookie भनेको वेबसाइटले सेटिङ सम्झन वा केही सुविधा सञ्चालन गर्न प्रयोग गर्न सक्ने सानो फाइल वा यस्तै प्रकारको भण्डारण हो।\n\nGranshi ले वेबसाइटका आधारभूत सुविधा, सुरक्षा वा प्रयोगकर्ताका प्राथमिकता कायम राख्न आवश्यक Browser Storage वा यस्तै प्रविधि प्रयोग गर्न सक्छ। भविष्यमा वैकल्पिक Analytics वा विज्ञापन सेवा थपिएमा आगन्तुकको भ्रमण मापन गर्न वा विज्ञापन देखाउन Cookies वा यस्तै पहिचान प्रविधि प्रयोग हुन सक्छन्।\n\nजहाँ आगन्तुकको सहमति आवश्यक हुन्छ, त्यहाँ स्पष्ट छनोटको अवसर नदिएसम्म वैकल्पिक Analytics र विज्ञापन प्रविधि बन्द रहनुपर्छ। आगन्तुकले Browser Settings बाट पनि Cookies व्यवस्थापन वा हटाउन सक्छन्।\n\nवेबसाइटका सुविधा परिवर्तनसँगै प्रयोग हुने Cookies र सेवा प्रदायक पनि परिवर्तन हुन सक्छन्। वास्तवमा प्रयोगमा रहेका प्रविधिबारे यो पृष्ठ अद्यावधिक गरिनेछ। वैकल्पिक सेवा जडान नभएसम्म Analytics वा विज्ञापनका Cookies सक्रिय छन् भनेर नबुझ्नुहोस्।"},"copyright":{"en":"We respect the work and rights of authors, photographers, artists, educators and other creators. We aim to publish original material or use material that we have permission or an appropriate right to use.\n\nVisitors must not copy, republish, sell or otherwise reuse protected material from Granshi or from other creators without permission or a lawful basis. Where practical, sources and creator credits should be acknowledged.\n\nIf you believe that material published on Granshi uses your work or affects your rights improperly, please email info@gopalkoirala.com.np. Include the page address, identify the material concerned, explain your connection to the original work and provide enough information for us to review the request.\n\nWe will consider genuine reports and, where appropriate, correct, credit, restrict or remove the material. We also welcome corrections to inaccurate attributions.","ne":"हामी लेखक, फोटोग्राफर, कलाकार, शिक्षक तथा अन्य सिर्जनाकर्ताको सिर्जना र अधिकारको सम्मान गर्छौँ। मौलिक सामग्री प्रकाशित गर्ने वा अनुमति अथवा उचित अधिकार भएको सामग्री मात्र प्रयोग गर्ने हाम्रो प्रयास हुन्छ।\n\nअनुमति वा कानुनी आधारबिना Granshi वा अन्य सिर्जनाकर्ताको संरक्षित सामग्री प्रतिलिपि गर्ने, पुनःप्रकाशन गर्ने, बिक्री गर्ने वा अन्य तरिकाले पुनःप्रयोग नगर्नुहोस्। सम्भव भएसम्म स्रोत र सिर्जनाकर्ताको नाम उल्लेख गर्नुपर्छ।\n\nGranshi मा प्रकाशित कुनै सामग्रीले तपाईंको सिर्जना वा अधिकार अनुचित रूपमा प्रयोग गरेको लागेमा info@gopalkoirala.com.np मा इमेल पठाउनुहोस्। सम्बन्धित पेजको लिंक, कुन सामग्रीबारे उजुरी हो, मौलिक सिर्जनासँग तपाईंको सम्बन्ध र समीक्षा गर्न आवश्यक विवरण उपलब्ध गराउनुहोस्।\n\nहामी वास्तविक उजुरी समीक्षा गर्नेछौँ र उपयुक्त भए सामग्री सच्याउने, श्रेय थप्ने, पहुँच सीमित गर्ने वा हटाउने कदम चाल्नेछौँ। गलत श्रेय वा स्रोत उल्लेखबारे सुधारका सुझाव पनि स्वागत छ।"}};
   for(const slug of ["about","contact","privacy","terms","disclaimer","cookies","copyright"]){document.getElementById('legal_'+slug+'_en').value=s['legal_'+slug+'_en']||policyDefaults[slug].en;document.getElementById('legal_'+slug+'_ne').value=s['legal_'+slug+'_ne']||policyDefaults[slug].ne;}
