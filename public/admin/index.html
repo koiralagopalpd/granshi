@@ -193,20 +193,52 @@ $('#recoverBtn').onclick=async()=>{
 $('#logout').onclick=async()=>{await api('/auth/logout',{method:'POST'});location.reload()};
 $('#exitFocus').onclick=()=>{setRoute({tab:'overview',deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab('overview')};
 let adminAlertTimer=0;
+function urlB64ToU8(base64String){
+  const pad='='.repeat((4-base64String.length%4)%4);
+  const b64str=(base64String+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(b64str);
+  const out=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
+  return out;
+}
+async function generateVapidKeypairInBrowser(){
+  const kp=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+  const rawPub=new Uint8Array(await crypto.subtle.exportKey('raw',kp.publicKey));
+  const jwkPriv=await crypto.subtle.exportKey('jwk',kp.privateKey);
+  const toB64=u8=>btoa(String.fromCharCode(...u8)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  return {publicKey:toB64(rawPub),privateKey:jwkPriv.d};
+}
 async function ensureAdminSw(){
   if(!('serviceWorker' in navigator))return null;
   try{return await navigator.serviceWorker.register('/sw.js');}catch{return null;}
 }
+async function syncPushSubscription(reg){
+  if(!reg||!('PushManager' in window))return {pushSubscribed:false,vapidConfigured:false};
+  const status=await api('/admin/push/status').catch(()=>null);
+  if(!status||!status.configured||!status.publicKey){
+    return {pushSubscribed:false,vapidConfigured:false};
+  }
+  let sub=await reg.pushManager.getSubscription();
+  if(!sub){
+    sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(status.publicKey)});
+  }
+  await api('/admin/push/subscribe',{method:'POST',body:JSON.stringify(sub.toJSON())});
+  return {pushSubscribed:true,vapidConfigured:true};
+}
 async function requestAdminNotifications(){
-  if(!('Notification' in window))return {ok:false,reason:'This browser does not support system notifications.'};
+  if(!('Notification' in window))return {ok:false,reason:'This browser does not support notifications.'};
   const perm=await Notification.requestPermission();
   if(perm!=='granted')return {ok:false,reason:'Notification permission denied. Enable it in browser site settings.'};
   const reg=await ensureAdminSw();
   if(reg&&'periodicSync' in reg){
     try{await reg.periodicSync.register('granshi-admin-inbox',{minInterval:12*60*1000});}catch{}
   }
+  let pushInfo={pushSubscribed:false,vapidConfigured:false};
+  try{pushInfo=await syncPushSubscription(reg);}catch(e){return {ok:false,reason:'Push subscription failed: '+e.message};}
   const title='Granshi Admin Alerts Active';
-  const body='You will receive notifications when new messages or emails arrive.';
+  const body=pushInfo.pushSubscribed
+    ?'True background Web Push enabled — alerts arrive even when browser is closed.'
+    :'Foreground/periodic alerts enabled. Add VAPID secrets in Security tab for closed-app background push.';
   try{
     if(reg&&reg.showNotification){
       await reg.showNotification(title,{body,icon:'/pwa-192x192.png',badge:'/pwa-192x192.png',tag:'granshi-alerts-enabled',data:{url:'/admin#messages'}});
@@ -214,7 +246,7 @@ async function requestAdminNotifications(){
       new Notification(title,{body,icon:'/pwa-192x192.png'});
     }
   }catch{}
-  return {ok:true};
+  return {ok:true,...pushInfo};
 }
 async function pollAdminNotifications(){
   try{
@@ -253,7 +285,11 @@ async function pollAdminNotifications(){
   }catch{}
 }
 function initAdminPwa(){
-  ensureAdminSw();
+  ensureAdminSw().then(reg=>{
+    if(reg&&'Notification' in window&&Notification.permission==='granted'){
+      syncPushSubscription(reg).catch(()=>{});
+    }
+  });
   const off=$('#adminOfflineNotice');
   const syncNet=()=>{if(off)off.classList.toggle('hidden',navigator.onLine!==false);};
   window.addEventListener('online',syncNet);
@@ -262,7 +298,14 @@ function initAdminPwa(){
 
   if('serviceWorker' in navigator){
     navigator.serviceWorker.addEventListener('message',ev=>{
-      if(ev.data&&ev.data.type==='OPEN_INBOX')tab('messages');
+      if(!ev.data)return;
+      if(ev.data.type==='OPEN_INBOX')tab('messages');
+      if(ev.data.type==='OPEN_ADMIN_ROUTE'){
+        const h=String(ev.data.hash||'');
+        if(h==='#comments')tab('comments');
+        else if(h==='#security')tab('security');
+        else tab('messages');
+      }
     });
   }
 
@@ -391,7 +434,8 @@ function showApp(email){
   $$('#brandDropdown button[data-tab]').forEach(btn=>btn.onclick=()=>{menu.classList.remove('open');$$('#brandDropdown button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');setRoute({tab:btn.dataset.tab,deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab(btn.dataset.tab)});
   initAdminPwa();
   const saved=getRoute();
-  const initialTab=location.hash==='#messages'?'messages':(saved.tab||'overview');
+  const h=location.hash;
+  const initialTab=h==='#messages'?'messages':h==='#comments'?'comments':h==='#security'?'security':(saved.tab||'overview');
   tab(initialTab);
 }
 const titles={overview:'',departments:'Departments & content',messages:'Inbox',comments:'Comments / Feedback',menus:'Menus',usefulLinks:'Useful Links',settings:'Settings',security:'Security'};
@@ -419,10 +463,34 @@ async function tab(name){
 }
 
 async function renderSecurity(v){
-  let sec={events:[],admin:null};
+  let sec={events:[],admin:null},push={configured:false,subscriptionCount:0,publicKey:''};
   try{sec=await api('/admin/security/events')}catch{}
+  try{push=await api('/admin/push/status')}catch{}
   const events=sec.events||[];
-  v.innerHTML=`<div class="box"><h3>Change password</h3>
+  v.innerHTML=`<div class="box">
+    <h3>Background Push Notifications (VAPID Web Push)</h3>
+    <p class="muted">Background मा browser/app बन्द हुँदा पनि Contact message, इमेल र comment को notification पाउन Cloudflare मा <code>VAPID_PUBLIC_KEY</code> र <code>VAPID_PRIVATE_KEY</code> Secrets राख्नुहोस्।</p>
+    <div style="margin:10px 0">
+      <div>Cloudflare VAPID Secrets: <span class="badge ${push.configured?'published':'draft'}">${push.configured?'Configured ✓':'Not Set Yet'}</span></div>
+      <div style="margin-top:6px">Registered Devices: <b>${Number(push.subscriptionCount||0)}</b> · Browser Permission: <b>${esc(('Notification' in window)?Notification.permission:'unsupported')}</b></div>
+    </div>
+    <div class="row" style="margin:10px 0">
+      <button class="btn gold" id="pushEnableBtn" type="button">🔔 Enable Push on This Device</button>
+      <button class="btn" id="pushTestBtn" type="button">📩 Send Test Push</button>
+      <button class="btn" id="genVapidBtn" type="button" style="background:#eef1f6;color:#172640">⚡ Generate VAPID Keys</button>
+    </div>
+    <div id="pushActionStatus" class="muted" style="font-size:12.5px"></div>
+    <div id="vapidGenOut" class="hidden" style="margin-top:12px;padding:12px;border:1px solid #d8b46a88;border-radius:10px;background:#fffbf0">
+      <b>New VAPID Keys Generated (copy into Cloudflare Dashboard → Worker → Settings → Variables and Secrets):</b>
+      <label style="margin-top:8px;display:block"><code>VAPID_PUBLIC_KEY</code></label>
+      <div class="row"><input id="genPubVal" readonly style="flex:1;margin:0;font-family:monospace;font-size:12px"><button type="button" class="btn" id="copyVapidPub">Copy</button></div>
+      <label style="margin-top:8px;display:block"><code>VAPID_PRIVATE_KEY</code> (keep secret!)</label>
+      <div class="row"><input id="genPrivVal" readonly style="flex:1;margin:0;font-family:monospace;font-size:12px"><button type="button" class="btn" id="copyVapidPriv">Copy</button></div>
+      <label style="margin-top:8px;display:block"><code>VAPID_SUBJECT</code> (optional)</label>
+      <input readonly value="mailto:info@gopalkoirala.com.np" style="margin:0;font-family:monospace;font-size:12px">
+    </div>
+  </div>
+  <div class="box"><h3>Change password</h3>
     <label>Current</label><input id="oldp" type="password">
     <label>New (12+)</label><input id="newp" type="password">
     <div class="row"><button class="btn gold" id="chp">Change</button><button class="btn danger" id="revokeAll" type="button">Log out all devices</button></div>
@@ -431,6 +499,29 @@ async function renderSecurity(v){
     <p class="muted">Active session version: <b>${Number(sec.admin?.session_version||0)}</b> · Current failed attempts: <b>${Number(sec.admin?.failed_login_attempts||0)}</b>/5</p>
     ${events.length?events.map(ev=>`<div class="diag-report-row"><div class="row" style="justify-content:space-between"><b>${esc(ev.event_type)} (attempt #${Number(ev.attempt_count||0)})</b><span class="badge ${ev.email_alert_status==='sent'?'published':ev.email_alert_status==='failed'?'draft':'new'}">Alert: ${esc(ev.email_alert_status)}</span></div><p>${esc((ev.created_at||'').replace('T',' ').slice(0,19))} UTC · IP: ${esc(ev.ip_address||'—')}</p><p>${esc(ev.user_agent||'')}${ev.email_alert_error?' · Error: '+esc(ev.email_alert_error):''}</p></div>`).join(''):'<p class="muted">No failed login events recorded.</p>'}
   </div>`;
+  $('#pushEnableBtn',v).onclick=async()=>{
+    const st=$('#pushActionStatus',v);st.textContent='Subscribing…';
+    const res=await requestAdminNotifications();
+    if(res.ok){
+      st.textContent=res.pushSubscribed?'Subscribed to background Web Push ✓':'Alerts allowed, but VAPID keys are not set in Cloudflare yet.';
+      if(res.pushSubscribed)setTimeout(()=>tab('security'),600);
+    }else{st.textContent=res.reason;}
+  };
+  $('#pushTestBtn',v).onclick=async()=>{
+    const st=$('#pushActionStatus',v);st.textContent='Sending test push…';
+    try{
+      const r=await api('/admin/push/test',{method:'POST',body:'{}'});
+      st.textContent=r.sent>0?`Sent test push to ${r.sent} device(s) ✓`:`Attempted ${r.attempted}, sent ${r.sent}. ${r.error||''}`;
+    }catch(e){st.textContent=e.message;}
+  };
+  $('#genVapidBtn',v).onclick=async()=>{
+    const kp=await generateVapidKeypairInBrowser();
+    $('#genPubVal',v).value=kp.publicKey;
+    $('#genPrivVal',v).value=kp.privateKey;
+    $('#vapidGenOut',v).classList.remove('hidden');
+  };
+  $('#copyVapidPub',v).onclick=()=>navigator.clipboard?.writeText($('#genPubVal',v).value).then(()=>{$('#copyVapidPub',v).textContent='Copied ✓';});
+  $('#copyVapidPriv',v).onclick=()=>navigator.clipboard?.writeText($('#genPrivVal',v).value).then(()=>{$('#copyVapidPriv',v).textContent='Copied ✓';});
   $('#chp').onclick=async()=>{try{await api('/admin/password',{method:'POST',body:JSON.stringify({currentPassword:$('#oldp').value,newPassword:$('#newp').value})});alert('Password changed. Please log in again.');location.reload()}catch(e){alert(e.message)}};
   $('#revokeAll').onclick=async()=>{if(!confirm('Revoke all active Admin sessions and log out everywhere?'))return;try{await api('/admin/security/revoke-sessions',{method:'POST',body:'{}'});location.reload()}catch(e){alert(e.message)}};
 }
@@ -439,7 +530,8 @@ async function renderSecurity(v){
 /* ---- Footer useful links ---- */
 
 async function renderAdminOverview(v){
- const d=await api('/admin/overview'),pages=d.pages||[],depts=d.departments||[];
+ const [d,push]=await Promise.all([api('/admin/overview'),api('/admin/push/status').catch(()=>({configured:false,subscriptionCount:0}))]);
+ const pages=d.pages||[],depts=d.departments||[];
  const newMessages=Number(d.new_messages||0),newEmails=Number(d.unread_emails||0),totalNew=newMessages+newEmails;
  v.innerHTML=`
  <div class="box">
@@ -457,7 +549,7 @@ async function renderAdminOverview(v){
  <div id="diagDetails" class="box hidden"></div>
  <div class="grid2">
   <div class="box"><h3>Content Overview</h3><div>Published pages: <b>${pages.length}</b></div><div>Departments: <b>${depts.length}</b></div><div>Knowledge Q&amp;As: <b id="qaCountVal">${Number(d.qa_count||0)}</b></div><div class="row" style="margin-top:10px"><button class="btn" id="rebuildQa" type="button">↻ Rebuild Q&amp;A Index</button><span id="qaRebuildStatus" class="muted"></span></div></div>
-  <div class="box"><h3>New Messages & Email</h3><div>Messages: <b>${newMessages}</b></div><div>Unread Email: <b>${newEmails}</b></div><p>Total New: <b>${totalNew}</b></p><div class="row"><button class="btn" data-go="messages">Open Inbox</button><button class="btn gold" id="ovEnableAlerts" type="button">${('Notification' in window && Notification.permission==='granted')?'✓ Alerts Enabled':'🔔 Enable Alerts'}</button></div><div id="ovAlertStatus" class="muted" style="margin-top:6px;font-size:12px"></div></div>
+  <div class="box"><h3>New Messages & Email</h3><div>Messages: <b>${newMessages}</b></div><div>Unread Email: <b>${newEmails}</b></div><p>Total New: <b>${totalNew}</b> · Push devices: <b>${Number(push.subscriptionCount||0)}</b></p><div class="row"><button class="btn" data-go="messages">Open Inbox</button><button class="btn gold" id="ovEnableAlerts" type="button">${('Notification' in window && Notification.permission==='granted')?'✓ Alerts Enabled':'🔔 Enable Alerts'}</button><button class="btn" data-go="security" type="button" style="background:#eef1f6;color:#172640">${push.configured?'Push Ready ✓':'⚙ VAPID Setup'}</button></div><div id="ovAlertStatus" class="muted" style="margin-top:6px;font-size:12px"></div></div>
   <div class="box"><h3>Quick Actions</h3><div class="row"><button class="btn" data-go="departments">Manage Content</button><button class="btn" data-go="comments">Comments</button><button class="btn" data-go="menus">Menus</button><button class="btn" data-go="settings">Settings</button><a class="btn" href="/" target="_blank" rel="noopener">Website Preview ↗</a></div></div>
   <div class="box">
    <div class="row" style="justify-content:space-between;align-items:center"><div><h3 style="margin:0">Pending Work</h3><p class="muted" style="margin:5px 0">Saved in D1 · available across devices</p></div><button class="btn gold" id="togglePending">Open Pending Work ▾</button></div>
@@ -476,8 +568,12 @@ async function renderAdminOverview(v){
  $('#ovEnableAlerts',v).onclick=async()=>{
    const btn=$('#ovEnableAlerts',v),st=$('#ovAlertStatus',v);
    const res=await requestAdminNotifications();
-   if(res.ok){btn.textContent='✓ Alerts Enabled';st.textContent='Background notifications active on this device.';}
-   else{st.textContent=res.reason;}
+   if(res.ok){
+     btn.textContent='✓ Alerts Enabled';
+     st.textContent=res.pushSubscribed
+       ?'Background Web Push active on this device ✓'
+       :'Alerts allowed. Add VAPID keys in Security tab for closed-app background push.';
+   }else{st.textContent=res.reason;}
  };
  $('#rebuildQa',v).onclick=async()=>{
    const btn=$('#rebuildQa',v),st=$('#qaRebuildStatus',v);

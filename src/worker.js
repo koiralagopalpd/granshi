@@ -83,6 +83,151 @@ async function body(req) {
     return {};
   }
 }
+async function ensurePushTable(env) {
+  if (!env.DB) return;
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS push_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, admin_email TEXT NOT NULL, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, user_agent TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+  ).run();
+}
+function concatUint8(...arrays) {
+  const len = arrays.reduce((acc, a) => acc + a.byteLength, 0);
+  const out = new Uint8Array(len);
+  let off = 0;
+  for (const a of arrays) {
+    out.set(a, off);
+    off += a.byteLength;
+  }
+  return out;
+}
+async function hmacSha256Raw(keyBytes, dataBytes) {
+  const k = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", k, dataBytes));
+}
+async function hkdfExpandSingle(prk, info, length) {
+  const out = await hmacSha256Raw(prk, concatUint8(info, new Uint8Array([1])));
+  return out.slice(0, length);
+}
+function getVapidConfig(env) {
+  const publicKey = String(env.VAPID_PUBLIC_KEY || "").trim();
+  const privateKey = String(env.VAPID_PRIVATE_KEY || "").trim();
+  const subject = String(env.VAPID_SUBJECT || "mailto:info@gopalkoirala.com.np").trim() || "mailto:info@gopalkoirala.com.np";
+  return { publicKey, privateKey, subject, configured: Boolean(publicKey && privateKey) };
+}
+function isSafePushEndpoint(rawUrl) {
+  try {
+    const parsed = new URL(String(rawUrl || ""));
+    if (parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    if (!host || host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".local")) return false;
+    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|127\.)/.test(host)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function importVapidPrivateKey(publicKeyB64, privateKeyB64) {
+  const pubRaw = unb64(publicKeyB64);
+  if (pubRaw.length !== 65 || pubRaw[0] !== 4) {
+    throw new Error("VAPID_PUBLIC_KEY must be an uncompressed 65-byte P-256 key.");
+  }
+  const privRaw = unb64(privateKeyB64);
+  if (privRaw.length !== 32) {
+    throw new Error("VAPID_PRIVATE_KEY must be a 32-byte P-256 private key.");
+  }
+  const x = b64(pubRaw.slice(1, 33));
+  const y = b64(pubRaw.slice(33, 65));
+  const d = b64(privRaw);
+  return await crypto.subtle.importKey(
+    "jwk",
+    { kty: "EC", crv: "P-256", x, y, d, ext: true },
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+}
+async function createVapidJwt(endpointUrl, vapidKey, subject) {
+  const aud = new URL(endpointUrl).origin;
+  const exp = Math.floor(Date.now() / 1000) + 12 * 3600;
+  const header = b64(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const claims = b64(enc.encode(JSON.stringify({ aud, exp, sub: subject })));
+  const input = `${header}.${claims}`;
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, vapidKey, enc.encode(input));
+  return `${input}.${b64(sig)}`;
+}
+async function encryptWebPushPayload(sub, payloadText) {
+  const uaPub = unb64(sub.p256dh);
+  const authSecret = unb64(sub.auth);
+  if (uaPub.length !== 65 || uaPub[0] !== 4) throw new Error("Invalid subscription p256dh key.");
+  if (authSecret.length !== 16) throw new Error("Invalid subscription auth secret.");
+  const asPair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey("raw", asPair.publicKey));
+  const uaKey = await crypto.subtle.importKey("raw", uaPub, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const sharedSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: uaKey }, asPair.privateKey, 256));
+  const prkKey = await hmacSha256Raw(authSecret, sharedSecret);
+  const keyInfo = concatUint8(enc.encode("WebPush: info\0"), uaPub, asPub);
+  const ikm = await hkdfExpandSingle(prkKey, keyInfo, 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const prk = await hmacSha256Raw(salt, ikm);
+  const cek = await hkdfExpandSingle(prk, enc.encode("Content-Encoding: aes128gcm\0"), 16);
+  const nonce = await hkdfExpandSingle(prk, enc.encode("Content-Encoding: nonce\0"), 12);
+  const aesKey = await crypto.subtle.importKey("raw", cek, { name: "AES-GCM" }, false, ["encrypt"]);
+  const plaintext = concatUint8(enc.encode(payloadText), new Uint8Array([2]));
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, tagLength: 128 }, aesKey, plaintext));
+  const header = new Uint8Array(21 + asPub.length);
+  header.set(salt, 0);
+  new DataView(header.buffer).setUint32(16, 4096, false);
+  header[20] = asPub.length;
+  header.set(asPub, 21);
+  return concatUint8(header, ciphertext);
+}
+async function notifyAdminsPush(env, payloadObj) {
+  const cfg = getVapidConfig(env);
+  if (!cfg.configured || !env.DB) return { attempted: 0, sent: 0, removed: 0, error: "VAPID secrets not set." };
+  await ensurePushTable(env);
+  const subs = await safeAll(env, "SELECT * FROM push_subscriptions ORDER BY updated_at DESC LIMIT 25");
+  if (!subs.length) return { attempted: 0, sent: 0, removed: 0, error: "No subscribed devices." };
+  const vapidKey = await importVapidPrivateKey(cfg.publicKey, cfg.privateKey);
+  const payloadText = JSON.stringify(payloadObj || {});
+  let sent = 0, removed = 0;
+  const details = [];
+  await Promise.all(subs.map(async (sub) => {
+    try {
+      if (!isSafePushEndpoint(sub.endpoint)) throw new Error("Unsafe push endpoint");
+      const jwt = await createVapidJwt(sub.endpoint, vapidKey, cfg.subject);
+      const bodyBytes = await encryptWebPushPayload(sub, payloadText);
+      const res = await fetch(sub.endpoint, {
+        method: "POST",
+        headers: {
+          "authorization": `vapid t=${jwt}, k=${cfg.publicKey}`,
+          "content-encoding": "aes128gcm",
+          "content-type": "application/octet-stream",
+          "ttl": "86400",
+          "urgency": "high"
+        },
+        body: bodyBytes,
+        signal: AbortSignal.timeout(6500)
+      });
+      if (res.status >= 200 && res.status < 300) {
+        sent++;
+        details.push({ status: res.status, ok: true });
+      } else if (res.status === 404 || res.status === 410) {
+        removed++;
+        await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").bind(sub.endpoint).run().catch(() => {});
+        details.push({ status: res.status, removed: true });
+      } else {
+        const errText = await res.text().catch(() => "");
+        details.push({ status: res.status, error: errText.slice(0, 120) });
+      }
+    } catch (e) {
+      details.push({ error: String(e).slice(0, 120) });
+    }
+  }));
+  return { attempted: subs.length, sent, removed, details };
+}
+function queueAdminPush(ctx, env, payloadObj) {
+  const work = notifyAdminsPush(env, payloadObj).catch(() => {});
+  if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(work);
+}
 function escapeHtml(s) {
   return String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -629,7 +774,7 @@ async function importReceivedEmail(env, emailId, fallback = {}) {
   return true;
 }
 
-async function handleResendWebhook(req, env) {
+async function handleResendWebhook(req, env, ctx = null) {
   const raw=await req.text();
   if (!(await verifyResendWebhook(req,raw,env.RESEND_WEBHOOK_SECRET))) return json({error:"Invalid webhook signature."},401);
   let event; try { event=JSON.parse(raw); } catch { return json({error:"Invalid JSON."},400); }
@@ -676,6 +821,12 @@ async function handleResendWebhook(req, env) {
     .bind(name,address,subject,cleanText.slice(0,30000), "new",received, JSON.stringify({inbound:true,html:htmlBody,attachments:attachmentRows}),null).run();
   await env.DB.prepare("INSERT INTO inbound_email_events(id,resend_email_id,message_id,sender,recipients,subject,body_text,body_html,headers_json,attachments_json,received_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
     .bind(crypto.randomUUID(),emailId,inserted.meta?.last_row_id||null,from,JSON.stringify(to),subject,textBody,htmlBody,JSON.stringify(mail.headers||{}),JSON.stringify(attachmentRows),received,new Date().toISOString()).run();
+  queueAdminPush(ctx, env, {
+    title: "New Email · info@gopalkoirala.com.np",
+    body: `${name}: ${subject}`,
+    url: "/admin#messages",
+    tag: "granshi-email-" + (inserted.meta?.last_row_id || Date.now())
+  });
   return json({received:true});
 }
 
@@ -824,12 +975,12 @@ async function diagnosisStateResponse(env) {
   return {status:state.status,active:state.status==="running",trigger_type:state.trigger_type,run_id:state.run_id,started_at:state.started_at,updated_at:state.updated_at,completed_at:state.completed_at,current_index:Number(state.current_index||0),total_checks:checks.length,checks,progress:checks.length?Math.round(Number(state.current_index||0)/checks.length*100):0,latest_report:latest};
 }
 
-async function api(req, env) {
+async function api(req, env, ctx = null) {
   const u = new URL(req.url);
   const p = u.pathname;
   const method = req.method;
 
-  if (p === "/api/webhooks/resend" && method === "POST") return handleResendWebhook(req,env);
+  if (p === "/api/webhooks/resend" && method === "POST") return handleResendWebhook(req, env, ctx);
   if (p === "/api/health") return json({ ok: true, v: 4 });
   if (p === "/api/public" && method === "GET")
     return json(await allPublic(env));
@@ -978,6 +1129,12 @@ async function api(req, env) {
       )
         .bind(slug, name, email, bodyText, "pending", new Date().toISOString())
         .run();
+      queueAdminPush(ctx, env, {
+        title: "New Comment on /" + slug,
+        body: `${name}: ${bodyText.slice(0, 90)}`,
+        url: "/admin#comments",
+        tag: "granshi-comment-" + slug
+      });
     } catch (e) {
       return json(
         {
@@ -1012,7 +1169,7 @@ async function api(req, env) {
       return json({ error: "Name, email and message required." }, 400);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       return json({ error: "Invalid email." }, 400);
-    await env.DB.prepare(
+    const insertedMsg = await env.DB.prepare(
       "INSERT INTO messages(department_id,name,email,subject,body,status,created_at) VALUES(?,?,?,?,?,?,?)"
     )
       .bind(
@@ -1025,6 +1182,12 @@ async function api(req, env) {
         new Date().toISOString()
       )
       .run();
+    queueAdminPush(ctx, env, {
+      title: "New Message on Granshi",
+      body: `${name}: ${subject || msg.slice(0, 90)}`,
+      url: "/admin#messages",
+      tag: "granshi-contact-" + (insertedMsg?.meta?.last_row_id || Date.now())
+    });
     // Contact Us submissions belong only to the Messages module.
     // Do not forward them into the real info@ mailbox.
     return json({ ok: true });
@@ -1328,6 +1491,61 @@ async function api(req, env) {
       total_unread: um + ue,
       latest_items: merged
     });
+  }
+
+  if (p === "/api/admin/push/status" && method === "GET") {
+    await ensurePushTable(env);
+    const cfg = getVapidConfig(env);
+    const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM push_subscriptions").first().catch(() => ({ n: 0 }));
+    return json({
+      configured: cfg.configured,
+      publicKey: cfg.publicKey,
+      subject: cfg.subject,
+      subscriptionCount: Number(row?.n || 0)
+    });
+  }
+  if (p === "/api/admin/push/subscribe" && method === "POST") {
+    await ensurePushTable(env);
+    const x = await body(req);
+    const endpoint = String(x.endpoint || "").trim();
+    const p256dh = String(x.keys?.p256dh || "").trim();
+    const authKey = String(x.keys?.auth || "").trim();
+    if (!isSafePushEndpoint(endpoint)) return json({ error: "Valid HTTPS push endpoint required." }, 400);
+    try {
+      const pub = unb64(p256dh);
+      const authBytes = unb64(authKey);
+      if (pub.length !== 65 || pub[0] !== 4 || authBytes.length !== 16) {
+        return json({ error: "Invalid browser push encryption keys." }, 400);
+      }
+    } catch {
+      return json({ error: "Malformed push encryption keys." }, 400);
+    }
+    const now = new Date().toISOString();
+    const ua = String(req.headers.get("user-agent") || "").slice(0, 200);
+    await env.DB.prepare(
+      "INSERT INTO push_subscriptions(admin_email,endpoint,p256dh,auth,user_agent,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET admin_email=excluded.admin_email,p256dh=excluded.p256dh,auth=excluded.auth,user_agent=excluded.user_agent,updated_at=excluded.updated_at"
+    ).bind(who, endpoint, p256dh, authKey, ua, now, now).run();
+    return json({ ok: true });
+  }
+  if (p === "/api/admin/push/unsubscribe" && method === "POST") {
+    await ensurePushTable(env);
+    const x = await body(req);
+    const endpoint = String(x.endpoint || "").trim();
+    if (endpoint) {
+      await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").bind(endpoint).run();
+    }
+    return json({ ok: true });
+  }
+  if (p === "/api/admin/push/test" && method === "POST") {
+    const cfg = getVapidConfig(env);
+    if (!cfg.configured) return json({ error: "VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY secrets are not configured yet." }, 400);
+    const res = await notifyAdminsPush(env, {
+      title: "Granshi Background Push Ready ✓",
+      body: "Alerts will arrive even when the browser or app is closed.",
+      url: "/admin#messages",
+      tag: "granshi-push-test"
+    });
+    return json({ ok: res.sent > 0, ...res });
   }
 
   if (p === "/api/admin/overview") {
@@ -2083,7 +2301,7 @@ export default {
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(runScheduledDiagnosis(env,controller.scheduledTime).catch(e=>console.error("Nightly diagnosis failed",e)));
   },
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const u = new URL(req.url);
     // Public SEO routes: generate from currently published database content.
     if (u.pathname === "/sitemap.xml") {
@@ -2130,7 +2348,7 @@ export default {
     }
     if (u.pathname.startsWith("/api/")) {
       try {
-        return await api(req, env);
+        return await api(req, env, ctx);
       } catch (e) {
         return json({ error: "Server error", detail: String(e) }, 500);
       }

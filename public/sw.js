@@ -1,4 +1,4 @@
-const CACHE_NAME = "granshi-shell-v2";
+const CACHE_NAME = "granshi-shell-v3";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -33,7 +33,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static icons & manifest: stale-while-revalidate
   if (/\.(png|jpg|jpeg|webp|svg|ico|webmanifest)$/i.test(url.pathname)) {
     event.respondWith(
       caches.match(req).then((cached) => {
@@ -50,7 +49,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // HTML navigation: network first with offline cache fallback
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req).then((res) => {
@@ -70,9 +68,9 @@ async function checkAdminInboxAndNotify() {
     if (!res.ok) return;
     const data = await res.json();
     const total = Number(data.total_unread || 0);
-    if (self.registration && "setAppBadge" in navigator) {
+    if ("setAppBadge" in navigator) {
       if (total > 0) navigator.setAppBadge(total).catch(() => {});
-      else navigator.clearAppBadge().catch(() => {});
+      else if ("clearAppBadge" in navigator) navigator.clearAppBadge().catch(() => {});
     }
     const items = Array.isArray(data.latest_items) ? data.latest_items : [];
     if (total > 0 && items.length) {
@@ -87,6 +85,7 @@ async function checkAdminInboxAndNotify() {
             icon: "/pwa-192x192.png",
             badge: "/pwa-192x192.png",
             tag,
+            vibrate: [200, 100, 200],
             data: { url: "/admin#messages" }
           }
         );
@@ -110,7 +109,8 @@ self.addEventListener("message", (event) => {
         icon: "/pwa-192x192.png",
         badge: "/pwa-192x192.png",
         tag: p.tag || ("granshi-admin-" + Date.now()),
-        data: { url: "/admin#messages" }
+        vibrate: [200, 100, 200],
+        data: { url: p.url || "/admin#messages" }
       })
     );
   }
@@ -121,26 +121,42 @@ self.addEventListener("message", (event) => {
 
 self.addEventListener("push", (event) => {
   let payload = {};
-  try { payload = event.data ? event.data.json() : {}; } catch (_) {}
-  event.waitUntil(
-    self.registration.showNotification(payload.title || "Granshi Admin Alert", {
-      body: payload.body || "New incoming message or email.",
+  if (event.data) {
+    try { payload = event.data.json(); }
+    catch (_) {
+      try { payload = { body: event.data.text() }; } catch (_) {}
+    }
+  }
+  const title = payload.title || "Granshi Admin Alert";
+  const body = payload.body || "You have a new message, email, or comment.";
+  const targetUrl = payload.url || "/admin#messages";
+  const tag = payload.tag || ("granshi-push-" + Date.now());
+  event.waitUntil((async () => {
+    if ("setAppBadge" in navigator) {
+      navigator.setAppBadge().catch(() => {});
+    }
+    await self.registration.showNotification(title, {
+      body,
       icon: "/pwa-192x192.png",
       badge: "/pwa-192x192.png",
-      tag: payload.tag || "granshi-push",
-      data: { url: payload.url || "/admin#messages" }
-    })
-  );
+      tag,
+      renotify: true,
+      vibrate: [200, 100, 200],
+      data: { url: targetUrl }
+    });
+  })());
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || "/admin";
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/admin#messages";
+  const hashMatch = String(targetUrl).match(/#([a-z0-9_-]+)/i);
+  const routeHash = hashMatch ? "#" + hashMatch[1] : "#messages";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const client of list) {
         if (client.url.includes("/admin") && "focus" in client) {
-          client.postMessage({ type: "OPEN_INBOX" });
+          client.postMessage({ type: "OPEN_ADMIN_ROUTE", hash: routeHash });
           return client.focus();
         }
       }
