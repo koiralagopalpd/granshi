@@ -3,7 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101a2c">
 <title>Granshi Admin</title>
+<link rel="manifest" href="/admin-manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GranshiAdm">
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
@@ -119,8 +127,16 @@ input,textarea,select{width:100%;padding:11px 12px;border:1px solid #dfe4ec;bord
 </div>
 
 <div id="app" class="shell hidden">
-  <aside class="side"><div class="brand-menu"><button type="button" class="brand-home" id="brandHome" aria-label="Granshi Admin Home">GRA</button><button type="button" class="brand-trigger" id="brandMenuBtn">NSHI ▾</button><nav class="brand-dropdown" id="brandDropdown"><button data-tab="departments">Departments & Content</button><button data-tab="messages">Inbox</button><button data-tab="comments">Comments & Feedback</button><button data-tab="menus">Menus</button><button data-tab="usefulLinks">Useful Links</button><button data-tab="settings">Settings</button><button data-tab="security">Security</button></nav></div><button id="logout" class="btn danger">Logout</button></aside>
+  <aside class="side">
+    <div class="brand-menu"><button type="button" class="brand-home" id="brandHome" aria-label="Granshi Admin Home">GRA</button><button type="button" class="brand-trigger" id="brandMenuBtn">NSHI ▾</button><nav class="brand-dropdown" id="brandDropdown"><button data-tab="departments">Departments &amp; Content</button><button data-tab="messages">Inbox</button><button data-tab="comments">Comments &amp; Feedback</button><button data-tab="menus">Menus</button><button data-tab="usefulLinks">Useful Links</button><button data-tab="settings">Settings</button><button data-tab="security">Security</button></nav></div>
+    <div class="row" style="gap:6px">
+      <button type="button" class="btn gold hidden" id="adminInstallBtn" style="padding:7px 10px;font-size:12px">＋ App</button>
+      <button type="button" class="btn" id="adminAlertBtn" style="background:#1c2d4b;border:1px solid #d8b46a55;padding:7px 10px;font-size:12px" title="Inbox &amp; Email Notifications">🔔 <span id="adminNotifCount" class="hidden">0</span></button>
+      <button id="logout" class="btn danger">Logout</button>
+    </div>
+  </aside>
   <main class="main">
+    <div id="adminOfflineNotice" class="notice hidden">Offline mode — reconnect to save changes or load Inbox.</div>
     <button class="btn" id="exitFocus" type="button">← Back to Admin menu</button>
     <h1 id="tabTitle" style="display:none;margin:0 0 8px;font-size:20px">Overview</h1>
     <div id="view"></div>
@@ -176,6 +192,196 @@ $('#recoverBtn').onclick=async()=>{
 };
 $('#logout').onclick=async()=>{await api('/auth/logout',{method:'POST'});location.reload()};
 $('#exitFocus').onclick=()=>{setRoute({tab:'overview',deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab('overview')};
+let adminAlertTimer=0;
+async function ensureAdminSw(){
+  if(!('serviceWorker' in navigator))return null;
+  try{return await navigator.serviceWorker.register('/sw.js');}catch{return null;}
+}
+async function requestAdminNotifications(){
+  if(!('Notification' in window))return {ok:false,reason:'This browser does not support system notifications.'};
+  const perm=await Notification.requestPermission();
+  if(perm!=='granted')return {ok:false,reason:'Notification permission denied. Enable it in browser site settings.'};
+  const reg=await ensureAdminSw();
+  if(reg&&'periodicSync' in reg){
+    try{await reg.periodicSync.register('granshi-admin-inbox',{minInterval:12*60*1000});}catch{}
+  }
+  const title='Granshi Admin Alerts Active';
+  const body='You will receive notifications when new messages or emails arrive.';
+  try{
+    if(reg&&reg.showNotification){
+      await reg.showNotification(title,{body,icon:'/pwa-192x192.png',badge:'/pwa-192x192.png',tag:'granshi-alerts-enabled',data:{url:'/admin#messages'}});
+    }else{
+      new Notification(title,{body,icon:'/pwa-192x192.png'});
+    }
+  }catch{}
+  return {ok:true};
+}
+async function pollAdminNotifications(){
+  try{
+    const d=await api('/admin/notifications');
+    const total=Number(d.total_unread||0);
+    const badge=$('#adminNotifCount');
+    if(badge){
+      badge.textContent=String(total);
+      badge.classList.toggle('hidden',total<=0);
+    }
+    if('setAppBadge' in navigator){
+      if(total>0)navigator.setAppBadge(total).catch(()=>{});
+      else if('clearAppBadge' in navigator)navigator.clearAppBadge().catch(()=>{});
+    }
+    const items=Array.isArray(d.latest_items)?d.latest_items:[];
+    if(total>0&&items.length){
+      const top=items[0];
+      const prev=localStorage.getItem('granshi_last_seen_notif')||'';
+      if(top.id&&top.id!==prev&&'Notification' in window&&Notification.permission==='granted'){
+        localStorage.setItem('granshi_last_seen_notif',top.id);
+        const reg=await navigator.serviceWorker?.ready.catch(()=>null);
+        const payload={
+          title:total===1?'New message on Granshi':`${total} unread messages on Granshi`,
+          body:`${top.sender||'Visitor'}: ${top.subject||top.preview||'Open Inbox'}`,
+          tag:'granshi-inbox-'+top.id
+        };
+        if(reg?.active){
+          reg.active.postMessage({type:'SHOW_ADMIN_NOTIFICATION',payload});
+        }else if(reg?.showNotification){
+          reg.showNotification(payload.title,{body:payload.body,icon:'/pwa-192x192.png',badge:'/pwa-192x192.png',tag:payload.tag,data:{url:'/admin#messages'}}).catch(()=>{});
+        }
+      }else if(top.id&&!prev){
+        localStorage.setItem('granshi_last_seen_notif',top.id);
+      }
+    }
+  }catch{}
+}
+function initAdminPwa(){
+  ensureAdminSw();
+  const off=$('#adminOfflineNotice');
+  const syncNet=()=>{if(off)off.classList.toggle('hidden',navigator.onLine!==false);};
+  window.addEventListener('online',syncNet);
+  window.addEventListener('offline',syncNet);
+  syncNet();
+
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('message',ev=>{
+      if(ev.data&&ev.data.type==='OPEN_INBOX')tab('messages');
+    });
+  }
+
+  const instBtn=$('#adminInstallBtn');
+  const isStandalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;
+  if(instBtn&&!isStandalone){
+    let deferred=null;
+    window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;instBtn.classList.remove('hidden');});
+    window.addEventListener('appinstalled',()=>{deferred=null;instBtn.classList.add('hidden');});
+    instBtn.onclick=()=>{
+      if(!deferred)return;
+      deferred.prompt();
+      deferred.userChoice.then(c=>{if(c?.outcome==='accepted')instBtn.classList.add('hidden');deferred=null;}).catch(()=>{});
+    };
+  }
+
+  const alertBtn=$('#adminAlertBtn');
+  if(alertBtn){
+    alertBtn.onclick=async()=>{
+      if('Notification' in window&&Notification.permission!=='granted'){
+        const res=await requestAdminNotifications();
+        if(!res.ok)alert(res.reason);
+      }
+      tab('messages');
+    };
+  }
+
+  pollAdminNotifications();
+  if(adminAlertTimer)clearInterval(adminAlertTimer);
+  adminAlertTimer=setInterval(()=>{if(document.visibilityState==='visible')pollAdminNotifications();},35000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pollAdminNotifications();});
+}
+
+async function autoTranslateText(text,source,target){
+  const clean=String(text||'').trim();
+  if(!clean)return '';
+  try{
+    const res=await api('/admin/translate',{method:'POST',body:JSON.stringify({text:clean,source,target})});
+    if(res&&res.ok&&res.translated)return res.translated;
+  }catch{}
+  try{
+    const u='https://translate.googleapis.com/translate_a/single?client=gtx&sl='+encodeURIComponent(source)+'&tl='+encodeURIComponent(target)+'&dt=t&q='+encodeURIComponent(clean);
+    const r=await fetch(u);
+    if(r.ok){
+      const d=await r.json();
+      if(Array.isArray(d?.[0])){
+        const out=d[0].map(p=>p?.[0]||'').join('').trim();
+        if(out)return out;
+      }
+    }
+  }catch{}
+  return '';
+}
+function bindBilingualAutoTranslate(root,pairs,opts={}){
+  const toggleEl=opts.toggleEl||null;
+  const statusEl=opts.statusEl||null;
+  const timers=new Map();
+  function isAutoOn(){return !toggleEl||toggleEl.checked;}
+  function setStatus(msg){if(statusEl)statusEl.textContent=msg||'';}
+
+  pairs.forEach(([enSel,neSel])=>{
+    const en=$(enSel,root),ne=$(neSel,root);
+    if(!en||!ne)return;
+    if(en.value.trim())en.dataset.manual='1';
+    if(ne.value.trim())ne.dataset.manual='1';
+
+    async function syncSide(fromEl,toEl,srcLang,dstLang){
+      const val=fromEl.value.trim();
+      if(!val||!isAutoOn())return;
+      if(toEl.dataset.manual==='1'&&toEl.value.trim())return;
+      setStatus(`Translating ${srcLang.toUpperCase()} → ${dstLang.toUpperCase()}…`);
+      const translated=await autoTranslateText(val,srcLang,dstLang);
+      if(translated && !(toEl.dataset.manual==='1'&&toEl.value.trim())){
+        toEl.value=translated;
+        toEl.dispatchEvent(new Event('autoTranslated'));
+        if(typeof opts.onFill==='function')opts.onFill(toEl,translated);
+        setStatus(`Auto-translated (${srcLang.toUpperCase()} → ${dstLang.toUpperCase()}) ✓`);
+      }else if(!translated){
+        setStatus('Auto-translate offline — please type manually');
+      }
+    }
+
+    en.addEventListener('input',()=>{
+      en.dataset.manual=en.value.trim()?'1':'';
+      if(!en.value.trim()&&ne.dataset.manual!=='1')ne.value='';
+      clearTimeout(timers.get(en));
+      timers.set(en,setTimeout(()=>syncSide(en,ne,'en','ne'),650));
+    });
+    ne.addEventListener('input',()=>{
+      ne.dataset.manual=ne.value.trim()?'1':'';
+      if(!ne.value.trim()&&en.dataset.manual!=='1')en.value='';
+      clearTimeout(timers.get(ne));
+      timers.set(ne,setTimeout(()=>syncSide(ne,en,'ne','en'),650));
+    });
+  });
+
+  return async function translateMissing(direction='en-ne'){
+    const src=direction==='ne-en'?'ne':'en';
+    const dst=direction==='ne-en'?'en':'ne';
+    setStatus('Translating fields…');
+    let count=0;
+    for(const [enSel,neSel] of pairs){
+      const en=$(enSel,root),ne=$(neSel,root);
+      if(!en||!ne)continue;
+      const fromEl=src==='en'?en:ne;
+      const toEl=src==='en'?ne:en;
+      if(fromEl.value.trim()&&!toEl.value.trim()){
+        const out=await autoTranslateText(fromEl.value.trim(),src,dst);
+        if(out){
+          toEl.value=out;
+          if(typeof opts.onFill==='function')opts.onFill(toEl,out);
+          count++;
+        }
+      }
+    }
+    setStatus(count?`Translated ${count} empty field(s) ✓`:'No empty opposite fields to translate.');
+  };
+}
+
 function showApp(email){
   $('#login').classList.add('hidden');$('#app').classList.remove('hidden');
   const menu=$('#brandDropdown'),brand=$('#brandMenuBtn'),home=$('#brandHome');
@@ -183,7 +389,10 @@ function showApp(email){
   home.onclick=()=>{menu.classList.remove('open');$$('#brandDropdown button').forEach(x=>x.classList.remove('active'));setRoute({tab:'overview',deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab('overview')};
   document.addEventListener('click',ev=>{if(!ev.target.closest('.brand-menu'))menu.classList.remove('open')});
   $$('#brandDropdown button[data-tab]').forEach(btn=>btn.onclick=()=>{menu.classList.remove('open');$$('#brandDropdown button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');setRoute({tab:btn.dataset.tab,deptId:null,deptSub:null,editorSlug:null,editorNew:false});tab(btn.dataset.tab)});
-  const saved=getRoute();tab(saved.tab||'overview');
+  initAdminPwa();
+  const saved=getRoute();
+  const initialTab=location.hash==='#messages'?'messages':(saved.tab||'overview');
+  tab(initialTab);
 }
 const titles={overview:'',departments:'Departments & content',messages:'Inbox',comments:'Comments / Feedback',menus:'Menus',usefulLinks:'Useful Links',settings:'Settings',security:'Security'};
 
@@ -248,7 +457,7 @@ async function renderAdminOverview(v){
  <div id="diagDetails" class="box hidden"></div>
  <div class="grid2">
   <div class="box"><h3>Content Overview</h3><div>Published pages: <b>${pages.length}</b></div><div>Departments: <b>${depts.length}</b></div><div>Knowledge Q&amp;As: <b id="qaCountVal">${Number(d.qa_count||0)}</b></div><div class="row" style="margin-top:10px"><button class="btn" id="rebuildQa" type="button">↻ Rebuild Q&amp;A Index</button><span id="qaRebuildStatus" class="muted"></span></div></div>
-  <div class="box"><h3>New Messages & Email</h3><div>Messages: <b>${newMessages}</b></div><div>Unread Email: <b>${newEmails}</b></div><p>Total New: <b>${totalNew}</b></p><button class="btn" data-go="messages">Open Inbox</button></div>
+  <div class="box"><h3>New Messages & Email</h3><div>Messages: <b>${newMessages}</b></div><div>Unread Email: <b>${newEmails}</b></div><p>Total New: <b>${totalNew}</b></p><div class="row"><button class="btn" data-go="messages">Open Inbox</button><button class="btn gold" id="ovEnableAlerts" type="button">${('Notification' in window && Notification.permission==='granted')?'✓ Alerts Enabled':'🔔 Enable Alerts'}</button></div><div id="ovAlertStatus" class="muted" style="margin-top:6px;font-size:12px"></div></div>
   <div class="box"><h3>Quick Actions</h3><div class="row"><button class="btn" data-go="departments">Manage Content</button><button class="btn" data-go="comments">Comments</button><button class="btn" data-go="menus">Menus</button><button class="btn" data-go="settings">Settings</button><a class="btn" href="/" target="_blank" rel="noopener">Website Preview ↗</a></div></div>
   <div class="box">
    <div class="row" style="justify-content:space-between;align-items:center"><div><h3 style="margin:0">Pending Work</h3><p class="muted" style="margin:5px 0">Saved in D1 · available across devices</p></div><button class="btn gold" id="togglePending">Open Pending Work ▾</button></div>
@@ -264,6 +473,12 @@ async function renderAdminOverview(v){
   </div>
  </div>`;
  $$('[data-go]',v).forEach(x=>x.onclick=()=>tab(x.dataset.go));
+ $('#ovEnableAlerts',v).onclick=async()=>{
+   const btn=$('#ovEnableAlerts',v),st=$('#ovAlertStatus',v);
+   const res=await requestAdminNotifications();
+   if(res.ok){btn.textContent='✓ Alerts Enabled';st.textContent='Background notifications active on this device.';}
+   else{st.textContent=res.reason;}
+ };
  $('#rebuildQa',v).onclick=async()=>{
    const btn=$('#rebuildQa',v),st=$('#qaRebuildStatus',v);
    btn.disabled=true;st.textContent='Rebuilding…';
@@ -435,7 +650,8 @@ async function renderDepartments(v){
 }
 function editDept(d){
   const ed=$('#deptEd');ed.classList.remove('hidden');ed.classList.add('workspace-active');
-  ed.innerHTML=`<h3 style="margin-top:0">${d?'Edit':'New'} department</h3>
+  ed.innerHTML=`<div class="row" style="justify-content:space-between;align-items:center"><h3 style="margin:0">${d?'Edit':'New'} department</h3><label style="font-size:12.5px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="d_autotr" checked style="width:auto;margin:0"> ⇄ Auto-translate EN ↔ NE</label></div>
+    <div id="d_tr_status" class="muted" style="font-size:12px;margin:4px 0 8px"></div>
     <div class="grid2">
       <div><label>Name EN *</label><input id="d_en" value="${esc(d?.name_en||'')}"></div>
       <div><label>Name NE</label><input id="d_ne" value="${esc(d?.name_ne||'')}"></div>
@@ -451,6 +667,7 @@ function editDept(d){
     <label>Description NE</label><textarea id="d_dne">${esc(d?.description_ne||'')}</textarea>
     <label><input type="checkbox" id="d_vis" ${d?.visible!==0?'checked':''}> Visible</label>
     <div class="row" style="margin-top:10px"><button class="btn gold" id="saveD">Save</button><button class="btn" id="canD">Cancel</button></div>`;
+  bindBilingualAutoTranslate(ed,[['#d_en','#d_ne'],['#d_den','#d_dne']],{toggleEl:$('#d_autotr',ed),statusEl:$('#d_tr_status',ed)});
   $('#d_image_file').onchange=async(ev)=>{
     const file=ev.target.files?.[0];if(!file)return;
     const st=$('#d_img_status');st.textContent='Uploading…';
@@ -592,6 +809,14 @@ function openPageEditor(page,dept,cats,restoring=false,deptMedia=[]){
     </div>
 
     <div class="box" style="margin:10px 0">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #eef1f6">
+        <label style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px"><input type="checkbox" id="p_autotr" checked style="width:auto;margin:0"> ⇄ Auto-translate EN ↔ NE</label>
+        <div class="row" style="gap:6px">
+          <button type="button" class="btn" id="trEnNeBtn" style="padding:5px 9px;font-size:11.5px">EN → NE</button>
+          <button type="button" class="btn" id="trNeEnBtn" style="padding:5px 9px;font-size:11.5px">NE → EN</button>
+          <span id="p_tr_status" class="muted" style="font-size:11.5px"></span>
+        </div>
+      </div>
       <div class="grid2">
         <div><label>Title EN *</label><input id="p_te" value="${esc(page?.title_en||'')}" placeholder="My App or Article Title"></div>
         <div><label>Title NE</label><input id="p_tn" value="${esc(page?.title_ne||'')}"></div>
@@ -696,6 +921,19 @@ function openPageEditor(page,dept,cats,restoring=false,deptMedia=[]){
 
   $('#p_te').addEventListener('input',()=>{if(!slugEdited&&!page)$('#p_sl').value=slugifyClient($('#p_te').value)});
   $('#p_sl').addEventListener('input',()=>{slugEdited=true});
+
+  const runTranslateMissing=bindBilingualAutoTranslate(ed,[
+    ['#p_te','#p_tn'],
+    ['#p_de','#p_dn'],
+    ['#p_ttitle_en','#p_ttitle_ne'],
+    ['#p_tsum_en','#p_tsum_ne']
+  ],{
+    toggleEl:$('#p_autotr',ed),
+    statusEl:$('#p_tr_status',ed),
+    onFill:(el,val)=>{if(el.id==='p_te'&&!slugEdited&&!page)$('#p_sl').value=slugifyClient(val);}
+  });
+  $('#trEnNeBtn',ed).onclick=()=>runTranslateMissing('en-ne');
+  $('#trNeEnBtn',ed).onclick=()=>runTranslateMissing('ne-en');
 
   function updateThumbPreview(){
     const u=$('#p_thumb').value.trim();
@@ -1178,7 +1416,8 @@ async function renderMessages(v){
     try{
       if(section==='messages'){
         const data=await api('/admin/messages?kind=contact'),list=Array.isArray(data)?data:[];
-        v.innerHTML='<div class="box mail-app"><div class="mail-top"><h3>Messages</h3><button class="btn" id="showEmail">✉ Email</button></div><p class="muted">Contact Us form बाट आएका सन्देशहरू। Reply गर्दा noreply@ बाट जान्छ (Reply-To: info@)।</p><div class="mail-list">'+(list.map(m=>'<article class="mail-row '+(!Number(m.is_read)?'unread':'read')+'"><div class="mail-row-main"><div class="mail-sender"><b>'+esc(m.name)+'</b><span>'+esc(m.email)+'</span><small>'+date(m.created_at)+'</small></div><b class="mail-subject">'+esc(m.subject||'(no subject)')+'</b><p>'+esc(String(m.body||'').slice(0,130))+'</p></div><div class="mail-row-actions"><span class="badge '+(m.status==='replied'?'replied':'new')+'">'+esc(m.status)+'</span><button class="btn" data-open-message="'+m.id+'">Open</button><button class="btn danger" data-delete-message="'+m.id+'">Delete</button></div></article>').join('')||'<p class="muted">No contact messages yet.</p>')+'</div><div id="mailDetail"></div></div>';
+        v.innerHTML='<div class="box mail-app"><div class="mail-top"><h3>Messages</h3><div class="row" style="gap:6px"><button class="btn gold" id="msgEnableAlerts" type="button">'+('Notification' in window && Notification.permission==='granted'?'✓ Alerts On':'🔔 Enable Alerts')+'</button><button class="btn" id="showEmail">✉ Email</button></div></div><p class="muted">Contact Us form बाट आएका सन्देशहरू। Reply गर्दा noreply@ बाट जान्छ (Reply-To: info@)।</p><div class="mail-list">'+(list.map(m=>'<article class="mail-row '+(!Number(m.is_read)?'unread':'read')+'"><div class="mail-row-main"><div class="mail-sender"><b>'+esc(m.name)+'</b><span>'+esc(m.email)+'</span><small>'+date(m.created_at)+'</small></div><b class="mail-subject">'+esc(m.subject||'(no subject)')+'</b><p>'+esc(String(m.body||'').slice(0,130))+'</p></div><div class="mail-row-actions"><span class="badge '+(m.status==='replied'?'replied':'new')+'">'+esc(m.status)+'</span><button class="btn" data-open-message="'+m.id+'">Open</button><button class="btn danger" data-delete-message="'+m.id+'">Delete</button></div></article>').join('')||'<p class="muted">No contact messages yet.</p>')+'</div><div id="mailDetail"></div></div>';
+         $('#msgEnableAlerts').onclick=async()=>{const res=await requestAdminNotifications();if(res.ok){$('#msgEnableAlerts').textContent='✓ Alerts On';}else{alert(res.reason);}};
          $('#showEmail').onclick=()=>{section='email';folder='inbox';window.__granshiInboxSynced=false;draw()};
         $$('[data-delete-message]').forEach(btn=>btn.onclick=async()=>{
           if(!confirm('यो Contact Us message स्थायी रूपमा Delete गर्ने? यो कार्य उल्ट्याउन मिल्दैन।'))return;

@@ -6,6 +6,15 @@
 <meta name="theme-color" content="#0f172a">
 <title>Granshi — Personal Digital Archive &amp; Ideas</title>
 <meta name="description" content="Writing, practical tools, learning resources and independent projects by Gopal Koirala.">
+<meta property="og:title" content="Granshi — Personal Digital Archive &amp; Ideas">
+<meta property="og:description" content="Writing, practical tools, learning resources and independent projects by Gopal Koirala.">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Granshi">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -161,6 +170,36 @@ button{font:inherit;cursor:pointer}
   background:rgba(255,255,255,.16);
   color:#e5e7eb;
 }
+.btn-install{
+  border:1px solid var(--gold);
+  background:var(--gold-soft);
+  color:var(--navy);
+  padding:7px 11px;
+  border-radius:8px;
+  font-size:12.5px;
+  font-weight:700;
+  white-space:nowrap;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  transition:background .15s,transform .15s;
+}
+.btn-install:hover{background:#efe1c0}
+.btn-install.hidden{display:none!important}
+.offline-badge{
+  position:fixed;
+  left:14px;
+  bottom:14px;
+  z-index:95;
+  background:#7c2d12;
+  color:#fff;
+  padding:7px 12px;
+  border-radius:8px;
+  font-size:12px;
+  font-weight:600;
+  box-shadow:0 8px 24px rgba(15,23,42,.22);
+}
+.offline-badge.hidden{display:none!important}
 .hamb{
   display:none;
   border:1px solid var(--line-strong);
@@ -487,83 +526,96 @@ button{font:inherit;cursor:pointer}
   border-color:var(--navy);
 }
 
-/* Publication / Article Cards */
+/* Publication / Article Cards — Compact Framed Horizontal Cards */
 .articles{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:18px;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
 }
 .article{
   background:var(--surface);
   border:1px solid var(--line);
   border-radius:14px;
   overflow:hidden;
-  display:flex;
-  flex-direction:column;
-  transition:transform .18s cubic-bezier(.16,1,.3,1),border-color .18s;
+  display:grid;
+  grid-template-columns:116px 1fr;
+  align-items:stretch;
+  transition:transform .18s cubic-bezier(.16,1,.3,1),border-color .18s,box-shadow .18s;
 }
 .article:hover{
   transform:translateY(-2px);
   border-color:var(--line-strong);
+  box-shadow:0 10px 24px rgba(15,23,42,.06);
 }
 .article-media{
-  aspect-ratio:4/3;
   width:100%;
-  background:var(--surface-alt);
+  height:100%;
+  min-height:112px;
+  padding:7px;
+  background:linear-gradient(145deg,#0f172a 0%,#1e3354 68%,#4a3816 100%);
+  border-right:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  justify-content:center;
   overflow:hidden;
-  border-bottom:1px solid var(--line);
 }
 .article-media img{
   width:100%;
   height:100%;
   object-fit:cover;
+  border-radius:8px;
+  background:var(--surface-alt);
+  box-shadow:0 4px 12px rgba(0,0,0,.22);
 }
 .article-art{
   width:100%;
   height:100%;
+  border-radius:8px;
   display:grid;
   place-items:center;
-  background:linear-gradient(145deg,#182438,#0f172a);
+  background:radial-gradient(circle at 28% 22%,rgba(216,180,106,.24),transparent 62%),linear-gradient(145deg,#182438,#0f172a);
   color:#f2d99e;
   font-family:var(--font-serif);
-  font-size:28px;
+  font-size:26px;
+  font-weight:700;
+  border:1px solid rgba(216,180,106,.35);
 }
 .article-body{
-  padding:16px 18px 18px;
+  padding:13px 16px;
   display:flex;
   flex-direction:column;
-  flex:1;
-  gap:8px;
+  justify-content:center;
+  min-width:0;
+  gap:5px;
 }
 .article-meta{
   display:flex;
   align-items:center;
-  gap:7px;
-  font-size:12px;
+  gap:6px;
+  font-size:11.5px;
   color:var(--muted);
   font-variant-numeric:tabular-nums;
 }
 .article-body h3{
   margin:0;
-  font-size:17px;
+  font-size:16px;
   font-weight:700;
-  line-height:1.35;
+  line-height:1.32;
   color:var(--ink);
 }
 .article-body p{
   margin:0;
-  font-size:13.5px;
-  line-height:1.55;
+  font-size:13px;
+  line-height:1.5;
   color:var(--muted);
-  flex:1;
   display:-webkit-box;
   -webkit-line-clamp:2;
   -webkit-box-orient:vertical;
   overflow:hidden;
 }
 .article-more{
-  margin-top:4px;
-  font-size:13px;
+  margin-top:2px;
+  font-size:12.5px;
   font-weight:600;
   color:var(--navy);
 }
@@ -582,35 +634,32 @@ button{font:inherit;cursor:pointer}
   text-align:center;
 }
 
-/* About & Contact Band */
+/* About Note Band */
 .connect-band{
   background:var(--surface);
   border-top:1px solid var(--line);
   border-bottom:1px solid var(--line);
-  padding:54px 0;
+  padding:46px 0;
 }
-.connect-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:40px;
-  align-items:start;
+.about-box{
+  max-width:74ch;
 }
 .about-box h2{
   font-family:var(--font-serif);
   font-size:clamp(1.5rem,2.6vw,2rem);
-  margin:0 0 14px;
+  margin:0 0 12px;
   color:var(--ink);
 }
 .about-prose{
   font-size:15.5px;
   line-height:1.75;
   color:var(--muted);
-  margin:0 0 20px;
+  margin:0 0 18px;
 }
 .about-links{
   display:flex;
   flex-wrap:wrap;
-  gap:16px;
+  gap:18px;
   align-items:center;
   font-size:14px;
   font-weight:600;
@@ -952,15 +1001,14 @@ footer{
 
 @media(max-width:960px){
   .hero-split{grid-template-columns:1fr;gap:22px}
-  .articles{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .connect-grid{grid-template-columns:1fr;gap:26px}
+  .articles{grid-template-columns:1fr}
   .footer-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:760px){
   .nav{height:58px;gap:8px}
   .hamb{display:inline-flex;width:38px;height:38px}
   .btn-search-cta kbd{display:none}
-  .btn-lang,.btn-search-cta{padding:7px 11px;font-size:12.5px}
+  .btn-lang,.btn-search-cta,.btn-install{padding:7px 10px;font-size:12px}
   .navlinks{
     display:none;
     position:absolute;
@@ -1003,26 +1051,22 @@ footer{
   .articles{grid-template-columns:1fr;gap:10px}
   .article{
     display:grid;
-    grid-template-columns:92px 1fr;
+    grid-template-columns:86px 1fr;
     align-items:stretch;
     border-radius:12px;
   }
   .article-media{
-    aspect-ratio:auto;
-    height:100%;
-    min-height:92px;
-    border-bottom:0;
+    min-height:86px;
+    padding:5px;
     border-right:1px solid var(--line);
   }
-  .article-art{font-size:22px}
-  .article-body{padding:11px 12px;gap:4px;min-width:0}
+  .article-art{font-size:21px}
+  .article-body{padding:10px 12px;gap:3px;min-width:0}
   .article-meta{font-size:11px}
   .article-body h3{font-size:14.5px;line-height:1.3}
   .article-body p{font-size:12.5px;-webkit-line-clamp:2}
   .article-more{font-size:12px;margin-top:2px}
-  .connect-band{padding:34px 0}
-  .contact-card{padding:18px}
-  .contact-grid-2{grid-template-columns:1fr}
+  .connect-band{padding:30px 0}
   .footer-grid{grid-template-columns:1fr;gap:22px}
   .search-dialog{margin:2vh auto}
   .search-main{padding:16px}
@@ -1049,6 +1093,7 @@ footer{
     </a>
     <nav class="navlinks" id="nav" aria-label="Primary"></nav>
     <div class="tools">
+      <button type="button" class="btn-install hidden" id="installAppBtn">＋ Install App</button>
       <button type="button" class="btn-lang" id="lang">नेपाली</button>
       <button type="button" class="btn-search-cta" id="openSearch" aria-label="Search website">
         <span aria-hidden="true">⌕</span>
@@ -1070,7 +1115,7 @@ footer{
           <p class="hero-lead" id="heroDesc">Knowledge, learning, practical tools, creativity and personal projects — organized cleanly in one place.</p>
           <div class="hero-actions">
             <button type="button" class="cta-primary" id="heroPrimaryCta" aria-expanded="false" aria-controls="departments">Explore Departments ▾</button>
-            <a class="cta-secondary" href="#contact" id="heroSecondaryCta">Get in Touch</a>
+            <a class="cta-secondary" href="/legal/contact" id="heroSecondaryCta">Get in Touch</a>
           </div>
         </div>
         <div class="hero-frame">
@@ -1099,7 +1144,7 @@ footer{
         </div>
         <div class="stat-cell">
           <small id="statContactLabel">Direct Correspondence</small>
-          <strong><a href="#contact" id="statContactLink">info@gopalkoirala.com.np</a></strong>
+          <strong><a href="/legal/contact" id="statContactLink">info@gopalkoirala.com.np</a></strong>
         </div>
       </div>
     </div>
@@ -1148,7 +1193,7 @@ footer{
   </section>
 
   <section class="connect-band" id="about">
-    <div class="wrap connect-grid">
+    <div class="wrap">
       <div class="about-box">
         <span class="section-kicker" id="aboutKicker">Personal Note</span>
         <h2 id="aboutHeadLabel">About This Website</h2>
@@ -1156,43 +1201,7 @@ footer{
         <div class="about-links">
           <a href="/legal/about" id="aboutReadMore">Read full profile &amp; mission →</a>
           <a href="#departments" id="aboutBrowseDept">All departments</a>
-        </div>
-      </div>
-
-      <div class="contact-card" id="contact">
-        <h3 id="contactTitle">Send a Direct Message</h3>
-        <p class="contact-sub" id="contactSub">Questions, feedback, corrections, or collaboration ideas are always welcome.</p>
-        <div id="contactPanel" class="open">
-          <form id="contactForm">
-            <div class="contact-grid-2">
-              <div class="field">
-                <label for="c_name" id="lblName">Your name</label>
-                <input id="c_name" required maxlength="120" autocomplete="name">
-              </div>
-              <div class="field">
-                <label for="c_email" id="lblEmail">Your email</label>
-                <input id="c_email" type="email" required maxlength="180" autocomplete="email">
-              </div>
-            </div>
-            <div class="contact-grid-2">
-              <div class="field">
-                <label for="c_dept" id="lblDept">Topic / Department</label>
-                <select id="c_dept"><option value="">General</option></select>
-              </div>
-              <div class="field">
-                <label for="c_subject" id="lblSubject">Subject</label>
-                <input id="c_subject" maxlength="200">
-              </div>
-            </div>
-            <div class="field">
-              <label for="c_body" id="lblMessage">Message</label>
-              <textarea id="c_body" required maxlength="5000"></textarea>
-            </div>
-            <div class="contact-actions">
-              <button class="cta-primary" type="submit" id="c_submit">Send Message</button>
-              <div id="c_msg" class="contact-status" aria-live="polite"></div>
-            </div>
-          </form>
+          <a href="/legal/contact" id="aboutContactLink">Contact &amp; Feedback →</a>
         </div>
       </div>
     </div>
@@ -1247,10 +1256,26 @@ footer{
     </div>
     <div class="foot-bottom">
       <span id="footerText">© Granshi — Our Digital World</span>
-      <a href="/sitemap.xml" style="color:#cbd5e1">Sitemap</a>
+      <a href="/sitemap" id="footerSitemapLink" style="color:#cbd5e1">Site Directory</a>
     </div>
   </div>
 </footer>
+
+<div class="search-overlay" id="iosInstallModal" role="dialog" aria-modal="true" aria-labelledby="iosInstallTitle">
+  <div class="search-dialog" style="max-width:460px">
+    <div class="search-top">
+      <strong id="iosInstallTitle">Add Granshi to Home Screen</strong>
+      <button type="button" class="search-close" id="closeIosInstall">✕ Close</button>
+    </div>
+    <div class="search-main">
+      <p id="iosInstallSteps" style="color:var(--ink);font-size:14.5px;margin-bottom:0">
+        1. Tap the <strong>Share</strong> icon in Safari's toolbar.<br>
+        2. Scroll down and select <strong>Add to Home Screen</strong>.
+      </p>
+    </div>
+  </div>
+</div>
+<div class="offline-badge hidden" id="offlineBadge">Offline mode — showing saved content</div>
 
 <script>
 let lang="en",settings={},menus=[],departments=[],latest=[],popular=[],allPages=[],activeDept="all",pageCursor=0,pagesHasMore=false,pagesLoading=false;
@@ -1277,11 +1302,6 @@ function deptUrl(d){
   else if(d.url&&d.url!=="#"&&d.url.indexOf("#")!==0)base=d.url;
   return withLang(base);
 }
-function focusContact(){
-  var target=document.getElementById("contact");
-  if(target)target.scrollIntoView({behavior:"smooth",block:"center"});
-  setTimeout(function(){var n=document.getElementById("c_name");if(n)n.focus();},250);
-}
 function toggleDepartmentsDrawer(force){
   var box=document.getElementById("departments"),btn=document.getElementById("heroPrimaryCta");
   if(!box)return;
@@ -1296,7 +1316,7 @@ function renderNav(){
     {label_en:"Explore",label_ne:"अन्वेषण",url:"#departments"},
     {label_en:"Library",label_ne:"संग्रह",url:"#library"},
     {label_en:"About",label_ne:"परिचय",url:"/legal/about"},
-    {label_en:"Contact",label_ne:"सम्पर्क",url:"#contact"}
+    {label_en:"Contact",label_ne:"सम्पर्क",url:"/legal/contact"}
   ];
   document.getElementById("nav").innerHTML=items.slice(0,5).map(function(m){
     var label=escText(t(m.label_en,m.label_ne));
@@ -1305,7 +1325,7 @@ function renderNav(){
     if(low==="#explore"||low==="#departments"||low==="/explore") return '<a href="#departments" data-section="departments">'+label+"</a>";
     if(low==="#library") return '<a href="#library" data-section="library">'+label+"</a>";
     if(low==="#about"||low==="/legal/about") return '<a href="'+withLang("/legal/about")+'">'+label+"</a>";
-    if(low==="#contact"||low==="/legal/contact") return '<a href="#contact" data-section="contact">'+label+"</a>";
+    if(low==="#contact"||low==="/legal/contact") return '<a href="'+withLang("/legal/contact")+'">'+label+"</a>";
     return '<a href="'+escText(withLang(u))+'">'+label+"</a>";
   }).join("");
   document.querySelectorAll("#nav a").forEach(function(a){
@@ -1318,9 +1338,6 @@ function renderNav(){
         e.preventDefault();
         var el=document.getElementById(sec);
         if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
-      }else if(sec==="contact"){
-        e.preventDefault();
-        focusContact();
       }
       closeMobileNav();
     });
@@ -1411,12 +1428,12 @@ function renderAllPages(reset){
   if(countEl)countEl.textContent=pool.length?(pool.length+" "+t("published","प्रकाशित")):"";
   if(reset){pageCursor=0;list.innerHTML="";}
   if(!pool.length){
-    list.innerHTML='<div class="empty-state"><h3>'+t("First publications are on the way","पहिला सामग्रीहरू तयार हुँदैछन्")+'</h3><p>'+t("Explore the departments or send a message using the form below.","विभागहरू हेर्नुहोस् वा तलको सम्पर्क फारमबाट सिधै सन्देश पठाउनुहोस्।")+'</p><a class="cta-secondary" href="#contact">'+t("Send a Message","सन्देश पठाउनुहोस्")+"</a></div>";
+    list.innerHTML='<div class="empty-state"><h3>'+t("First publications are on the way","पहिला सामग्रीहरू तयार हुँदैछन्")+'</h3><p>'+t("Explore the departments or reach out directly via our Contact page.","विभागहरू हेर्नुहोस् वा सम्पर्क पेजबाट सिधै सन्देश पठाउनुहोस्।")+'</p><a class="cta-secondary" href="'+withLang("/legal/contact")+'">'+t("Send a Message","सन्देश पठाउनुहोस्")+"</a></div>";
     var moreEmpty=document.getElementById("loadMorePages");
     if(moreEmpty)moreEmpty.style.display="none";
     return;
   }
-  var next=pool.slice(pageCursor,pageCursor+9);
+  var next=pool.slice(pageCursor,pageCursor+8);
   list.insertAdjacentHTML("beforeend",next.map(articleCard).join(""));
   pageCursor+=next.length;
   var more=document.getElementById("loadMorePages");
@@ -1452,7 +1469,7 @@ function renderUsefulLinks(){
     box.innerHTML=html;
   }else{
     if(head)head.textContent=t("Quick Access","द्रुत पहुँच");
-    box.innerHTML='<a href="#departments" data-open-dept="1">'+t("Departments","विभागहरू")+'</a><a href="#library">'+t("Publications","प्रकाशित सामग्री")+'</a><a href="#contact">'+t("Contact","सम्पर्क")+'</a><a href="/admin">'+t("Admin Sign In","Admin लगइन")+"</a>";
+    box.innerHTML='<a href="#departments" data-open-dept="1">'+t("Departments","विभागहरू")+'</a><a href="#library">'+t("Publications","प्रकाशित सामग्री")+'</a><a href="'+withLang("/legal/contact")+'">'+t("Contact","सम्पर्क")+'</a><a href="/admin">'+t("Admin Sign In","Admin लगइन")+"</a>";
     box.querySelectorAll("[data-open-dept]").forEach(function(el){
       el.addEventListener("click",function(e){e.preventDefault();toggleDepartmentsDrawer(true);});
     });
@@ -1460,11 +1477,6 @@ function renderUsefulLinks(){
 }
 function renderExploreLists(){
   renderUsefulLinks();
-  var sel=document.getElementById("c_dept");
-  if(sel){
-    sel.innerHTML='<option value="">'+t("General","सामान्य")+"</option>"+
-      (departments||[]).map(function(d){return '<option value="'+escText(d.id)+'">'+escText(t(d.name_en,d.name_ne))+"</option>";}).join("");
-  }
 }
 function applyTexts(){
   document.documentElement.lang=lang;
@@ -1484,8 +1496,12 @@ function applyTexts(){
     settings.hero_desc_ne||"ज्ञान, सिकाइ, उपयोगी डिजिटल उपकरण र व्यक्तिगत परियोजनाहरू — सबै एउटै व्यवस्थित स्थानमा।"
   );
   document.getElementById("heroPrimaryCta").textContent=t("Explore Departments ▾","विभागहरू हेर्नुहोस् ▾");
-  document.getElementById("heroSecondaryCta").textContent=t("Get in Touch","सम्पर्क गर्नुहोस्");
+  var hsc=document.getElementById("heroSecondaryCta");
+  hsc.textContent=t("Get in Touch","सम्पर्क गर्नुहोस्");
+  hsc.href=withLang("/legal/contact");
   document.getElementById("searchBtnLabel").textContent=t("Ask / Search","खोज / प्रश्न");
+  var instBtn=document.getElementById("installAppBtn");
+  if(instBtn)instBtn.textContent=t("＋ Install App","＋ App थप्नुहोस्");
 
   var heroImg=document.getElementById("heroMediaImg");
   if(heroImg&&settings.hero_image&&heroImg.getAttribute("src")!==settings.hero_image){
@@ -1499,6 +1515,8 @@ function applyTexts(){
   document.getElementById("statDeptsVal").textContent=String((departments||[]).length);
   document.getElementById("statLangLabel").textContent=t("Bilingual Reading","द्विभाषी पठन");
   document.getElementById("statContactLabel").textContent=t("Direct Correspondence","सीधा सम्पर्क");
+  var scl=document.getElementById("statContactLink");
+  if(scl)scl.href=withLang("/legal/contact");
 
   document.getElementById("deptKicker").textContent=t("Explore by Topic","विषयअनुसार");
   document.getElementById("deptHead").textContent=t("Departments","विभागहरू");
@@ -1518,15 +1536,8 @@ function applyTexts(){
   arm.textContent=t("Read full profile & mission →","पूरा परिचय र उद्देश्य पढ्नुहोस् →");
   arm.href=withLang("/legal/about");
   document.getElementById("aboutBrowseDept").textContent=t("All departments","सबै विभागहरू");
-
-  document.getElementById("contactTitle").textContent=t("Send a Direct Message","सीधा सन्देश पठाउनुहोस्");
-  document.getElementById("contactSub").textContent=t("Questions, feedback, corrections, or collaboration ideas are always welcome.","प्रश्न, सुझाव, सुधार वा सहकार्यका विचार सधैँ स्वागत छन्।");
-  document.getElementById("lblName").textContent=t("Your name","तपाईंको नाम");
-  document.getElementById("lblEmail").textContent=t("Your email","तपाईंको इमेल");
-  document.getElementById("lblDept").textContent=t("Topic / Department","विषय / विभाग");
-  document.getElementById("lblSubject").textContent=t("Subject","शीर्षक");
-  document.getElementById("lblMessage").textContent=t("Message","सन्देश");
-  document.getElementById("c_submit").textContent=t("Send Message","सन्देश पठाउनुहोस्");
+  var acl=document.getElementById("aboutContactLink");
+  if(acl){acl.textContent=t("Contact & Feedback →","सम्पर्क तथा सुझाव →");acl.href=withLang("/legal/contact");}
 
   document.getElementById("searchTopLabel").textContent=t("Granshi Knowledge Search","Granshi ज्ञान खोज");
   document.getElementById("searchHeading").textContent=t("Ask Granshi about this website","Granshi वेबसाइटबारे प्रश्न सोध्नुहोस्");
@@ -1545,6 +1556,17 @@ function applyTexts(){
   });
   document.getElementById("footerText").textContent=settings.footer_text||"© Granshi — Gopal Prasad Koirala";
   document.getElementById("footerTag").textContent=settings.tagline||"Learn Together · Explore Freely · Grow Together.";
+  var fsm=document.getElementById("footerSitemapLink");
+  if(fsm){fsm.textContent=t("Site Directory","साइट नक्सा (Sitemap)");fsm.href=withLang("/sitemap");}
+
+  var iosT=document.getElementById("iosInstallTitle");
+  var iosS=document.getElementById("iosInstallSteps");
+  var offB=document.getElementById("offlineBadge");
+  if(iosT)iosT.textContent=t("Add Granshi to Home Screen","Home Screen मा Granshi थप्नुहोस्");
+  if(iosS)iosS.innerHTML=lang==="ne"
+    ?'1. Safari को तल वा माथि रहेको <strong>Share</strong> आइकनमा थिच्नुहोस्।<br>2. तल स्क्रोल गरी <strong>Add to Home Screen</strong> छान्नुहोस्।'
+    :'1. Tap the <strong>Share</strong> icon in Safari\'s toolbar.<br>2. Scroll down and select <strong>Add to Home Screen</strong>.';
+  if(offB)offB.textContent=t("Offline mode — showing saved content","अफलाइन मोड — सुरक्षित सामग्री देखाइँदैछ");
 
   if(settings.brand_name)document.title=settings.brand_name;
   if(settings.primary_color)document.documentElement.style.setProperty("--navy",settings.primary_color);
@@ -1655,30 +1677,6 @@ document.addEventListener("keydown",function(e){
     e.preventDefault();openSearch();
   }
 });
-document.getElementById("heroSecondaryCta").addEventListener("click",function(e){
-  e.preventDefault();focusContact();
-});
-document.getElementById("statContactLink").addEventListener("click",function(e){
-  e.preventDefault();focusContact();
-});
-document.getElementById("contactForm").onsubmit=function(e){
-  e.preventDefault();
-  var msg=document.getElementById("c_msg"),btn=document.getElementById("c_submit");
-  btn.disabled=true;msg.className="contact-status";msg.textContent=t("Sending…","पठाइँदैछ…");
-  fetch("/api/contact",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
-    name:document.getElementById("c_name").value.trim(),
-    email:document.getElementById("c_email").value.trim(),
-    subject:document.getElementById("c_subject").value.trim(),
-    body:document.getElementById("c_body").value.trim(),
-    department_id:document.getElementById("c_dept").value||null
-  })}).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});}).then(function(x){
-    if(!x.ok)throw new Error(x.d.error||"Failed");
-    msg.className="contact-status ok";msg.textContent=t("Message sent. Thank you!","सन्देश पठाइयो। धन्यवाद!");
-    document.getElementById("contactForm").reset();
-  }).catch(function(err){
-    msg.className="contact-status err";msg.textContent=err.message||"Error";
-  }).finally(function(){btn.disabled=false;});
-};
 document.getElementById("lang").onclick=function(){
   lang=lang==="en"?"ne":"en";
   try{localStorage.setItem("granshi_lang",lang);}catch(_){}
@@ -1693,6 +1691,51 @@ document.getElementById("heroMediaImg").addEventListener("error",function(){
   if(box)box.innerHTML='<div class="hero-media-fallback">Granshi · Digital Archive</div>';
 });
 document.getElementById("loadMorePages").onclick=loadMorePages;
+
+/* PWA Service Worker, Install Prompt & Offline Indicator */
+(function initPwa(){
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("/sw.js").catch(function(){});
+  }
+  var offBadge=document.getElementById("offlineBadge");
+  function syncOnline(){if(offBadge)offBadge.classList.toggle("hidden",navigator.onLine!==false);}
+  window.addEventListener("online",syncOnline);
+  window.addEventListener("offline",syncOnline);
+  syncOnline();
+
+  var isStandalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
+  var installBtn=document.getElementById("installAppBtn");
+  var iosModal=document.getElementById("iosInstallModal");
+  var closeIos=document.getElementById("closeIosInstall");
+  if(closeIos&&iosModal)closeIos.onclick=function(){iosModal.classList.remove("open");};
+  if(iosModal)iosModal.addEventListener("click",function(e){if(e.target===iosModal)iosModal.classList.remove("open");});
+  if(isStandalone||!installBtn)return;
+
+  var deferredPrompt=null;
+  var isIos=/iphone|ipad|ipod/i.test(navigator.userAgent||"")||(/macintosh/i.test(navigator.userAgent||"")&&"ontouchend" in document);
+  if(isIos)installBtn.classList.remove("hidden");
+
+  window.addEventListener("beforeinstallprompt",function(e){
+    e.preventDefault();
+    deferredPrompt=e;
+    installBtn.classList.remove("hidden");
+  });
+  window.addEventListener("appinstalled",function(){
+    deferredPrompt=null;
+    installBtn.classList.add("hidden");
+  });
+  installBtn.addEventListener("click",function(){
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(choice){
+        if(choice&&choice.outcome==="accepted")installBtn.classList.add("hidden");
+        deferredPrompt=null;
+      }).catch(function(){});
+    }else if(isIos&&iosModal){
+      iosModal.classList.add("open");
+    }
+  });
+})();
 
 fetch("/api/public").then(function(r){return r.ok?r.json():null;}).then(function(d){
   if(!d)return;
