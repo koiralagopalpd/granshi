@@ -2400,6 +2400,10 @@ export default {
     // Static files for ZIP pages: /_p/{slug}/path
     if (u.pathname.startsWith("/_p/") && env.MEDIA) {
       const rest = u.pathname.slice(4); // slug/path
+      if (rest && (rest.endsWith("/") || !rest.includes("/"))) {
+        const slugOnly = rest.replace(/\/+$/, "");
+        if (slugOnly) return Response.redirect(`${u.origin}/${encodeURIComponent(slugOnly)}${u.search}`, 302);
+      }
       const key = `pages/${rest}`;
       const obj = await env.MEDIA.get(key);
       if (!obj) return new Response("Not found", { status: 404 });
