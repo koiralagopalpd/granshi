@@ -2620,13 +2620,13 @@ async function renderAnyPage(page, env, u) {
     }
     if (widget) {
       if (/<\/body>/i.test(html))
-        html = html.replace(/<\/body>/i, widget + "\n</body>");
+        html = html.replace(/<\/body>(?![\s\S]*<\/body>)/i, () => widget + "\n</body>");
       else html += widget;
     }
     // ZIP page HTML is preserved exactly; do not inject, replace, or remove its header/body until a safe shared-header adapter is tested.
     const contentNotice = '<footer id="granshi-content-note" style="margin:36px auto 0;padding:22px 20px;background:#101b35;color:#d4dbea;font:13px/1.7 system-ui,sans-serif"><div style="max-width:1050px;margin:auto"><p><strong>सामग्रीसम्बन्धी सूचना:</strong> यस पेजमा प्रस्तुत जानकारी सार्वजनिक रूपमा उपलब्ध अनलाइन स्रोत तथा सन्दर्भहरूको अध्ययन र संकलनमा आधारित हुन सक्छ। प्रकाशित सबै कुरा स्वतन्त्र रूपमा शतप्रतिशत प्रमाणित वा त्रुटिरहित छन् भन्ने ग्यारेन्टी छैन। महत्त्वपूर्ण निर्णय गर्नुअघि आधिकारिक तथा विश्वसनीय मूल स्रोतबाट पुष्टि गर्नुहोस्। कुनै सुझाव, सुधार वा त्रुटि भेटिएमा <a href="/legal/contact" style="color:#edbd62">Contact Us</a> मार्फत जानकारी दिनुहोस्।</p><p><strong>Content note:</strong> Information on this page may be compiled from publicly available online sources and references. We cannot guarantee that every statement has been independently verified or is error-free. Please verify important information with authoritative original sources. Suggestions and corrections are welcome via <a href="/legal/contact" style="color:#edbd62">Contact Us</a>.</p></div></footer>';
     if (!html.includes('id="granshi-content-note"')) {
-      if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, contentNotice + "\n</body>");
+      if (/<\/body>/i.test(html)) html = html.replace(/<\/body>(?![\s\S]*<\/body>)/i, () => contentNotice + "\n</body>");
       else html += contentNotice;
     }
     return new Response(html, {
